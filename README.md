@@ -1,0 +1,1 @@
+# gnome-ticker-price-extension
