@@ -13,10 +13,11 @@ const HISTORY_LOOKBACK_DAYS = 7;
 const DEFAULT_TEXT_COLOR = '#ffffff';
 const POSITIVE_COLOR = '#3FB950';
 const NEGATIVE_COLOR = '#F85149';
+const US_MARKET_TIME_ZONE = 'America/New_York';
 const TICKERS = [
-    {label: 'SPX', symbol: '^spx', priceDecimals: 0},
-    {label: 'ETH', symbol: 'eth.v', priceDecimals: 0},
-    {label: 'BTC', symbol: 'btc.v', priceDecimals: 0},
+    {label: 'SPX', symbol: '^spx', priceDecimals: 0, marketType: 'us-session'},
+    {label: 'ETH', symbol: 'eth.v', priceDecimals: 0, marketType: 'always-open'},
+    {label: 'BTC', symbol: 'btc.v', priceDecimals: 0, marketType: 'always-open'},
 ];
 
 const TickerIndicator = GObject.registerClass(
@@ -78,6 +79,8 @@ export default class HelloWorldExtension extends Extension {
     constructor(metadata) {
         super(metadata);
         this._indicator = null;
+        this._latestQuotesBySymbol = new Map();
+        this._previousCloseCache = new Map();
         this._refreshTimeoutId = 0;
         this._session = new Soup.Session();
     }
@@ -89,13 +92,13 @@ export default class HelloWorldExtension extends Extension {
         // side of the panel without displacing the user's existing status icons
         // from the far-right edge.
         Main.panel.addToStatusArea(this.uuid, this._indicator, 0, 'right');
-        this._refreshPrices();
+        this._refreshPrices(true);
 
         this._refreshTimeoutId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             REFRESH_INTERVAL_SECONDS,
             () => {
-                this._refreshPrices();
+                this._refreshPrices(false);
                 return GLib.SOURCE_CONTINUE;
             }
         );
@@ -107,25 +110,34 @@ export default class HelloWorldExtension extends Extension {
             this._refreshTimeoutId = 0;
         }
 
+        this._latestQuotesBySymbol.clear();
+        this._previousCloseCache.clear();
         this._indicator?.destroy();
         this._indicator = null;
     }
 
-    async _refreshPrices() {
-        let quotePricesBySymbol;
+    async _refreshPrices(forceRefreshAll = false) {
+        const tickersToRefresh = forceRefreshAll
+            ? TICKERS
+            : TICKERS.filter(ticker => this._shouldRefreshTicker(ticker));
 
-        try {
-            const quoteCsv = await this._fetchText(this._buildBatchQuoteUrl());
-            quotePricesBySymbol = this._parseBatchQuotePrices(quoteCsv);
-        } catch (error) {
-            logError(error, `${this.uuid}: failed to refresh batched quotes`);
-            quotePricesBySymbol = new Map();
+        if (tickersToRefresh.length > 0) {
+            try {
+                const quoteCsv = await this._fetchText(this._buildBatchQuoteUrl(tickersToRefresh));
+                const quotesBySymbol = this._parseBatchQuotes(quoteCsv, tickersToRefresh.length);
+
+                quotesBySymbol.forEach((quote, symbol) => {
+                    this._latestQuotesBySymbol.set(symbol, quote);
+                });
+            } catch (error) {
+                logError(error, `${this.uuid}: failed to refresh batched quotes`);
+            }
         }
 
         const entries = await Promise.all(
             TICKERS.map(async ticker => {
                 try {
-                    return await this._fetchTickerEntry(ticker, quotePricesBySymbol);
+                    return await this._fetchTickerEntry(ticker);
                 } catch (error) {
                     logError(error, `${this.uuid}: failed to refresh ${ticker.label}`);
 
@@ -146,23 +158,40 @@ export default class HelloWorldExtension extends Extension {
         this._indicator.setEntries(entries);
     }
 
-    async _fetchTickerEntry(ticker, quotePricesBySymbol) {
-        const latestPrice = quotePricesBySymbol.get(ticker.symbol.toUpperCase());
+    async _fetchTickerEntry(ticker) {
+        const quote = this._latestQuotesBySymbol.get(ticker.symbol.toUpperCase());
 
-        if (!Number.isFinite(latestPrice))
+        if (!quote)
             throw new Error(`Missing batched quote for ${ticker.symbol}`);
 
-        const historyCsv = await this._fetchText(this._buildHistoryUrl(ticker.symbol));
-        const previousClose = this._parsePreviousClose(historyCsv);
-        const percentChange = ((latestPrice - previousClose) / previousClose) * 100;
+        const previousClose = await this._getPreviousClose(ticker, quote.quoteDate);
+        const percentChange = ((quote.price - previousClose) / previousClose) * 100;
 
         return {
             label: ticker.label,
-            priceText: this._formatPrice(latestPrice, ticker.priceDecimals),
+            priceText: this._formatPrice(quote.price, ticker.priceDecimals),
             arrow: this._getArrow(percentChange),
             percentText: `${Math.abs(percentChange).toFixed(1)}%`,
             changeColor: this._getChangeColor(percentChange),
         };
+    }
+
+    async _getPreviousClose(ticker, quoteDate) {
+        const cacheKey = ticker.symbol.toUpperCase();
+        const cachedEntry = this._previousCloseCache.get(cacheKey);
+
+        if (cachedEntry?.quoteDate === quoteDate)
+            return cachedEntry.previousClose;
+
+        const historyCsv = await this._fetchText(this._buildHistoryUrl(ticker.symbol));
+        const previousClose = this._parsePreviousClose(historyCsv, quoteDate);
+
+        this._previousCloseCache.set(cacheKey, {
+            quoteDate,
+            previousClose,
+        });
+
+        return previousClose;
     }
 
     async _fetchText(url) {
@@ -171,8 +200,8 @@ export default class HelloWorldExtension extends Extension {
         return new TextDecoder().decode(bytes.get_data()).trim();
     }
 
-    _buildBatchQuoteUrl() {
-        const joinedSymbols = TICKERS
+    _buildBatchQuoteUrl(tickers) {
+        const joinedSymbols = tickers
             .map(ticker => ticker.symbol)
             .join('+');
 
@@ -194,8 +223,8 @@ export default class HelloWorldExtension extends Extension {
         return `${year}${month}${day}`;
     }
 
-    _parseBatchQuotePrices(csv) {
-        const pricesBySymbol = new Map();
+    _parseBatchQuotes(csv, expectedCount) {
+        const quotesBySymbol = new Map();
         const rows = csv
             .split('\n')
             .map(line => line.trim())
@@ -204,36 +233,68 @@ export default class HelloWorldExtension extends Extension {
         rows.forEach(row => {
             const fields = row.split(',');
             const symbol = fields[0]?.trim().toUpperCase();
+            const quoteDate = this._normalizeQuoteDate(fields[1]?.trim() ?? '');
             const price = Number.parseFloat(fields[6]?.trim() ?? '');
 
-            if (!symbol || !Number.isFinite(price))
+            if (!symbol || !quoteDate || !Number.isFinite(price))
                 throw new Error(`Unexpected batched quote row: ${row}`);
 
-            pricesBySymbol.set(symbol, price);
+            quotesBySymbol.set(symbol, {price, quoteDate});
         });
 
-        if (pricesBySymbol.size !== TICKERS.length)
+        if (quotesBySymbol.size !== expectedCount)
             throw new Error(`Unexpected batched quote response: ${csv}`);
 
-        return pricesBySymbol;
+        return quotesBySymbol;
     }
 
-    _parsePreviousClose(csv) {
+    _parsePreviousClose(csv, quoteDate) {
         const rows = csv
             .split('\n')
             .slice(1)
-            .filter(line => line.trim() !== '');
+            .filter(line => line.trim() !== '')
+            .map(line => {
+                const fields = line.split(',');
+                return {
+                    date: this._normalizeQuoteDate(fields[0]?.trim() ?? ''),
+                    close: Number.parseFloat(fields[4]?.trim() ?? ''),
+                };
+            });
 
         if (rows.length < 2)
             throw new Error(`Not enough history rows: ${csv}`);
 
-        const previousFields = rows.at(-2).split(',');
-        const previousClose = Number.parseFloat(previousFields[4]?.trim() ?? '');
+        const previousRow = rows.findLast(row => row.date && row.date < quoteDate);
+        const previousClose = previousRow?.close;
 
         if (!Number.isFinite(previousClose))
             throw new Error(`Unexpected history response: ${csv}`);
 
         return previousClose;
+    }
+
+    _normalizeQuoteDate(dateText) {
+        const normalized = dateText.replaceAll('-', '');
+        return /^\d{8}$/.test(normalized) ? normalized : '';
+    }
+
+    _shouldRefreshTicker(ticker) {
+        if (ticker.marketType === 'always-open')
+            return true;
+
+        if (ticker.marketType === 'us-session')
+            return !this._isUsMarketWeekend();
+
+        return true;
+    }
+
+    _isUsMarketWeekend() {
+        const weekday = new Intl.DateTimeFormat('en-US', {
+            timeZone: US_MARKET_TIME_ZONE,
+            weekday: 'short',
+        }).format(new Date());
+
+        return weekday === 'Sat' || weekday === 'Sun';
     }
 
     _formatPrice(price, decimals) {
