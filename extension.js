@@ -49,14 +49,21 @@ export default class HelloWorldExtension extends Extension {
     }
 
     async _refreshPrice() {
-        const message = Soup.Message.new('GET', API_URL);
-        const bytes = await this._session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null);
+        try {
+            const message = Soup.Message.new('GET', API_URL);
+            const bytes = await this._session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null);
 
-        const csv = new TextDecoder().decode(bytes.get_data()).trim();
-        const fields = csv.split(',');
-        const price = fields[6]?.trim();
+            const csv = new TextDecoder().decode(bytes.get_data()).trim();
+            const fields = csv.split(',');
+            const price = fields[6]?.trim();
 
-        if (price)
+            if (!price)
+                throw new Error(`Unexpected response: ${csv}`);
+
             this._indicator?.setText(`BTC ${price}`);
+        } catch (error) {
+            logError(error, `${this.uuid}: failed to refresh BTC price`);
+            this._indicator?.setText('BTC --');
+        }
     }
 }
