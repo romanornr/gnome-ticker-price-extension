@@ -28,21 +28,23 @@ This extension uses the UUID:
 ticker-price-extension@romano
 ```
 
-### 1. Create the extension directory
+### Option 1: Copy-based install
 
 ```bash
-mkdir -p ~/.local/share/gnome-shell/extensions/ticker-price-extension@romano
+./install.sh
 ```
 
-### 2. Copy the extension files
+This copies `metadata.json` and `extension.js` into the extension directory.
 
-From this repository directory, run:
+### Option 2: Symlink-based dev install
 
 ```bash
-cp metadata.json extension.js ~/.local/share/gnome-shell/extensions/ticker-price-extension@romano/
+./install-dev.sh
 ```
 
-### 3. Enable the extension
+This links the installed extension directory directly to this repository, which is the better development workflow on Wayland because you do not need to recopy files after each edit.
+
+### Enable the extension
 
 ```bash
 gnome-extensions enable ticker-price-extension@romano
@@ -72,6 +74,14 @@ then press Enter.
 
 A full shell restart is not available the same way. Log out and log back in.
 
+With `./install-dev.sh`, the usual loop becomes:
+
+```text
+edit files in the repo -> log out -> log back in
+```
+
+You do not need to rerun install or remove scripts for each code change.
+
 You can then disable and re-enable the extension:
 
 ```bash
@@ -87,10 +97,10 @@ gnome-extensions enable ticker-price-extension@romano
 gnome-extensions disable ticker-price-extension@romano
 ```
 
-### Remove the installed extension files
+### Remove the installed extension files or symlink
 
 ```bash
-rm -rf ~/.local/share/gnome-shell/extensions/ticker-price-extension@romano
+./remove.sh
 ```
 
 After removal, log out and back in, or reload GNOME Shell if you are on Xorg.
