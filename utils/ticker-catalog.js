@@ -5,8 +5,7 @@ import {FX_TICKERS} from './catalog/fx.js';
 import {US_ETF_TICKERS} from './catalog/us-etf.js';
 import {US_EQUITY_TICKERS} from './catalog/us-equity.js';
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from './asset-categories.js';
-import {scoreHyperliquidCatalogEntry} from './hyperliquid.js';
-import {scoreKrakenCatalogEntry} from './kraken.js';
+import {getCryptoProviderAdapter} from './crypto-providers/index.js';
 
 /*
  * The ticker catalog is the search/lookup layer used by prefs.
@@ -124,10 +123,8 @@ function scoreCuratedTicker(entry, assetCategory, normalizedQuery) {
 
 /* Provider-specific crypto scoring is delegated so ticker-catalog stays orchestration-oriented, not provider-aware. */
 function scoreCryptoCatalogEntry(entry, query, cryptoProvider) {
-    if ((cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN) === CRYPTO_PROVIDERS.HYPERLIQUID)
-        return scoreHyperliquidCatalogEntry(entry, query);
-
-    return scoreKrakenCatalogEntry(entry, query);
+    return getCryptoProviderAdapter(cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN)
+        .scoreCatalogEntry(entry, query);
 }
 
 /* prefs can swap between static curated lists and runtime crypto catalogs through this single catalog selector. */

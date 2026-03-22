@@ -2,12 +2,7 @@ import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
-import {
-    createHyperliquidQuote,
-    fetchHyperliquidMarketSnapshots,
-    HYPERLIQUID_WEBSOCKET_URL,
-    normalizeHyperliquidLiveSymbol,
-} from '../../utils/hyperliquid.js';
+import {hyperliquidAdapter} from '../../utils/crypto-providers/hyperliquid-adapter.js';
 import {LiveWebsocketProvider} from './live-websocket-provider.js';
 
 /*
@@ -23,7 +18,7 @@ export async function refresh(tickers, {session, quoteStore}) {
     if (!session || tickers.length === 0)
         return new Map();
 
-    const snapshots = await fetchHyperliquidMarketSnapshots(session);
+    const snapshots = await hyperliquidAdapter.fetchMarketSnapshots(session);
     const perpsBySymbol = new Map(snapshots.perps.map(entry => [entry.liveSymbol, entry]));
     const spotsBySymbol = new Map(snapshots.spots.map(entry => [entry.liveSymbol, entry]));
     const quotesBySymbol = new Map();
@@ -33,7 +28,7 @@ export async function refresh(tickers, {session, quoteStore}) {
             ? spotsBySymbol.get(ticker.liveSymbol)
             : perpsBySymbol.get(ticker.liveSymbol);
         const existingQuote = quoteStore?.getQuote(ticker.symbol);
-        const quote = createHyperliquidQuote(entry, existingQuote?.previousClose);
+        const quote = hyperliquidAdapter.createQuote(entry, existingQuote?.previousClose);
         if (quote)
             quotesBySymbol.set(ticker.symbol.toUpperCase(), quote);
     });
@@ -60,7 +55,7 @@ export class HyperliquidLiveProvider extends LiveWebsocketProvider {
 
     /* Hyperliquid connection setup is just the provider-specific websocket endpoint for the shared base lifecycle. */
     async _openConnection(session) {
-        const message = Soup.Message.new('GET', HYPERLIQUID_WEBSOCKET_URL);
+        const message = Soup.Message.new('GET', hyperliquidAdapter.websocketUrl);
         return new Promise((resolve, reject) => {
             session.websocket_connect_async(
                 message,
@@ -100,13 +95,13 @@ export class HyperliquidLiveProvider extends LiveWebsocketProvider {
         if (payload?.channel !== 'activeAssetCtx' || !payload?.data?.coin || !payload?.data?.ctx)
             return null;
 
-        const liveSymbol = normalizeHyperliquidLiveSymbol(payload.data.coin);
+        const liveSymbol = hyperliquidAdapter.normalizeLiveSymbol(payload.data.coin);
         const tickerSymbol = this._getSymbolToTickerSymbolMap().get(liveSymbol);
         if (!tickerSymbol)
             return null;
 
         const existingQuote = this._quoteStore?.getQuote(tickerSymbol);
-        const quote = createHyperliquidQuote({
+        const quote = hyperliquidAdapter.createQuote({
             liveSymbol,
             ctx: payload.data.ctx,
         }, existingQuote?.previousClose);

@@ -1,6 +1,5 @@
 import {CRYPTO_PROVIDERS} from '../asset-categories.js';
-import {loadHyperliquidMarkets} from '../hyperliquid.js';
-import {loadKrakenSpotPairs} from '../kraken.js';
+import {loadCryptoProviderCatalog} from '../crypto-providers/index.js';
 import {
     getCatalogMatches,
     getCryptoCatalogLoadingMessage,
@@ -19,9 +18,7 @@ import {
  */
 /* The dialog controller calls this provider switchboard to load the correct runtime crypto catalog. */
 export async function loadCryptoCatalog(cryptoProvider) {
-    return cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-        ? loadHyperliquidMarkets()
-        : loadKrakenSpotPairs();
+    return loadCryptoProviderCatalog(cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN);
 }
 
 /* The dialog controller uses this pure row-model builder instead of mixing search policy into GTK widget code. */

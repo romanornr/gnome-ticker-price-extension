@@ -13,6 +13,7 @@ import {
     FORMAT_PRESETS,
     SEPARATOR_STYLES,
 } from './display-settings.js';
+import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './panel-sides.js';
 import {
     cloneTicker as cloneTickerConfig,
     normalizeTickerConfig,
@@ -29,15 +30,13 @@ export const SETTINGS_KEYS = {
     SEPARATOR_STYLE: 'separator-style',
 };
 
-export const LEFT_PANEL_SIDE = 'left';
-export const RIGHT_PANEL_SIDE = 'right';
-
 export {ASSET_CATEGORIES, MARKET_TYPES, getAssetCategoryOptions};
 export {
     CRYPTO_PROVIDERS,
     getCryptoProviderOptions,
     getDefaultCryptoProvider,
 };
+export {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE};
 
 export const DEFAULT_TICKERS = [
     {
@@ -193,17 +192,6 @@ export function cloneTicker(ticker) {
 
 function cloneTickers(tickers) {
     return tickers.map(cloneTicker);
-}
-
-function normalizeMarketType(marketType) {
-    switch (marketType) {
-    case MARKET_TYPES.ALWAYS_OPEN:
-    case MARKET_TYPES.WEEKDAY_SESSION:
-    case MARKET_TYPES.US_SESSION:
-        return marketType;
-    default:
-        return MARKET_TYPES.US_SESSION;
-    }
 }
 
 function normalizeFormatPreset(formatPreset) {

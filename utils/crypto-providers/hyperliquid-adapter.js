@@ -1,16 +1,15 @@
 import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from './asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../asset-categories.js';
 
 /*
- * Hyperliquid helpers cover three system responsibilities in one provider area:
- * - runtime market discovery for prefs search
- * - symbol normalization/scoring for catalog selection
- * - REST/live quote normalization for the quote pipeline
+ * This module is the Hyperliquid provider adapter implementation.
  *
- * Higher layers call into these helpers instead of embedding Hyperliquid's API
- * response shapes directly in prefs or quote orchestration.
+ * It owns Hyperliquid-specific market discovery, symbol normalization, catalog
+ * scoring, quote normalization, and transport helpers. Both prefs-side catalog
+ * flows and runtime quote providers depend on this module so Hyperliquid
+ * behavior stays behind one provider boundary.
  */
 export const HYPERLIQUID_API_URL = 'https://api.hyperliquid.xyz/info';
 export const HYPERLIQUID_WEBSOCKET_URL = 'wss://api.hyperliquid.xyz/ws';
@@ -170,6 +169,18 @@ export async function postHyperliquidInfo(session, body) {
     return JSON.parse(new TextDecoder().decode(bytes.get_data()));
 }
 
+/* Runtime layers use this adapter object for both shared and Hyperliquid-specific capabilities. */
+export const hyperliquidAdapter = {
+    provider: CRYPTO_PROVIDERS.HYPERLIQUID,
+    websocketUrl: HYPERLIQUID_WEBSOCKET_URL,
+    loadCatalog: loadHyperliquidMarkets,
+    normalizeLiveSymbol: normalizeHyperliquidLiveSymbol,
+    normalizeTickerSymbol: normalizeHyperliquidTickerSymbol,
+    scoreCatalogEntry: scoreHyperliquidCatalogEntry,
+    createQuote: createHyperliquidQuote,
+    fetchMarketSnapshots: fetchHyperliquidMarketSnapshots,
+};
+
 /* Cached market lists are cloned before returning so callers cannot mutate shared provider state. */
 function cloneHyperliquidCatalogEntries(entries) {
     return entries.map(entry => ({
@@ -179,7 +190,6 @@ function cloneHyperliquidCatalogEntries(entries) {
 }
 
 /* The runtime crypto catalog is assembled once from both perp and spot discovery endpoints. */
-/* Runtime market discovery combines spot and perp listings into the dialog's unified crypto catalog. */
 async function _fetchHyperliquidMarkets() {
     const session = new Soup.Session();
 

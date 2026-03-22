@@ -1,12 +1,15 @@
 import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
-import {ASSET_CATEGORIES, MARKET_TYPES} from './asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../asset-categories.js';
 
 /*
- * Kraken helpers play the same role for Kraken that hyperliquid.js plays for
- * Hyperliquid: they isolate provider-specific discovery, normalization, and
- * search scoring from the prefs and provider runtime layers.
+ * This module is the Kraken provider adapter implementation.
+ *
+ * It owns Kraken-specific discovery, symbol normalization, catalog scoring,
+ * and runtime transport metadata. Higher layers import the adapter or its
+ * exported helpers from here so Kraken behavior lives behind one provider
+ * boundary instead of a legacy utility module.
  */
 export const KRAKEN_WEBSOCKET_URL = 'wss://ws.kraken.com/v2';
 
@@ -37,6 +40,7 @@ export function createKrakenCatalogEntry(pair) {
 
     return {
         assetCategory: ASSET_CATEGORIES.CRYPTO,
+        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         label: liveSymbol || `${base}/${quote}`,
         symbol: normalizedSymbol,
         priceDecimals: clampDecimals(pair?.price_precision),
@@ -112,6 +116,16 @@ export function scoreKrakenCatalogEntry(entry, query) {
 
     return score;
 }
+
+/* Runtime layers use this adapter object for shared provider capabilities and metadata. */
+export const krakenAdapter = {
+    provider: CRYPTO_PROVIDERS.KRAKEN,
+    websocketUrl: KRAKEN_WEBSOCKET_URL,
+    loadCatalog: loadKrakenSpotPairs,
+    normalizeLiveSymbol: normalizeKrakenLiveSymbol,
+    normalizeTickerSymbol: normalizeKrakenTickerSymbol,
+    scoreCatalogEntry: scoreKrakenCatalogEntry,
+};
 
 /* Cached Kraken pair lists are cloned to keep callers from mutating shared provider state. */
 function cloneKrakenSpotPairs(pairs) {

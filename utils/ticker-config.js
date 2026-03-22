@@ -5,17 +5,8 @@ import {
     getAssetCategoryDefaultMarketType,
     getDefaultCryptoProvider,
 } from './asset-categories.js';
-import {
-    normalizeHyperliquidLiveSymbol,
-    normalizeHyperliquidTickerSymbol,
-} from './hyperliquid.js';
-import {
-    normalizeKrakenLiveSymbol,
-    normalizeKrakenTickerSymbol,
-} from './kraken.js';
-
-const LEFT_PANEL_SIDE = 'left';
-const RIGHT_PANEL_SIDE = 'right';
+import {getCryptoProviderAdapter} from './crypto-providers/index.js';
+import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './panel-sides.js';
 
 const SUPPORTED_LIVE_TICKERS = [
     {
@@ -202,14 +193,11 @@ function clampInteger(value, min, max, fallback) {
 }
 
 function normalizeTickerSymbolForProvider(symbol, rawLiveSymbol, cryptoProvider) {
-    const liveSymbol = normalizeCryptoLiveSymbol(rawLiveSymbol, cryptoProvider);
+    const adapter = getCryptoProviderAdapter(cryptoProvider);
+    const liveSymbol = adapter.normalizeLiveSymbol(rawLiveSymbol);
 
-    if (liveSymbol !== '') {
-        if (cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID)
-            return normalizeHyperliquidTickerSymbol(liveSymbol);
-
-        return normalizeKrakenTickerSymbol(liveSymbol);
-    }
+    if (liveSymbol !== '')
+        return adapter.normalizeTickerSymbol(liveSymbol);
 
     /*
      * This preserves older saved Kraken ticker ids from before the extension
@@ -266,8 +254,5 @@ function hasKnownCryptoProvider(cryptoProvider) {
 }
 
 function normalizeCryptoLiveSymbol(rawLiveSymbol, cryptoProvider) {
-    if (cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID)
-        return normalizeHyperliquidLiveSymbol(rawLiveSymbol);
-
-    return normalizeKrakenLiveSymbol(rawLiveSymbol);
+    return getCryptoProviderAdapter(cryptoProvider).normalizeLiveSymbol(rawLiveSymbol);
 }

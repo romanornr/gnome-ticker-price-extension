@@ -20,12 +20,14 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `services/providers/kraken-live.js`: Kraken live quote adapter, subscription management, and reconnect handling
 - `services/providers/hyperliquid-live.js`: Hyperliquid live quote adapter plus REST fallback snapshot normalization
 - `README.md`: user-facing setup notes, ticker add flow, and curated catalog editing guide
+- `PROVIDER_ADAPTER_REFACTOR_PLAN.md`: implementation plan for introducing a shared crypto provider adapter contract across Kraken and Hyperliquid
 - `CODE_STYLE_GUIDE.md`: repo-local coding and commenting contract intended to be understandable by human contributors and coding agents
 - `utils/format.js`: display-entry formatting and color helpers
 - `utils/asset-categories.js`: shared asset-category metadata, category search terms, and default market-type mapping
+- `utils/crypto-providers/index.js`: crypto provider switchboard that exposes the shared adapter seam to prefs and ticker normalization layers
+- `utils/crypto-providers/kraken-adapter.js`: Kraken provider adapter implementation for catalog loading, symbol normalization, scoring, and websocket metadata
+- `utils/crypto-providers/hyperliquid-adapter.js`: Hyperliquid provider adapter implementation for catalog loading, symbol normalization, quote creation, and REST/websocket metadata
 - `utils/display-settings.js`: display preset defaults, separator metadata, and refresh-interval option helpers
-- `utils/hyperliquid.js`: Hyperliquid REST/WebSocket helpers for spot and perp discovery, symbol normalization, and runtime crypto catalog entries
-- `utils/kraken.js`: Kraken WebSocket helpers for instrument discovery, symbol normalization, and runtime crypto catalog entries
 - `utils/market-schedule.js`: shared market-hours and refresh-cadence rules using `America/New_York`
 - `utils/settings.js`: shared settings defaults, validation, and settings-backed ticker/display loading
 - `utils/ticker-config.js`: saved ticker normalization, serialization, asset inference, and legacy compatibility policy

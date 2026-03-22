@@ -2,7 +2,7 @@ import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
-import {KRAKEN_WEBSOCKET_URL} from '../../utils/kraken.js';
+import {krakenAdapter} from '../../utils/crypto-providers/kraken-adapter.js';
 import {LiveWebsocketProvider} from './live-websocket-provider.js';
 
 /*
@@ -28,7 +28,7 @@ export class KrakenLiveProvider extends LiveWebsocketProvider {
 
     /* Kraken connection setup is just the provider-specific websocket endpoint for the shared base lifecycle. */
     async _openConnection(session) {
-        const message = Soup.Message.new('GET', KRAKEN_WEBSOCKET_URL);
+        const message = Soup.Message.new('GET', krakenAdapter.websocketUrl);
         return new Promise((resolve, reject) => {
             session.websocket_connect_async(
                 message,
