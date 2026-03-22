@@ -6,8 +6,10 @@ export function createLoadingEntries(tickers) {
     return tickers.map(ticker => ({
         label: ticker.label,
         priceText: '...',
+        displayPrice: null,
         arrow: '',
         percentText: '',
+        priceColor: DEFAULT_TEXT_COLOR,
         changeColor: DEFAULT_TEXT_COLOR,
     }));
 }
@@ -16,8 +18,10 @@ export function createErrorEntry(label) {
     return {
         label,
         priceText: '--',
+        displayPrice: null,
         arrow: '',
         percentText: '',
+        priceColor: DEFAULT_TEXT_COLOR,
         changeColor: DEFAULT_TEXT_COLOR,
     };
 }
@@ -28,8 +32,10 @@ export function createDisplayEntry(ticker, quote, previousClose) {
     return {
         label: ticker.label,
         priceText: formatPrice(quote.price, ticker.priceDecimals),
+        displayPrice: quote.price,
         arrow: getArrow(percentChange),
         percentText: `${Math.abs(percentChange).toFixed(1)}%`,
+        priceColor: DEFAULT_TEXT_COLOR,
         changeColor: getChangeColor(percentChange),
     };
 }

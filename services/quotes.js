@@ -6,6 +6,9 @@ import {
     createDisplayEntry,
     createErrorEntry,
     createLoadingEntries,
+    DEFAULT_TEXT_COLOR,
+    NEGATIVE_COLOR,
+    POSITIVE_COLOR,
 } from '../utils/format.js';
 
 const REFRESH_INTERVAL_SECONDS = 300;
@@ -14,6 +17,7 @@ const KRAKEN_WEBSOCKET_URL = 'wss://ws.kraken.com/v2';
 const KRAKEN_TICKER_SYMBOLS = ['BTC/USD', 'ETH/USD'];
 const KRAKEN_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
 const CRYPTO_UI_UPDATE_INTERVAL_SECONDS = 4;
+const PRICE_FLASH_DURATION_MS = 700;
 const US_MARKET_TIME_ZONE = 'America/New_York';
 const KRAKEN_SYMBOL_TO_TICKER_SYMBOL = new Map([
     ['BTC/USD', 'BTC.V'],
@@ -22,8 +26,8 @@ const KRAKEN_SYMBOL_TO_TICKER_SYMBOL = new Map([
 
 export const TICKERS = [
     {label: 'SPX', symbol: '^spx', priceDecimals: 0, marketType: 'us-session'},
-    {label: 'ETH', symbol: 'eth.v', priceDecimals: 2, marketType: 'always-open'},
-    {label: 'BTC', symbol: 'btc.v', priceDecimals: 1, marketType: 'always-open'},
+    {label: 'ETH', symbol: 'eth.v', priceDecimals: 0, marketType: 'always-open'},
+    {label: 'BTC', symbol: 'btc.v', priceDecimals: 0, marketType: 'always-open'},
 ];
 
 export const QuotesService = GObject.registerClass({
@@ -44,6 +48,7 @@ export const QuotesService = GObject.registerClass({
         this._entriesUpdateInProgress = false;
         this._entriesUpdateQueued = false;
         this._lastEntriesUpdateUsec = 0;
+        this._priceFlashTimeoutId = 0;
         this._krakenWebsocket = null;
         this._krakenWebsocketSignalIds = [];
         this._krakenReconnectTimeoutId = 0;
@@ -81,6 +86,7 @@ export const QuotesService = GObject.registerClass({
         this._removeTimeout('_refreshTimeoutId');
         this._removeTimeout('_entriesUpdateTimeoutId');
         this._removeTimeout('_krakenReconnectTimeoutId');
+        this._removeTimeout('_priceFlashTimeoutId');
 
         this._entriesUpdateInProgress = false;
         this._entriesUpdateQueued = false;
@@ -188,9 +194,10 @@ export const QuotesService = GObject.registerClass({
             );
 
             if (this._running) {
-                this._entries = entries;
+                this._entries = this._decorateEntriesWithPriceFlash(entries);
                 this._lastEntriesUpdateUsec = GLib.get_monotonic_time();
                 this.emit('entries-changed');
+                this._schedulePriceFlashReset();
             }
         } finally {
             this._entriesUpdateInProgress = false;
@@ -503,6 +510,56 @@ export const QuotesService = GObject.registerClass({
         }).format(new Date());
 
         return weekday === 'Sat' || weekday === 'Sun';
+    }
+
+    _decorateEntriesWithPriceFlash(entries) {
+        const previousEntriesByLabel = new Map(
+            this._entries.map(entry => [entry.label, entry])
+        );
+
+        return entries.map(entry => {
+            const previousEntry = previousEntriesByLabel.get(entry.label);
+            const previousPrice = previousEntry?.displayPrice;
+
+            if (
+                !previousEntry ||
+                !Number.isFinite(previousPrice) ||
+                !Number.isFinite(entry.displayPrice) ||
+                previousEntry.priceText === entry.priceText
+            ) {
+                return entry;
+            }
+
+            return {
+                ...entry,
+                priceColor: entry.displayPrice > previousPrice ? POSITIVE_COLOR : NEGATIVE_COLOR,
+            };
+        });
+    }
+
+    _schedulePriceFlashReset() {
+        this._removeTimeout('_priceFlashTimeoutId');
+
+        if (!this._entries.some(entry => entry.priceColor !== DEFAULT_TEXT_COLOR))
+            return;
+
+        this._priceFlashTimeoutId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            PRICE_FLASH_DURATION_MS,
+            () => {
+                this._priceFlashTimeoutId = 0;
+
+                if (!this._running)
+                    return GLib.SOURCE_REMOVE;
+
+                this._entries = this._entries.map(entry => ({
+                    ...entry,
+                    priceColor: DEFAULT_TEXT_COLOR,
+                }));
+                this.emit('entries-changed');
+                return GLib.SOURCE_REMOVE;
+            }
+        );
     }
 
     _removeTimeout(propertyName) {

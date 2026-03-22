@@ -33,7 +33,7 @@ class TickerIndicator extends PanelMenu.Button {
             this._content.add_child(new St.Label({
                 text: `${entry.label} ${entry.priceText}`,
                 y_align: Clutter.ActorAlign.CENTER,
-                style: `color: ${DEFAULT_TEXT_COLOR};`,
+                style: `color: ${entry.priceColor ?? DEFAULT_TEXT_COLOR};`,
             }));
 
             if (!entry.arrow || !entry.percentText)
