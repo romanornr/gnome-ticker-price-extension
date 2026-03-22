@@ -28,6 +28,7 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/kraken.js`: Kraken WebSocket helpers for instrument discovery, symbol normalization, and runtime crypto catalog entries
 - `utils/market-schedule.js`: shared market-hours and refresh-cadence rules using `America/New_York`
 - `utils/settings.js`: shared settings defaults, validation, and settings-backed ticker/display loading
+- `utils/ticker-config.js`: saved ticker normalization, serialization, asset inference, and legacy compatibility policy
 - `utils/prefs/ticker-dialog-state.js`: pure ticker-dialog validation, crypto resolution, and form-to-config normalization helpers
 - `utils/prefs/catalog-suggestions.js`: prefs-side crypto catalog loading and suggestion row model generation
 - `utils/prefs/ticker-dialog-controller.js`: ticker dialog orchestration, state transitions, verification flow, and suggestion wiring for prefs

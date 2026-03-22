@@ -20,6 +20,7 @@ gjs -m services/quote-store.js
 gjs -m utils/display-settings.js
 gjs -m utils/market-schedule.js
 gjs -m utils/settings.js
+gjs -m utils/ticker-config.js
 gjs -m utils/prefs/catalog-suggestions.js
 gjs -m utils/prefs/ticker-dialog-state.js
 

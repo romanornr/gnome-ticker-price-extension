@@ -1,6 +1,10 @@
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../asset-categories.js';
+import {
+    ASSET_CATEGORIES,
+    CRYPTO_PROVIDERS,
+    getAssetCategoryDefaultMarketType,
+    getDefaultCryptoProvider,
+} from '../asset-categories.js';
 import {findCuratedTicker, matchCuratedTickers, resolveCryptoCatalogTicker} from '../ticker-catalog.js';
-import {getDefaultCryptoProvider, getMarketTypeForAssetCategory} from '../settings.js';
 
 /*
  * These are the pure state and validation rules behind the ticker dialog.
@@ -138,7 +142,7 @@ export function buildTickerConfig({
             : symbolText.trim().toLowerCase(),
         priceDecimals,
         panelSide,
-        marketType: getMarketTypeForAssetCategory(assetCategory),
+        marketType: getAssetCategoryDefaultMarketType(assetCategory),
         assetCategory,
     };
 
