@@ -70,6 +70,28 @@ This is useful because you can:
 
 That is usually the fastest feedback loop available for GNOME Shell extension work.
 
+If you need to confirm whether the shell currently sees the extension at all,
+start with:
+
+```bash
+gnome-extensions info ticker-price-extension@romano
+```
+
+or:
+
+```bash
+gnome-extensions show ticker-price-extension@romano
+```
+
+If those commands return no information, the extension is either not installed
+for the current session or the current environment cannot see the active GNOME
+session bus. In that case, do not trust CLI inspection alone; install the
+extension and verify in the real desktop session.
+
+If `busctl --user list` fails with a permission or transport error, you are not
+in a usable user-bus context for live shell inspection. In that case, local
+`gjs` checks still help, but they do not replace desktop-session verification.
+
 ## 4. Use Looking Glass
 
 GNOME Shell has a built-in inspection and debugging tool called Looking Glass.

@@ -2,6 +2,23 @@
 
 GNOME Shell extension that shows market tickers in the top bar, with curated suggestions for common equities, ETFs, commodities, FX pairs, and crypto catalogs backed by Kraken and Hyperliquid.
 
+## Provider Layout
+
+The crypto provider code is split into two layers:
+
+- `utils/crypto-providers/` for provider semantics such as symbol normalization, catalog loading, scoring, and quote normalization
+- `services/providers/` for runtime transport, provider ownership, and refresh orchestration
+
+The stable adapter entrypoints remain:
+
+- `utils/crypto-providers/kraken-adapter.js`
+- `utils/crypto-providers/hyperliquid-adapter.js`
+
+Their internals are now split by concern under:
+
+- `utils/crypto-providers/kraken/`
+- `utils/crypto-providers/hyperliquid/`
+
 ## Adding Tickers
 
 You can add tickers in two ways:
@@ -52,6 +69,20 @@ This runs:
 - `gjs -m tests/run.js`
 - focused `gjs -m` import checks for the runtime/provider/helper modules that should load outside the GNOME prefs host
 
+The current test suite covers:
+
+- market schedule policy
+- entry-model rendering
+- shared live-provider and live-websocket helpers
+- provider adapters and runtime provider registry
+- Stooq parsing and live-provider payload handling
+- QuotesService orchestration and lifecycle
+- ticker config and prefs dialog state
+
+The current suite count is expected to grow as provider refactors add more
+focused seams. If `tests/run.js` reports more suites than this README lists,
+prefer the code and update the document in the same change.
+
 It intentionally does not import `prefs.js` directly, because the GNOME prefs resource path only exists when the real extension preferences host process launches it.
 
 ## Refactor Regression Workflow
@@ -80,3 +111,5 @@ journalctl --user -f /usr/bin/gnome-shell
    confirm Kraken and Hyperliquid crypto entries receive live updates;
    confirm price changes still flash briefly and then settle back to the default text color.
 6. If a runtime issue appears, add targeted `log()` or `logError()` statements near the relevant provider, orchestrator, or prefs path before doing more refactoring.
+
+If `gnome-extensions info ticker-price-extension@romano` or `gnome-extensions show ticker-price-extension@romano` returns no data, the extension is not currently installed or not visible to the active session. In that case, install it first and repeat the checklist in the real GNOME session.

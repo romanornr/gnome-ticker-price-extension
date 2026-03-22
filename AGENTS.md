@@ -19,16 +19,26 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `services/providers/live-websocket-provider.js`: shared websocket lifecycle base for connect/disconnect/reconnect mechanics across live crypto providers
 - `services/providers/kraken-live.js`: Kraken live quote adapter, subscription management, and reconnect handling
 - `services/providers/hyperliquid-live.js`: Hyperliquid live quote adapter plus REST fallback snapshot normalization
+- `services/providers/runtime-provider-registry.js`: QuotesService-facing runtime provider registry for ownership, lifecycle wiring, and fallback-refresh capabilities
 - `README.md`: user-facing setup notes, ticker add flow, and curated catalog editing guide
-- `PROVIDER_ADAPTER_REFACTOR_PLAN.md`: implementation plan for introducing a shared crypto provider adapter contract across Kraken and Hyperliquid
+- `PROVIDER_ADAPTER_REFACTOR_PLAN.md`: historical note marking the completed adapter migration and redirecting to the current long-term architecture doc
+- `PROVIDER_ARCHITECTURE_LONG_TERM_PLAN.md`: long-term architecture plan covering adapter/runtime boundaries, migration order, and Option C cleanup for crypto providers
 - `CODE_STYLE_GUIDE.md`: repo-local coding and commenting contract intended to be understandable by human contributors and coding agents
 - `utils/format.js`: display-entry formatting and color helpers
 - `utils/asset-categories.js`: shared asset-category metadata, category search terms, and default market-type mapping
 - `utils/crypto-providers/index.js`: crypto provider switchboard that exposes the shared adapter seam to prefs and ticker normalization layers
 - `utils/crypto-providers/kraken-adapter.js`: Kraken provider adapter implementation for catalog loading, symbol normalization, scoring, and websocket metadata
+- `utils/crypto-providers/kraken/catalog.js`: Kraken catalog discovery, cached instrument snapshot loading, and runtime catalog entry normalization
+- `utils/crypto-providers/kraken/quotes.js`: Kraken quote normalization helpers for websocket ticker payloads
+- `utils/crypto-providers/kraken/symbols.js`: Kraken live symbol normalization, saved ticker id derivation, and catalog search scoring
 - `utils/crypto-providers/hyperliquid-adapter.js`: Hyperliquid provider adapter implementation for catalog loading, symbol normalization, quote creation, and REST/websocket metadata
+- `utils/crypto-providers/hyperliquid/catalog.js`: Hyperliquid REST discovery, snapshot loading, and catalog entry normalization for perp and spot markets
+- `utils/crypto-providers/hyperliquid/quotes.js`: Hyperliquid quote normalization helpers shared by REST fallback and live websocket paths
+- `utils/crypto-providers/hyperliquid/symbols.js`: Hyperliquid symbol normalization, spot detection, and catalog search scoring helpers
+- `utils/crypto-providers/shared.js`: intentionally small shared helper layer for provider-agnostic crypto adapter normalization utilities
 - `utils/display-settings.js`: display preset defaults, separator metadata, and refresh-interval option helpers
 - `utils/market-schedule.js`: shared market-hours and refresh-cadence rules using `America/New_York`
+- `utils/panel-sides.js`: shared left/right panel-side constants used by settings, ticker normalization, and UI flows
 - `utils/settings.js`: shared settings defaults, validation, and settings-backed ticker/display loading
 - `utils/ticker-config.js`: saved ticker normalization, serialization, asset inference, and legacy compatibility policy
 - `utils/prefs/ticker-dialog-state.js`: pure ticker-dialog validation, crypto resolution, and form-to-config normalization helpers
