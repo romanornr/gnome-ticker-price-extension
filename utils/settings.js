@@ -40,7 +40,7 @@ export const DEFAULT_TICKERS = [
     {label: 'USO', symbol: 'uso.us', priceDecimals: 2, marketType: MARKET_TYPES.US_SESSION, panelSide: RIGHT_PANEL_SIDE},
     {
         label: 'ETH',
-        symbol: 'eth.v',
+        symbol: 'ethusd',
         priceDecimals: 0,
         marketType: MARKET_TYPES.ALWAYS_OPEN,
         panelSide: RIGHT_PANEL_SIDE,
@@ -49,7 +49,7 @@ export const DEFAULT_TICKERS = [
     },
     {
         label: 'BTC',
-        symbol: 'btc.v',
+        symbol: 'btcusd',
         priceDecimals: 0,
         marketType: MARKET_TYPES.ALWAYS_OPEN,
         panelSide: RIGHT_PANEL_SIDE,
@@ -68,13 +68,13 @@ export const DEFAULT_DISPLAY_SETTINGS = {
 const SUPPORTED_LIVE_TICKERS = [
     {
         label: 'BTC',
-        symbol: 'btc.v',
+        symbol: 'btcusd',
         marketType: MARKET_TYPES.ALWAYS_OPEN,
         liveSymbol: 'BTC/USD',
     },
     {
         label: 'ETH',
-        symbol: 'eth.v',
+        symbol: 'ethusd',
         marketType: MARKET_TYPES.ALWAYS_OPEN,
         liveSymbol: 'ETH/USD',
     },
@@ -204,7 +204,7 @@ function normalizeTickerConfig(rawTicker) {
         return null;
 
     const label = `${rawTicker.label ?? ''}`.trim();
-    const symbol = `${rawTicker.symbol ?? ''}`.trim().toLowerCase();
+    const symbol = normalizeTickerSymbol(`${rawTicker.symbol ?? ''}`.trim().toLowerCase(), rawTicker.liveSymbol);
     if (label === '' || symbol === '')
         return null;
 
@@ -294,6 +294,18 @@ function clampInteger(value, min, max, fallback) {
         return fallback;
 
     return Math.min(max, Math.max(min, parsed));
+}
+
+function normalizeTickerSymbol(symbol, rawLiveSymbol) {
+    const liveSymbol = typeof rawLiveSymbol === 'string' ? rawLiveSymbol : '';
+
+    if (symbol === 'btc.v' && liveSymbol === 'BTC/USD')
+        return 'btcusd';
+
+    if (symbol === 'eth.v' && liveSymbol === 'ETH/USD')
+        return 'ethusd';
+
+    return symbol;
 }
 
 function getSupportedLiveSymbol(ticker, rawLiveSymbol) {

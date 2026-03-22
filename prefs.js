@@ -10,6 +10,7 @@ import {
     getFormatPresetOptions,
     getMarketTypeOptions,
     getRefreshIntervalOptions,
+    getTickersForSide,
     getSeparatorOptions,
     LEFT_PANEL_SIDE,
     loadDisplaySettings,
@@ -34,7 +35,9 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
         this._settings = settings;
         this._window = window;
-        this._tickerGroup = null;
+        this._leftTickerGroup = null;
+        this._rightTickerGroup = null;
+        this._tickerActionsGroup = null;
         this._tickerRows = [];
         this._refreshOptions = getRefreshIntervalOptions();
         this._marketTypeOptions = getMarketTypeOptions();
@@ -44,11 +47,23 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
     }
 
     _build() {
-        this._tickerGroup = new Adw.PreferencesGroup({
-            title: 'Tickers',
-            description: 'Choose which tickers appear, where they live in the panel, and how they refresh.',
+        this._leftTickerGroup = new Adw.PreferencesGroup({
+            title: 'Left Panel Tickers',
+            description: 'Tickers configured to appear on the left side of the panel.',
         });
-        this.add(this._tickerGroup);
+        this.add(this._leftTickerGroup);
+
+        this._rightTickerGroup = new Adw.PreferencesGroup({
+            title: 'Right Panel Tickers',
+            description: 'Tickers configured to appear on the right side of the panel.',
+        });
+        this.add(this._rightTickerGroup);
+
+        this._tickerActionsGroup = new Adw.PreferencesGroup({
+            title: 'Ticker Management',
+            description: 'Restore the built-in ticker list and placement.',
+        });
+        this.add(this._tickerActionsGroup);
 
         const refreshGroup = new Adw.PreferencesGroup({
             title: 'Refresh',
@@ -103,36 +118,67 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
     }
 
     _rebuildTickerRows() {
-        this._tickerRows.forEach(row => this._tickerGroup.remove(row));
-        this._tickerRows = [];
+        this._clearTickerRows();
 
         const tickers = loadTickerConfigs(this._settings);
+        const leftTickers = getTickersForSide(tickers, LEFT_PANEL_SIDE);
+        const rightTickers = getTickersForSide(tickers, RIGHT_PANEL_SIDE);
 
-        tickers.forEach((ticker, index) => {
+        this._addTickerRowsForSide({
+            tickers,
+            visibleTickers: leftTickers,
+            group: this._leftTickerGroup,
+            addSide: LEFT_PANEL_SIDE,
+        });
+        this._addTickerRowsForSide({
+            tickers,
+            visibleTickers: rightTickers,
+            group: this._rightTickerGroup,
+            addSide: RIGHT_PANEL_SIDE,
+        });
+
+        const resetRow = new Adw.ActionRow({
+            title: 'Reset to defaults',
+            subtitle: 'Restore the built-in ticker list and placement.',
+        });
+        resetRow.add_suffix(this._createTextButton('Reset', () => {
+            resetTickerConfigs(this._settings);
+            this._rebuildTickerRows();
+        }));
+        this._addTickerRow(this._tickerActionsGroup, resetRow);
+    }
+
+    _addTickerRowsForSide({tickers, visibleTickers, group, addSide}) {
+        visibleTickers.forEach((ticker, visibleIndex) => {
+            const index = tickers.indexOf(ticker);
             const row = new Adw.ActionRow({
                 title: ticker.label,
-                subtitle: `${ticker.symbol} \u00b7 ${this._formatPanelSide(ticker.panelSide)} \u00b7 ${ticker.priceDecimals} decimals`,
+                subtitle: `${ticker.symbol} \u00b7 ${ticker.priceDecimals} decimals`,
             });
 
             row.add_suffix(this._createIconButton('go-up-symbolic', 'Move up', () => {
-                if (index === 0)
+                if (visibleIndex === 0)
                     return;
 
+                const previousTicker = visibleTickers[visibleIndex - 1];
+                const previousIndex = tickers.indexOf(previousTicker);
                 const nextTickers = [...tickers];
-                [nextTickers[index - 1], nextTickers[index]] = [nextTickers[index], nextTickers[index - 1]];
+                [nextTickers[previousIndex], nextTickers[index]] = [nextTickers[index], nextTickers[previousIndex]];
                 saveTickerConfigs(this._settings, nextTickers);
                 this._rebuildTickerRows();
-            }, index === 0));
+            }, visibleIndex === 0));
 
             row.add_suffix(this._createIconButton('go-down-symbolic', 'Move down', () => {
-                if (index === tickers.length - 1)
+                if (visibleIndex === visibleTickers.length - 1)
                     return;
 
+                const nextTicker = visibleTickers[visibleIndex + 1];
+                const nextIndex = tickers.indexOf(nextTicker);
                 const nextTickers = [...tickers];
-                [nextTickers[index], nextTickers[index + 1]] = [nextTickers[index + 1], nextTickers[index]];
+                [nextTickers[index], nextTickers[nextIndex]] = [nextTickers[nextIndex], nextTickers[index]];
                 saveTickerConfigs(this._settings, nextTickers);
                 this._rebuildTickerRows();
-            }, index === tickers.length - 1));
+            }, visibleIndex === visibleTickers.length - 1));
 
             row.add_suffix(this._createTextButton('Edit', () => {
                 this._presentTickerDialog({
@@ -153,7 +199,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 this._rebuildTickerRows();
             }));
 
-            this._addTickerRow(row);
+            this._addTickerRow(group, row);
         });
 
         const addRow = new Adw.ActionRow({
@@ -166,7 +212,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                     label: '',
                     symbol: '',
                     priceDecimals: 2,
-                    panelSide: RIGHT_PANEL_SIDE,
+                    panelSide: addSide,
                     marketType: this._marketTypeOptions[1].value,
                 },
                 onSave: newTicker => {
@@ -175,17 +221,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 },
             });
         }));
-        this._addTickerRow(addRow);
-
-        const resetRow = new Adw.ActionRow({
-            title: 'Reset to defaults',
-            subtitle: 'Restore the built-in ticker list and placement.',
-        });
-        resetRow.add_suffix(this._createTextButton('Reset', () => {
-            resetTickerConfigs(this._settings);
-            this._rebuildTickerRows();
-        }));
-        this._addTickerRow(resetRow);
+        this._addTickerRow(group, addRow);
     }
 
     _presentTickerDialog({title, initialTicker, onSave}) {
@@ -335,9 +371,14 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         return '';
     }
 
-    _addTickerRow(row) {
-        this._tickerGroup.add(row);
-        this._tickerRows.push(row);
+    _clearTickerRows() {
+        this._tickerRows.forEach(({group, row}) => group.remove(row));
+        this._tickerRows = [];
+    }
+
+    _addTickerRow(group, row) {
+        group.add(row);
+        this._tickerRows.push({group, row});
     }
 
     _createSwitchRow({title, key}) {
@@ -388,10 +429,6 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         });
         button.connect('clicked', onClicked);
         return button;
-    }
-
-    _formatPanelSide(panelSide) {
-        return panelSide === LEFT_PANEL_SIDE ? 'Left' : 'Right';
     }
 }
 
