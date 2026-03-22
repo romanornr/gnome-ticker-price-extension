@@ -191,14 +191,14 @@ export function getCryptoCatalogUnavailableTitle(cryptoProvider) {
 /* Prompt copy nudges the user toward valid provider-specific market shapes. */
 export function getCryptoSearchPrompt(cryptoProvider) {
     return cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-        ? 'Type a perp like BTC or a spot pair like PURR/USDC.'
+        ? 'Type a perp like BTC or ETH, or a spot pair like ETH/USDC.'
         : 'Type a base asset or pair like SOL, SOLUSD, or SOL/USD.';
 }
 
 /* Empty-result copy stays alongside the rest of the dialog's provider-aware search policy. */
 export function getCryptoEmptyStateSubtitle(cryptoProvider) {
     return cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-        ? 'Type an exact Hyperliquid perp like BTC or a spot pair like PURR/USDC.'
+        ? 'Type an exact Hyperliquid perp like BTC or ETH, or a spot pair like ETH/USDC.'
         : 'Type an exact Kraken WebSocket pair like SOL/USD, or keep searching.';
 }
 
