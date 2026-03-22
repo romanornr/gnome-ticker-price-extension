@@ -12,6 +12,7 @@ import {
 } from '../utils/format.js';
 
 const REFRESH_INTERVAL_SECONDS = 300;
+const US_SESSION_OVERNIGHT_REFRESH_INTERVAL_SECONDS = 1800;
 const HISTORY_LOOKBACK_DAYS = 7;
 const KRAKEN_WEBSOCKET_URL = 'wss://ws.kraken.com/v2';
 const KRAKEN_TICKER_SYMBOLS = ['BTC/USD', 'ETH/USD'];
@@ -19,6 +20,8 @@ const KRAKEN_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
 const CRYPTO_UI_UPDATE_INTERVAL_SECONDS = 4;
 const PRICE_FLASH_DURATION_MS = 700;
 const US_MARKET_TIME_ZONE = 'America/New_York';
+const US_MARKET_PREMARKET_START_HOUR = 4;
+const US_MARKET_AFTER_HOURS_END_HOUR = 20;
 const KRAKEN_SYMBOL_TO_TICKER_SYMBOL = new Map([
     ['BTC/USD', 'BTC.V'],
     ['ETH/USD', 'ETH.V'],
@@ -44,6 +47,7 @@ export const QuotesService = GObject.registerClass({
         this._entries = createLoadingEntries(TICKERS);
         this._latestQuotesBySymbol = new Map();
         this._previousCloseCache = new Map();
+        this._lastRefreshTimeBySymbol = new Map();
         this._refreshTimeoutId = 0;
         this._entriesUpdateTimeoutId = 0;
         this._entriesUpdateInProgress = false;
@@ -100,6 +104,7 @@ export const QuotesService = GObject.registerClass({
 
         this._latestQuotesBySymbol.clear();
         this._previousCloseCache.clear();
+        this._lastRefreshTimeBySymbol.clear();
         this._entries = createLoadingEntries(TICKERS);
     }
 
@@ -124,6 +129,10 @@ export const QuotesService = GObject.registerClass({
                 const quotesBySymbol = this._parseBatchQuotes(quoteCsv, tickersToRefresh.length);
                 quotesBySymbol.forEach((quote, symbol) => {
                     this._latestQuotesBySymbol.set(symbol, quote);
+                });
+                const refreshedAtUsec = GLib.get_monotonic_time();
+                tickersToRefresh.forEach(ticker => {
+                    this._lastRefreshTimeBySymbol.set(ticker.symbol.toUpperCase(), refreshedAtUsec);
                 });
             } catch (error) {
                 if (this._running)
@@ -498,10 +507,35 @@ export const QuotesService = GObject.registerClass({
         if (ticker.marketType === 'always-open')
             return true;
 
-        if (ticker.marketType === 'us-session')
-            return !this._isUsMarketWeekend();
+        if (ticker.marketType === 'us-session') {
+            if (this._isUsMarketWeekend())
+                return false;
+
+            return this._hasTickerReachedRefreshCadence(
+                ticker,
+                this._getRefreshIntervalSecondsForTicker(ticker)
+            );
+        }
 
         return true;
+    }
+
+    _hasTickerReachedRefreshCadence(ticker, refreshIntervalSeconds) {
+        const lastRefreshUsec = this._lastRefreshTimeBySymbol.get(ticker.symbol.toUpperCase());
+        if (!lastRefreshUsec)
+            return true;
+
+        const elapsedSeconds = (GLib.get_monotonic_time() - lastRefreshUsec) / 1_000_000;
+        return elapsedSeconds >= refreshIntervalSeconds;
+    }
+
+    _getRefreshIntervalSecondsForTicker(ticker) {
+        if (ticker.marketType !== 'us-session')
+            return REFRESH_INTERVAL_SECONDS;
+
+        return this._isUsMarketExtendedHoursActive()
+            ? REFRESH_INTERVAL_SECONDS
+            : US_SESSION_OVERNIGHT_REFRESH_INTERVAL_SECONDS;
     }
 
     _isUsMarketWeekend() {
@@ -511,6 +545,31 @@ export const QuotesService = GObject.registerClass({
         }).format(new Date());
 
         return weekday === 'Sat' || weekday === 'Sun';
+    }
+
+    _isUsMarketExtendedHoursActive() {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: US_MARKET_TIME_ZONE,
+            hour: 'numeric',
+            hourCycle: 'h23',
+            minute: 'numeric',
+        }).formatToParts(new Date());
+
+        const hour = Number.parseInt(
+            parts.find(part => part.type === 'hour')?.value ?? '',
+            10
+        );
+        const minute = Number.parseInt(
+            parts.find(part => part.type === 'minute')?.value ?? '',
+            10
+        );
+
+        if (!Number.isInteger(hour) || !Number.isInteger(minute))
+            return true;
+
+        const minutesSinceMidnight = (hour * 60) + minute;
+        return minutesSinceMidnight >= US_MARKET_PREMARKET_START_HOUR * 60 &&
+            minutesSinceMidnight < US_MARKET_AFTER_HOURS_END_HOUR * 60;
     }
 
     _decorateEntriesWithPriceFlash(entries) {
