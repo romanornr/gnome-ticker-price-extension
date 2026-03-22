@@ -4,6 +4,10 @@ import {
     getAssetCategoryDefaultMarketType,
     getAssetCategoryOptions,
 } from './asset-categories.js';
+import {
+    normalizeKrakenLiveSymbol,
+    normalizeKrakenTickerSymbol,
+} from './kraken.js';
 
 export const SETTINGS_KEYS = {
     TICKERS_JSON: 'tickers-json',
@@ -257,7 +261,8 @@ function normalizeTickerConfig(rawTicker) {
         return null;
 
     const label = `${rawTicker.label ?? ''}`.trim();
-    const symbol = normalizeTickerSymbol(`${rawTicker.symbol ?? ''}`.trim().toLowerCase(), rawTicker.liveSymbol);
+    const rawLiveSymbol = normalizeKrakenLiveSymbol(rawTicker.liveSymbol);
+    const symbol = normalizeTickerSymbol(`${rawTicker.symbol ?? ''}`.trim().toLowerCase(), rawLiveSymbol);
     if (label === '' || symbol === '')
         return null;
 
@@ -267,7 +272,7 @@ function normalizeTickerConfig(rawTicker) {
         label,
         symbol,
         marketType,
-        liveSymbol: rawTicker.liveSymbol,
+        liveSymbol: rawLiveSymbol,
     });
     const panelSide = normalizePanelSide(rawTicker.panelSide);
     const separatorBefore = typeof rawTicker.separatorBefore === 'string'
@@ -286,7 +291,7 @@ function normalizeTickerConfig(rawTicker) {
     if (separatorBefore !== '')
         ticker.separatorBefore = separatorBefore;
 
-    const liveSymbol = getSupportedLiveSymbol(ticker, rawTicker.liveSymbol);
+    const liveSymbol = getSupportedLiveSymbol(ticker, rawLiveSymbol);
     if (liveSymbol)
         ticker.liveSymbol = liveSymbol;
 
@@ -372,7 +377,10 @@ function clampInteger(value, min, max, fallback) {
 }
 
 function normalizeTickerSymbol(symbol, rawLiveSymbol) {
-    const liveSymbol = typeof rawLiveSymbol === 'string' ? rawLiveSymbol : '';
+    const liveSymbol = normalizeKrakenLiveSymbol(rawLiveSymbol);
+
+    if (liveSymbol !== '')
+        return normalizeKrakenTickerSymbol(liveSymbol);
 
     if (symbol === 'btc.v' && liveSymbol === 'BTC/USD')
         return 'btcusd';
@@ -384,7 +392,11 @@ function normalizeTickerSymbol(symbol, rawLiveSymbol) {
 }
 
 function getSupportedLiveSymbol(ticker, rawLiveSymbol) {
-    const explicitLiveSymbol = typeof rawLiveSymbol === 'string' ? rawLiveSymbol : '';
+    const explicitLiveSymbol = normalizeKrakenLiveSymbol(rawLiveSymbol);
+
+    if (ticker.assetCategory === ASSET_CATEGORIES.CRYPTO && explicitLiveSymbol !== '')
+        return explicitLiveSymbol;
+
     const supportedTicker = SUPPORTED_LIVE_TICKERS.find(candidate =>
         candidate.label === ticker.label &&
         candidate.symbol === ticker.symbol &&
@@ -404,7 +416,7 @@ function inferAssetCategory(ticker) {
         ? ticker.liveSymbol
         : '';
 
-    if (marketType === MARKET_TYPES.ALWAYS_OPEN || liveSymbol !== '')
+    if (marketType === MARKET_TYPES.ALWAYS_OPEN || normalizeKrakenLiveSymbol(liveSymbol) !== '')
         return ASSET_CATEGORIES.CRYPTO;
 
     if (marketType === MARKET_TYPES.WEEKDAY_SESSION) {

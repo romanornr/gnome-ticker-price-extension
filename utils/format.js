@@ -9,7 +9,11 @@ export const POSITIVE_COLOR = '#3FB950';
 export const NEGATIVE_COLOR = '#F85149';
 
 export function createLoadingEntries(tickers, displaySettings = DEFAULT_DISPLAY_SETTINGS) {
-    return tickers.map((ticker, index) => createBaseEntry({
+    return tickers.map((ticker, index) => createLoadingEntry(ticker, index, displaySettings));
+}
+
+export function createLoadingEntry(ticker, index, displaySettings = DEFAULT_DISPLAY_SETTINGS) {
+    return createBaseEntry({
         ticker,
         index,
         displaySettings,
@@ -19,7 +23,7 @@ export function createLoadingEntries(tickers, displaySettings = DEFAULT_DISPLAY_
         percentText: '',
         priceColor: DEFAULT_TEXT_COLOR,
         changeColor: DEFAULT_TEXT_COLOR,
-    }));
+    });
 }
 
 export function createErrorEntry(ticker, index, displaySettings = DEFAULT_DISPLAY_SETTINGS) {

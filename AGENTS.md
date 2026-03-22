@@ -14,6 +14,7 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `README.md`: user-facing setup notes, ticker add flow, and curated catalog editing guide
 - `utils/format.js`: display-entry formatting and color helpers
 - `utils/asset-categories.js`: shared asset-category metadata, category search terms, and default market-type mapping
+- `utils/kraken.js`: Kraken WebSocket helpers for instrument discovery, symbol normalization, and runtime crypto catalog entries
 - `utils/settings.js`: shared settings defaults, validation, and settings-backed ticker/display loading
 - `utils/ticker-catalog.js`: curated ticker aggregation and search helpers for guided prefs selection
 - `utils/catalog/*.js`: curated ticker data split by asset category for contributor-friendly maintenance
@@ -33,13 +34,13 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 
 ## Data And API Conventions
 
-- Market data is fetched from Stooq, with Kraken WebSocket v2 used for live BTC/USD and ETH/USD updates.
+- Market data is fetched from Stooq, with Kraken WebSocket v2 used for crypto pair discovery and live crypto updates.
 - The current supported non-crypto tickers are SPX, NDX, DXY, EUR/USD, Gold, and USO; verify Stooq symbol availability with `curl` before adding more.
 - Keep `utils/catalog/us-equity.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
 - Keep `utils/catalog/us-etf.js`, `utils/catalog/commodity.js`, and `utils/catalog/fx.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
 - Tickers may be split across GNOME panel sides via per-ticker `panelSide` metadata; when adding indicators to the left panel, append them after existing left-side items so other extensions are not shifted unexpectedly.
 - Prefer the batched quote endpoint for current prices.
-- Maintain one persistent Kraken public WebSocket connection for BTC/USD and ETH/USD rather than opening one socket per ticker.
+- Maintain one persistent Kraken public WebSocket connection for all saved crypto pairs rather than opening one socket per ticker.
 - Keep REST fallback behavior on the normal polling cadence if the crypto socket disconnects; do not increase REST frequency because the socket is down.
 - Throttle crypto-driven UI updates so the top bar is not repainted on every trade.
 - Reconnect the Kraken socket conservatively and avoid aggressive retry loops.

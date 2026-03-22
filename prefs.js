@@ -28,7 +28,9 @@ import {
 import {
     findCuratedTicker,
     matchCuratedTickers,
+    resolveCryptoCatalogTicker,
 } from './utils/ticker-catalog.js';
+import {loadKrakenSpotPairs} from './utils/kraken.js';
 
 const MAX_CURATED_SUGGESTIONS = 8;
 
@@ -164,7 +166,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             const index = tickers.indexOf(ticker);
             const row = new Adw.ActionRow({
                 title: ticker.label,
-                subtitle: `${ticker.symbol} \u00b7 ${ticker.priceDecimals} decimals`,
+                subtitle: `${ticker.liveSymbol ?? ticker.symbol} \u00b7 ${ticker.priceDecimals} decimals`,
             });
 
             row.add_suffix(this._createIconButton('go-up-symbolic', 'Move up', () => {
@@ -324,6 +326,12 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
         let activeAssetCategory = initialTicker.assetCategory ?? this._assetCategoryOptions[0].value;
         let activeMarketType = getMarketTypeForAssetCategory(activeAssetCategory);
+        let cryptoCatalog = null;
+        let cryptoCatalogError = '';
+        let cryptoCatalogLoading = false;
+        let cryptoCatalogRequestId = 0;
+        let isDialogDestroyed = false;
+        let autoFilledCryptoLabel = initialTicker.label ?? '';
 
         const assetCategoryRow = this._createComboRow({
             title: 'Asset type',
@@ -347,7 +355,9 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
         const symbolRow = new Adw.EntryRow({
             title: 'Symbol',
-            text: initialTicker.symbol ?? '',
+            text: activeAssetCategory === 'crypto'
+                ? (initialTicker.liveSymbol ?? initialTicker.symbol ?? '')
+                : (initialTicker.symbol ?? ''),
         });
         formGroup.add(symbolRow);
 
@@ -411,12 +421,16 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         const suggestionRows = [];
         const applyCuratedTicker = curatedTicker => {
             labelRow.text = curatedTicker.label;
-            symbolRow.text = curatedTicker.symbol;
+            symbolRow.text = activeAssetCategory === 'crypto'
+                ? (curatedTicker.liveSymbol ?? curatedTicker.symbol)
+                : curatedTicker.symbol;
             decimalsRow.value = curatedTicker.priceDecimals;
             activeAssetCategory = curatedTicker.assetCategory;
             activeMarketType = curatedTicker.marketType;
             assetCategoryRow.selected = this._findOptionIndex(this._assetCategoryOptions, curatedTicker.assetCategory);
             marketTypeRow.subtitle = this._getMarketTypeTitle(activeMarketType);
+            if (activeAssetCategory === 'crypto')
+                autoFilledCryptoLabel = curatedTicker.label;
             updateSaveSensitivity();
         };
 
@@ -439,14 +453,106 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             suggestionRows.splice(0).forEach(row => suggestionsGroup.remove(row));
         };
 
+        const getCatalogOptions = () => ({
+            cryptoCatalog: Array.isArray(cryptoCatalog) ? cryptoCatalog : [],
+        });
+        const updateSuggestionsDescription = () => {
+            suggestionsGroup.description = activeAssetCategory === 'crypto'
+                ? 'Search live Kraken WebSocket pairs. Non-crypto assets still use the built-in catalog.'
+                : 'Type a label or symbol above to search the built-in catalog. You can still save any custom Stooq symbol.';
+        };
+
+        const getCryptoSearchQuery = () => symbolRow.text.trim() || labelRow.text.trim();
+
+        const getResolvedCryptoTicker = () => {
+            if (activeAssetCategory !== 'crypto' || !Array.isArray(cryptoCatalog))
+                return null;
+
+            const query = getCryptoSearchQuery();
+            if (query === '')
+                return null;
+
+            const exactMatch = findCuratedTicker({
+                label: labelRow.text.trim(),
+                symbol: query,
+                assetCategory: activeAssetCategory,
+            }, getCatalogOptions());
+
+            return exactMatch ?? resolveCryptoCatalogTicker(query, cryptoCatalog);
+        };
+
+        const ensureCryptoCatalogLoaded = async () => {
+            if (activeAssetCategory !== 'crypto' || Array.isArray(cryptoCatalog) || cryptoCatalogLoading)
+                return;
+
+            cryptoCatalogLoading = true;
+            cryptoCatalogError = '';
+            renderCuratedSuggestions();
+            updateSaveSensitivity();
+
+            cryptoCatalogRequestId += 1;
+            const requestId = cryptoCatalogRequestId;
+
+            try {
+                const loadedCryptoCatalog = await loadKrakenSpotPairs();
+                if (isDialogDestroyed || requestId !== cryptoCatalogRequestId)
+                    return;
+
+                cryptoCatalog = loadedCryptoCatalog;
+                cryptoCatalogError = '';
+            } catch (error) {
+                if (isDialogDestroyed || requestId !== cryptoCatalogRequestId)
+                    return;
+
+                cryptoCatalog = null;
+                cryptoCatalogError = error.message;
+            } finally {
+                if (isDialogDestroyed || requestId !== cryptoCatalogRequestId)
+                    return;
+
+                cryptoCatalogLoading = false;
+                renderCuratedSuggestions();
+                updateSaveSensitivity();
+            }
+        };
+
         const renderCuratedSuggestions = () => {
             clearSuggestionRows();
 
-            const query = symbolRow.text.trim() || labelRow.text.trim();
+            const query = activeAssetCategory === 'crypto'
+                ? getCryptoSearchQuery()
+                : (symbolRow.text.trim() || labelRow.text.trim());
+
+            if (activeAssetCategory === 'crypto') {
+                if (cryptoCatalogLoading) {
+                    const loadingRow = new Adw.ActionRow({
+                        title: 'Loading crypto pairs',
+                        subtitle: 'Fetching active Kraken WebSocket pairs for search and verification.',
+                        sensitive: false,
+                    });
+                    suggestionsGroup.add(loadingRow);
+                    suggestionRows.push(loadingRow);
+                    return;
+                }
+
+                if (cryptoCatalogError !== '') {
+                    const unavailableRow = new Adw.ActionRow({
+                        title: 'Kraken crypto catalog unavailable',
+                        subtitle: cryptoCatalogError,
+                        sensitive: false,
+                    });
+                    suggestionsGroup.add(unavailableRow);
+                    suggestionRows.push(unavailableRow);
+                    return;
+                }
+            }
+
             if (query === '') {
                 const promptRow = new Adw.ActionRow({
                     title: 'Start typing to search',
-                    subtitle: 'Curated matches stay hidden until you enter a label or symbol.',
+                    subtitle: activeAssetCategory === 'crypto'
+                        ? 'Type a base asset or pair like SOL, SOLUSD, or SOL/USD.'
+                        : 'Curated matches stay hidden until you enter a label or symbol.',
                     sensitive: false,
                 });
                 suggestionsGroup.add(promptRow);
@@ -454,11 +560,13 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 return;
             }
 
-            const matches = matchCuratedTickers(activeAssetCategory, query);
+            const matches = matchCuratedTickers(activeAssetCategory, query, getCatalogOptions());
             if (matches.length === 0) {
                 const emptyRow = new Adw.ActionRow({
                     title: 'No curated matches',
-                    subtitle: 'Keep your manual symbol and use Verify to check whether Stooq returns data for it.',
+                    subtitle: activeAssetCategory === 'crypto'
+                        ? 'Type an exact Kraken WebSocket pair like SOL/USD, or keep searching.'
+                        : 'Keep your manual symbol and use Verify to check whether Stooq returns data for it.',
                     sensitive: false,
                 });
                 suggestionsGroup.add(emptyRow);
@@ -469,8 +577,8 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             matches.slice(0, MAX_CURATED_SUGGESTIONS).forEach(curatedTicker => {
                 const keywordText = (curatedTicker.keywords ?? []).slice(0, 3).join(' · ');
                 const subtitle = keywordText === ''
-                    ? `${curatedTicker.symbol} · ${curatedTicker.priceDecimals} decimals`
-                    : `${curatedTicker.symbol} · ${curatedTicker.priceDecimals} decimals · ${keywordText}`;
+                    ? `${curatedTicker.liveSymbol ?? curatedTicker.symbol} · ${curatedTicker.priceDecimals} decimals`
+                    : `${curatedTicker.liveSymbol ?? curatedTicker.symbol} · ${curatedTicker.priceDecimals} decimals · ${keywordText}`;
                 const row = new Adw.ActionRow({
                     title: curatedTicker.label,
                     subtitle,
@@ -494,10 +602,39 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         };
 
         const updateVerifyButtonSensitivity = () => {
-            verifyButton.set_sensitive(symbolRow.text.trim() !== '' && !verifyInProgress);
+            verifyButton.set_sensitive(
+                symbolRow.text.trim() !== '' &&
+                !verifyInProgress &&
+                !(activeAssetCategory === 'crypto' && cryptoCatalogLoading)
+            );
         };
 
         const runSymbolVerification = async () => {
+            if (activeAssetCategory === 'crypto') {
+                await ensureCryptoCatalogLoaded();
+
+                if (cryptoCatalogLoading)
+                    return;
+
+                if (cryptoCatalogError !== '') {
+                    setVerificationMessage(cryptoCatalogError, true);
+                    updateVerifyButtonSensitivity();
+                    return;
+                }
+
+                const resolvedCryptoTicker = getResolvedCryptoTicker();
+                if (!resolvedCryptoTicker) {
+                    setVerificationMessage('Choose a Kraken-supported pair before saving.', true);
+                    updateVerifyButtonSensitivity();
+                    return;
+                }
+
+                lastVerifiedSymbol = resolvedCryptoTicker.liveSymbol;
+                setVerificationMessage(`Verified ${resolvedCryptoTicker.liveSymbol}. Kraken WebSocket supports this pair.`);
+                updateVerifyButtonSensitivity();
+                return;
+            }
+
             const symbol = symbolRow.text.trim().toLowerCase();
             const symbolValidationMessage = this._validateTickerSymbol(symbol);
 
@@ -537,7 +674,12 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         };
 
         const updateSaveSensitivity = () => {
-            const validationMessage = this._validateTickerDraft(labelRow.text, symbolRow.text);
+            const validationMessage = this._validateTickerDraft(labelRow.text, symbolRow.text, {
+                assetCategory: activeAssetCategory,
+                cryptoCatalogLoading,
+                cryptoCatalogError,
+                resolvedCryptoTicker: getResolvedCryptoTicker(),
+            });
             const isValid = validationMessage === '';
             saveButton.set_sensitive(isValid);
             errorLabel.visible = !isValid;
@@ -553,6 +695,9 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             activeAssetCategory = option.value;
             activeMarketType = getMarketTypeForAssetCategory(activeAssetCategory);
             marketTypeRow.subtitle = this._getMarketTypeTitle(activeMarketType);
+            updateSuggestionsDescription();
+            if (activeAssetCategory === 'crypto')
+                void ensureCryptoCatalogLoaded();
             renderCuratedSuggestions();
             updateSaveSensitivity();
         });
@@ -561,41 +706,71 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             updateSaveSensitivity();
         });
         symbolRow.connect('notify::text', () => {
-            if (lastVerifiedSymbol !== '' && symbolRow.text.trim().toLowerCase() !== lastVerifiedSymbol)
+            const normalizedSymbolText = activeAssetCategory === 'crypto'
+                ? symbolRow.text.trim()
+                : symbolRow.text.trim().toLowerCase();
+
+            if (lastVerifiedSymbol !== '' && normalizedSymbolText !== lastVerifiedSymbol)
                 clearVerificationState();
+
+            if (activeAssetCategory === 'crypto') {
+                const resolvedCryptoTicker = getResolvedCryptoTicker();
+                if (labelRow.text.trim() === '' || labelRow.text.trim() === autoFilledCryptoLabel) {
+                    if (resolvedCryptoTicker) {
+                        autoFilledCryptoLabel = resolvedCryptoTicker.label;
+                        labelRow.text = resolvedCryptoTicker.label;
+                        decimalsRow.value = resolvedCryptoTicker.priceDecimals;
+                    }
+                }
+            }
 
             renderCuratedSuggestions();
             updateSaveSensitivity();
         });
+        updateSuggestionsDescription();
+        if (activeAssetCategory === 'crypto')
+            void ensureCryptoCatalogLoaded();
         renderCuratedSuggestions();
         updateSaveSensitivity();
 
         dialog.connect('destroy', () => {
+            isDialogDestroyed = true;
             verificationRequestId += 1;
             verificationSession.abort();
         });
 
         dialog.connect('response', (_dialog, responseId) => {
             if (responseId === Gtk.ResponseType.OK) {
+                const resolvedCryptoTicker = getResolvedCryptoTicker();
+                const effectiveLabel = activeAssetCategory === 'crypto' && labelRow.text.trim() === ''
+                    ? (resolvedCryptoTicker?.label ?? '')
+                    : labelRow.text.trim();
                 const matchingCuratedTicker = findCuratedTicker({
-                    label: labelRow.text.trim(),
-                    symbol: symbolRow.text.trim().toLowerCase(),
+                    label: effectiveLabel,
+                    symbol: activeAssetCategory === 'crypto'
+                        ? (resolvedCryptoTicker?.liveSymbol ?? symbolRow.text.trim())
+                        : symbolRow.text.trim().toLowerCase(),
                     assetCategory: activeAssetCategory,
-                });
+                }, getCatalogOptions());
                 const nextTicker = {
                     ...initialTicker,
-                    label: labelRow.text.trim(),
-                    symbol: symbolRow.text.trim().toLowerCase(),
+                    label: effectiveLabel,
+                    symbol: activeAssetCategory === 'crypto'
+                        ? (resolvedCryptoTicker?.symbol ?? symbolRow.text.trim().toLowerCase())
+                        : symbolRow.text.trim().toLowerCase(),
                     priceDecimals: decimalsRow.value,
                     panelSide: sideOptions[sideRow.selected].value,
                     marketType: getMarketTypeForAssetCategory(activeAssetCategory),
                     assetCategory: activeAssetCategory,
                 };
 
-                if (matchingCuratedTicker?.liveSymbol)
+                if (activeAssetCategory === 'crypto') {
+                    nextTicker.liveSymbol = resolvedCryptoTicker?.liveSymbol ?? matchingCuratedTicker?.liveSymbol ?? '';
+                } else if (matchingCuratedTicker?.liveSymbol) {
                     nextTicker.liveSymbol = matchingCuratedTicker.liveSymbol;
-                else
+                } else {
                     delete nextTicker.liveSymbol;
+                }
 
                 onSave(nextTicker);
             }
@@ -606,7 +781,23 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         dialog.present();
     }
 
-    _validateTickerDraft(label, symbol) {
+    _validateTickerDraft(label, symbol, options = {}) {
+        if (options.assetCategory === 'crypto') {
+            if (symbol.trim() === '')
+                return 'Symbol is required.';
+
+            if (options.cryptoCatalogLoading)
+                return 'Kraken crypto pairs are still loading.';
+
+            if (options.cryptoCatalogError)
+                return 'Kraken crypto pairs could not be loaded.';
+
+            if (!options.resolvedCryptoTicker)
+                return 'Choose a Kraken-supported crypto pair.';
+
+            return '';
+        }
+
         if (label.trim() === '')
             return 'Label is required.';
 

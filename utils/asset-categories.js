@@ -47,7 +47,7 @@ const ASSET_CATEGORY_METADATA = {
     },
     [ASSET_CATEGORIES.CRYPTO]: {
         title: 'Crypto',
-        description: 'Always-open crypto markets. BTC and ETH support live Kraken updates.',
+        description: 'Always-open crypto markets backed by Kraken WebSocket pairs.',
         defaultMarketType: MARKET_TYPES.ALWAYS_OPEN,
         searchKeywords: ['crypto', 'cryptocurrency', 'cryptocurrencies'],
     },
