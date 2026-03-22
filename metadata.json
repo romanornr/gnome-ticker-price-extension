@@ -2,6 +2,7 @@
   "uuid": "ticker-price-extension@romano",
   "name": "Ticker Price Extension",
   "description": "Shows market tickers in the GNOME Shell top bar with live crypto updates.",
+  "settings-schema": "org.gnome.shell.extensions.ticker-price-extension",
   "shell-version": [
     "49",
     "49.5"

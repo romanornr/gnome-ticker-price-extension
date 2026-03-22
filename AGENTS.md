@@ -8,9 +8,12 @@ The current ticker list is defined in `extension.js`.
 ## Key Files
 
 - `extension.js`: extension lifecycle orchestration, panel registration, service startup/shutdown
+- `prefs.js`: GNOME preferences window for ticker configuration, refresh cadence, and display options
 - `ui/indicator.js`: panel indicator rendering
 - `services/quotes.js`: quote fetching, Kraken WebSocket lifecycle, cache management, update scheduling
 - `utils/format.js`: display-entry formatting and color helpers
+- `utils/settings.js`: shared settings defaults, validation, and settings-backed ticker/display loading
+- `schemas/org.gnome.shell.extensions.ticker-price-extension.gschema.xml`: extension settings schema
 - `metadata.json`: GNOME Shell extension metadata and compatibility
 - `install.sh`: copy-based local install, including runtime module directories
 - `install-dev.sh`: symlink-based development install

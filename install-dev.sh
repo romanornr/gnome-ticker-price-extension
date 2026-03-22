@@ -13,6 +13,7 @@ elif [[ -L "${TARGET_DIR}" ]]; then
     rm -f "${TARGET_DIR}"
 fi
 
+glib-compile-schemas "${SOURCE_DIR}/schemas"
 ln -s "${SOURCE_DIR}" "${TARGET_DIR}"
 printf 'Linked %s -> %s\n' "${TARGET_DIR}" "${SOURCE_DIR}"
 

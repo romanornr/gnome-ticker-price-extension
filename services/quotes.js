@@ -10,44 +10,49 @@ import {
     NEGATIVE_COLOR,
     POSITIVE_COLOR,
 } from '../utils/format.js';
+import {
+    DEFAULT_REFRESH_INTERVAL_SECONDS,
+    loadDisplaySettings,
+    loadRefreshIntervalSeconds,
+    loadTickerConfigs,
+    MARKET_TYPES,
+    SETTINGS_KEYS,
+} from '../utils/settings.js';
 
-const REFRESH_INTERVAL_SECONDS = 300;
 const US_SESSION_OVERNIGHT_REFRESH_INTERVAL_SECONDS = 1800;
+const KRAKEN_TICKER_URL = 'https://api.kraken.com/0/public/Ticker';
 const KRAKEN_WEBSOCKET_URL = 'wss://ws.kraken.com/v2';
-const KRAKEN_TICKER_SYMBOLS = ['BTC/USD', 'ETH/USD'];
 const KRAKEN_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
 const CRYPTO_UI_UPDATE_INTERVAL_SECONDS = 4;
 const PRICE_FLASH_DURATION_MS = 700;
 const US_MARKET_TIME_ZONE = 'America/New_York';
 const US_MARKET_PREMARKET_START_HOUR = 4;
 const US_MARKET_AFTER_HOURS_END_HOUR = 20;
-const KRAKEN_SYMBOL_TO_TICKER_SYMBOL = new Map([
-    ['BTC/USD', 'BTC.V'],
-    ['ETH/USD', 'ETH.V'],
+const KRAKEN_REST_PAIR_BY_LIVE_SYMBOL = new Map([
+    ['BTC/USD', 'BTCUSD'],
+    ['ETH/USD', 'ETHUSD'],
 ]);
-
-export const TICKERS = [
-    {label: 'SPX', symbol: '^spx', priceDecimals: 0, marketType: 'us-session', panelSide: 'right'},
-    {label: 'NDX', symbol: '^ndq', priceDecimals: 0, marketType: 'us-session', panelSide: 'right'},
-    {label: 'DXY', symbol: 'dx.f', priceDecimals: 2, marketType: 'weekday-session', panelSide: 'left'},
-    {label: 'EUR/USD', symbol: 'eurusd', priceDecimals: 4, marketType: 'weekday-session', panelSide: 'left'},
-    {label: 'Gold', symbol: 'xauusd', priceDecimals: 0, marketType: 'weekday-session', panelSide: 'right'},
-    {label: 'USO', symbol: 'uso.us', priceDecimals: 2, marketType: 'us-session', panelSide: 'right'},
-    {label: 'ETH', symbol: 'eth.v', priceDecimals: 0, marketType: 'always-open', panelSide: 'right', separatorBefore: ' || '},
-    {label: 'BTC', symbol: 'btc.v', priceDecimals: 0, marketType: 'always-open', panelSide: 'right'},
-];
+const KRAKEN_RESPONSE_KEY_BY_LIVE_SYMBOL = new Map([
+    ['BTC/USD', 'XXBTZUSD'],
+    ['ETH/USD', 'XETHZUSD'],
+]);
 
 export const QuotesService = GObject.registerClass({
     Signals: {
         'entries-changed': {},
     },
 }, class QuotesService extends GObject.Object {
-    _init(uuid) {
+    _init(uuid, settings) {
         super._init();
         this._uuid = uuid;
+        this._settings = settings;
+        this._settingsSignalIds = [];
         this._session = null;
         this._running = false;
-        this._entries = createLoadingEntries(TICKERS);
+        this._tickers = loadTickerConfigs(this._settings);
+        this._displaySettings = loadDisplaySettings(this._settings);
+        this._refreshIntervalSeconds = loadRefreshIntervalSeconds(this._settings);
+        this._entries = createLoadingEntries(this._tickers, this._displaySettings);
         this._latestQuotesBySymbol = new Map();
         this._lastRefreshTimeBySymbol = new Map();
         this._refreshTimeoutId = 0;
@@ -60,6 +65,7 @@ export const QuotesService = GObject.registerClass({
         this._krakenWebsocketSignalIds = [];
         this._krakenReconnectTimeoutId = 0;
         this._krakenReconnectAttempt = 0;
+        this._krakenSubscribedSymbols = [];
     }
 
     start() {
@@ -68,20 +74,14 @@ export const QuotesService = GObject.registerClass({
 
         this._running = true;
         this._session = new Soup.Session();
-        this._entries = createLoadingEntries(TICKERS);
+        this._loadConfiguration();
+        this._connectSettingsSignals();
+        this._entries = createLoadingEntries(this._tickers, this._displaySettings);
         this.emit('entries-changed');
 
         void this._refreshQuotes(true);
         void this._connectKrakenWebsocket();
-
-        this._refreshTimeoutId = GLib.timeout_add_seconds(
-            GLib.PRIORITY_DEFAULT,
-            REFRESH_INTERVAL_SECONDS,
-            () => {
-                void this._refreshQuotes(false);
-                return GLib.SOURCE_CONTINUE;
-            }
-        );
+        this._scheduleRefreshTimer();
     }
 
     stop() {
@@ -90,6 +90,7 @@ export const QuotesService = GObject.registerClass({
 
         this._running = false;
 
+        this._disconnectSettingsSignals();
         this._removeTimeout('_refreshTimeoutId');
         this._removeTimeout('_entriesUpdateTimeoutId');
         this._removeTimeout('_krakenReconnectTimeoutId');
@@ -99,6 +100,7 @@ export const QuotesService = GObject.registerClass({
         this._entriesUpdateQueued = false;
         this._lastEntriesUpdateUsec = 0;
         this._krakenReconnectAttempt = 0;
+        this._krakenSubscribedSymbols = [];
 
         this._disconnectKrakenWebsocket();
         this._session?.abort();
@@ -106,7 +108,7 @@ export const QuotesService = GObject.registerClass({
 
         this._latestQuotesBySymbol.clear();
         this._lastRefreshTimeBySymbol.clear();
-        this._entries = createLoadingEntries(TICKERS);
+        this._entries = createLoadingEntries(this._tickers, this._displaySettings);
     }
 
     getEntries() {
@@ -118,30 +120,90 @@ export const QuotesService = GObject.registerClass({
             return;
 
         const tickersToRefresh = forceRefreshAll
-            ? TICKERS
-            : TICKERS.filter(ticker => this._shouldRefreshTicker(ticker));
+            ? this._tickers
+            : this._tickers.filter(ticker => this._shouldRefreshTicker(ticker));
 
-        if (tickersToRefresh.length > 0) {
-            try {
-                const quoteCsv = await this._fetchText(this._buildBatchQuoteUrl(tickersToRefresh));
-                if (!this._running)
-                    return;
+        const stooqTickers = tickersToRefresh.filter(ticker => !this._isKrakenRestTicker(ticker));
+        const krakenTickers = tickersToRefresh.filter(ticker => this._isKrakenRestTicker(ticker));
 
-                const quotesBySymbol = this._parseBatchQuotes(quoteCsv, tickersToRefresh.length);
-                quotesBySymbol.forEach((quote, symbol) => {
-                    this._latestQuotesBySymbol.set(symbol, quote);
-                });
-                const refreshedAtUsec = GLib.get_monotonic_time();
-                tickersToRefresh.forEach(ticker => {
-                    this._lastRefreshTimeBySymbol.set(ticker.symbol.toUpperCase(), refreshedAtUsec);
-                });
-            } catch (error) {
-                if (this._running)
-                    logError(error, `${this._uuid}: failed to refresh batched quotes`);
-            }
-        }
+        if (stooqTickers.length > 0)
+            await this._refreshStooqQuotes(stooqTickers);
+
+        if (krakenTickers.length > 0)
+            await this._refreshKrakenRestQuotes(krakenTickers);
 
         this._requestEntriesUpdate(true);
+    }
+
+    _connectSettingsSignals() {
+        this._disconnectSettingsSignals();
+
+        this._settingsSignalIds = [
+            this._settings.connect(`changed::${SETTINGS_KEYS.TICKERS_JSON}`, () => {
+                this._loadConfiguration();
+                this._pruneCachedQuotes();
+                this._entries = createLoadingEntries(this._tickers, this._displaySettings);
+                this.emit('entries-changed');
+                this._scheduleRefreshTimer();
+                this._reconnectKrakenWebsocketIfNeeded();
+                void this._refreshQuotes(true);
+            }),
+            this._settings.connect(`changed::${SETTINGS_KEYS.REFRESH_INTERVAL_SECONDS}`, () => {
+                this._refreshIntervalSeconds = loadRefreshIntervalSeconds(this._settings);
+                this._scheduleRefreshTimer();
+            }),
+            this._settings.connect(`changed::${SETTINGS_KEYS.FORMAT_PRESET}`, () => this._handleDisplaySettingsChanged()),
+            this._settings.connect(`changed::${SETTINGS_KEYS.SHOW_PRICE}`, () => this._handleDisplaySettingsChanged()),
+            this._settings.connect(`changed::${SETTINGS_KEYS.SHOW_ARROW}`, () => this._handleDisplaySettingsChanged()),
+            this._settings.connect(`changed::${SETTINGS_KEYS.SHOW_PERCENT}`, () => this._handleDisplaySettingsChanged()),
+            this._settings.connect(`changed::${SETTINGS_KEYS.SEPARATOR_STYLE}`, () => this._handleDisplaySettingsChanged()),
+        ];
+    }
+
+    _disconnectSettingsSignals() {
+        this._settingsSignalIds.forEach(signalId => this._settings?.disconnect(signalId));
+        this._settingsSignalIds = [];
+    }
+
+    _handleDisplaySettingsChanged() {
+        this._displaySettings = loadDisplaySettings(this._settings);
+        this._requestEntriesUpdate(true);
+    }
+
+    _loadConfiguration() {
+        this._tickers = loadTickerConfigs(this._settings);
+        this._displaySettings = loadDisplaySettings(this._settings);
+        this._refreshIntervalSeconds = loadRefreshIntervalSeconds(this._settings);
+    }
+
+    _pruneCachedQuotes() {
+        const activeSymbols = new Set(this._tickers.map(ticker => ticker.symbol.toUpperCase()));
+
+        [...this._latestQuotesBySymbol.keys()].forEach(symbol => {
+            if (!activeSymbols.has(symbol))
+                this._latestQuotesBySymbol.delete(symbol);
+        });
+
+        [...this._lastRefreshTimeBySymbol.keys()].forEach(symbol => {
+            if (!activeSymbols.has(symbol))
+                this._lastRefreshTimeBySymbol.delete(symbol);
+        });
+    }
+
+    _scheduleRefreshTimer() {
+        this._removeTimeout('_refreshTimeoutId');
+
+        if (!this._running)
+            return;
+
+        this._refreshTimeoutId = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            this._refreshIntervalSeconds,
+            () => {
+                void this._refreshQuotes(false);
+                return GLib.SOURCE_CONTINUE;
+            }
+        );
     }
 
     _requestEntriesUpdate(immediate = false) {
@@ -192,14 +254,14 @@ export const QuotesService = GObject.registerClass({
 
         try {
             const entries = await Promise.all(
-                TICKERS.map(async ticker => {
+                this._tickers.map(async (ticker, index) => {
                     try {
-                        return await this._buildTickerEntry(ticker);
+                        return await this._buildTickerEntry(ticker, index);
                     } catch (error) {
                         if (this._running)
                             logError(error, `${this._uuid}: failed to refresh ${ticker.label}`);
 
-                        return createErrorEntry(ticker);
+                        return createErrorEntry(ticker, index, this._displaySettings);
                     }
                 })
             );
@@ -221,13 +283,13 @@ export const QuotesService = GObject.registerClass({
         }
     }
 
-    async _buildTickerEntry(ticker) {
+    async _buildTickerEntry(ticker, index) {
         const quote = this._latestQuotesBySymbol.get(ticker.symbol.toUpperCase());
 
         if (!quote)
-            throw new Error(`Missing batched quote for ${ticker.symbol}`);
+            throw new Error(`Missing quote for ${ticker.symbol}`);
 
-        return createDisplayEntry(ticker, quote, quote.previousClose);
+        return createDisplayEntry(ticker, quote, quote.previousClose, index, this._displaySettings);
     }
 
     async _fetchText(url) {
@@ -239,8 +301,60 @@ export const QuotesService = GObject.registerClass({
         return new TextDecoder().decode(bytes.get_data()).trim();
     }
 
+    async _fetchJson(url) {
+        const text = await this._fetchText(url);
+
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            throw new Error(`Unexpected JSON response from ${url}: ${error.message}`);
+        }
+    }
+
+    async _refreshStooqQuotes(tickers) {
+        try {
+            const quoteCsv = await this._fetchText(this._buildBatchQuoteUrl(tickers));
+            if (!this._running)
+                return;
+
+            const quotesBySymbol = this._parseBatchQuotes(quoteCsv, tickers.length);
+            quotesBySymbol.forEach((quote, symbol) => {
+                this._latestQuotesBySymbol.set(symbol, quote);
+            });
+            this._markTickersRefreshed(tickers);
+        } catch (error) {
+            if (this._running)
+                logError(error, `${this._uuid}: failed to refresh Stooq quotes`);
+        }
+    }
+
+    async _refreshKrakenRestQuotes(tickers) {
+        try {
+            const payload = await this._fetchJson(this._buildKrakenTickerUrl(tickers));
+            if (!this._running)
+                return;
+
+            const quotesBySymbol = this._parseKrakenTickerResponse(payload, tickers);
+            const preserveLivePrice = this._krakenWebsocket !== null;
+            quotesBySymbol.forEach((quote, symbol) => {
+                const existingQuote = this._latestQuotesBySymbol.get(symbol);
+                this._latestQuotesBySymbol.set(symbol, {
+                    ...quote,
+                    price: preserveLivePrice && Number.isFinite(existingQuote?.price)
+                        ? existingQuote.price
+                        : quote.price,
+                });
+            });
+            this._markTickersRefreshed(tickers);
+        } catch (error) {
+            if (this._running)
+                logError(error, `${this._uuid}: failed to refresh Kraken quotes`);
+        }
+    }
+
     async _connectKrakenWebsocket() {
-        if (!this._running || !this._session || this._krakenWebsocket)
+        const liveSymbols = this._getDesiredKrakenSymbols();
+        if (!this._running || !this._session || this._krakenWebsocket || liveSymbols.length === 0)
             return;
 
         try {
@@ -281,12 +395,13 @@ export const QuotesService = GObject.registerClass({
                 }),
             ];
 
+            this._krakenSubscribedSymbols = liveSymbols;
             websocket.send_text(JSON.stringify({
                 method: 'subscribe',
                 params: {
                     channel: 'ticker',
                     event_trigger: 'trades',
-                    symbol: KRAKEN_TICKER_SYMBOLS,
+                    symbol: liveSymbols,
                     snapshot: true,
                 },
             }));
@@ -317,15 +432,16 @@ export const QuotesService = GObject.registerClass({
     _handleKrakenDisconnect() {
         this._krakenWebsocket = null;
         this._krakenWebsocketSignalIds = [];
+        this._krakenSubscribedSymbols = [];
 
-        if (!this._running)
+        if (!this._running || this._getDesiredKrakenSymbols().length === 0)
             return;
 
         this._scheduleKrakenReconnect();
     }
 
     _scheduleKrakenReconnect() {
-        if (!this._running || this._krakenReconnectTimeoutId !== 0)
+        if (!this._running || this._krakenReconnectTimeoutId !== 0 || this._getDesiredKrakenSymbols().length === 0)
             return;
 
         const index = Math.min(
@@ -382,9 +498,10 @@ export const QuotesService = GObject.registerClass({
             return;
 
         let updated = false;
+        const liveSymbolMap = this._getKrakenSymbolToTickerSymbolMap();
 
         payload.data.forEach(entry => {
-            const tickerSymbol = KRAKEN_SYMBOL_TO_TICKER_SYMBOL.get(entry?.symbol ?? '');
+            const tickerSymbol = liveSymbolMap.get(entry?.symbol ?? '');
             const price = Number.parseFloat(`${entry?.last ?? ''}`);
             const quoteDate = this._normalizeTimestampDate(entry?.timestamp ?? '');
 
@@ -406,12 +523,61 @@ export const QuotesService = GObject.registerClass({
         }
     }
 
+    _reconnectKrakenWebsocketIfNeeded() {
+        const desiredSymbols = this._getDesiredKrakenSymbols();
+        const currentSymbols = [...this._krakenSubscribedSymbols].sort().join('|');
+        const nextSymbols = [...desiredSymbols].sort().join('|');
+
+        if (currentSymbols === nextSymbols && (desiredSymbols.length === 0 || this._krakenWebsocket))
+            return;
+
+        this._removeTimeout('_krakenReconnectTimeoutId');
+        this._krakenReconnectAttempt = 0;
+        this._disconnectKrakenWebsocket();
+
+        if (desiredSymbols.length === 0)
+            return;
+
+        void this._connectKrakenWebsocket();
+    }
+
+    _getDesiredKrakenSymbols() {
+        return [...new Set(
+            this._tickers
+                .map(ticker => ticker.liveSymbol)
+                .filter(liveSymbol => typeof liveSymbol === 'string' && liveSymbol !== '')
+        )];
+    }
+
+    _getKrakenSymbolToTickerSymbolMap() {
+        return new Map(
+            this._tickers
+                .filter(ticker => ticker.liveSymbol)
+                .map(ticker => [ticker.liveSymbol, ticker.symbol.toUpperCase()])
+        );
+    }
+
+    _isKrakenRestTicker(ticker) {
+        return typeof ticker.liveSymbol === 'string' &&
+            KRAKEN_REST_PAIR_BY_LIVE_SYMBOL.has(ticker.liveSymbol);
+    }
+
     _buildBatchQuoteUrl(tickers) {
         const joinedSymbols = tickers
             .map(ticker => ticker.symbol)
             .join('+');
 
         return `https://stooq.com/q/l/?s=${encodeURIComponent(joinedSymbols).replace(/%2B/g, '+')}&f=sd2t2cp&i=d`;
+    }
+
+    _buildKrakenTickerUrl(tickers) {
+        const pairs = [...new Set(
+            tickers
+                .map(ticker => KRAKEN_REST_PAIR_BY_LIVE_SYMBOL.get(ticker.liveSymbol))
+                .filter(pair => typeof pair === 'string' && pair !== '')
+        )];
+
+        return `${KRAKEN_TICKER_URL}?pair=${encodeURIComponent(pairs.join(','))}`;
     }
 
     _parseBatchQuotes(csv, expectedCount) {
@@ -444,6 +610,40 @@ export const QuotesService = GObject.registerClass({
         return quotesBySymbol;
     }
 
+    _parseKrakenTickerResponse(payload, tickers) {
+        if (!payload || typeof payload !== 'object')
+            throw new Error('Unexpected Kraken ticker payload');
+
+        if (Array.isArray(payload.error) && payload.error.length > 0)
+            throw new Error(`Kraken ticker error: ${payload.error.join(', ')}`);
+
+        const result = payload.result;
+        if (!result || typeof result !== 'object')
+            throw new Error('Missing Kraken ticker results');
+
+        const quoteDate = this._getCurrentUtcDate();
+        const quotesBySymbol = new Map();
+
+        tickers.forEach(ticker => {
+            const liveSymbol = ticker.liveSymbol ?? '';
+            const responseKey = KRAKEN_RESPONSE_KEY_BY_LIVE_SYMBOL.get(liveSymbol);
+            const entry = responseKey ? result[responseKey] : null;
+            const price = Number.parseFloat(`${entry?.c?.[0] ?? ''}`);
+            const dayOpen = Number.parseFloat(`${entry?.o ?? ''}`);
+
+            if (!responseKey || !entry || !Number.isFinite(price) || !Number.isFinite(dayOpen))
+                throw new Error(`Unexpected Kraken ticker payload for ${liveSymbol || ticker.symbol}`);
+
+            quotesBySymbol.set(ticker.symbol.toUpperCase(), {
+                price,
+                quoteDate,
+                previousClose: dayOpen,
+            });
+        });
+
+        return quotesBySymbol;
+    }
+
     _normalizeQuoteDate(dateText) {
         const normalized = dateText.replaceAll('-', '');
         return /^\d{8}$/.test(normalized) ? normalized : '';
@@ -453,14 +653,38 @@ export const QuotesService = GObject.registerClass({
         return this._normalizeQuoteDate(timestampText.slice(0, 10));
     }
 
+    _getCurrentUtcDate() {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'UTC',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).formatToParts(new Date());
+
+        const year = parts.find(part => part.type === 'year')?.value ?? '';
+        const month = parts.find(part => part.type === 'month')?.value ?? '';
+        const day = parts.find(part => part.type === 'day')?.value ?? '';
+
+        return /^\d{4}$/.test(year) && /^\d{2}$/.test(month) && /^\d{2}$/.test(day)
+            ? `${year}${month}${day}`
+            : '';
+    }
+
+    _markTickersRefreshed(tickers) {
+        const refreshedAtUsec = GLib.get_monotonic_time();
+        tickers.forEach(ticker => {
+            this._lastRefreshTimeBySymbol.set(ticker.symbol.toUpperCase(), refreshedAtUsec);
+        });
+    }
+
     _shouldRefreshTicker(ticker) {
-        if (ticker.marketType === 'always-open')
+        if (ticker.marketType === MARKET_TYPES.ALWAYS_OPEN)
             return true;
 
-        if (ticker.marketType === 'weekday-session')
+        if (ticker.marketType === MARKET_TYPES.WEEKDAY_SESSION)
             return !this._isUsMarketWeekend();
 
-        if (ticker.marketType === 'us-session') {
+        if (ticker.marketType === MARKET_TYPES.US_SESSION) {
             if (this._isUsMarketWeekend())
                 return false;
 
@@ -483,12 +707,12 @@ export const QuotesService = GObject.registerClass({
     }
 
     _getRefreshIntervalSecondsForTicker(ticker) {
-        if (ticker.marketType !== 'us-session')
-            return REFRESH_INTERVAL_SECONDS;
+        if (ticker.marketType !== MARKET_TYPES.US_SESSION)
+            return this._refreshIntervalSeconds || DEFAULT_REFRESH_INTERVAL_SECONDS;
 
         return this._isUsMarketExtendedHoursActive()
-            ? REFRESH_INTERVAL_SECONDS
-            : US_SESSION_OVERNIGHT_REFRESH_INTERVAL_SECONDS;
+            ? (this._refreshIntervalSeconds || DEFAULT_REFRESH_INTERVAL_SECONDS)
+            : Math.max(this._refreshIntervalSeconds || DEFAULT_REFRESH_INTERVAL_SECONDS, US_SESSION_OVERNIGHT_REFRESH_INTERVAL_SECONDS);
     }
 
     _isUsMarketWeekend() {
@@ -526,12 +750,12 @@ export const QuotesService = GObject.registerClass({
     }
 
     _decorateEntriesWithPriceFlash(entries) {
-        const previousEntriesByLabel = new Map(
-            this._entries.map(entry => [entry.label, entry])
+        const previousEntriesBySymbol = new Map(
+            this._entries.map(entry => [entry.symbol?.toUpperCase() ?? entry.label, entry])
         );
 
         return entries.map(entry => {
-            const previousEntry = previousEntriesByLabel.get(entry.label);
+            const previousEntry = previousEntriesBySymbol.get(entry.symbol?.toUpperCase() ?? entry.label);
             const previousPrice = previousEntry?.displayPrice;
 
             if (
