@@ -7,9 +7,12 @@ The current ticker list is defined in `extension.js`.
 
 ## Key Files
 
-- `extension.js`: main extension logic, ticker definitions, API fetches, caching, formatting, panel rendering
+- `extension.js`: extension lifecycle orchestration, panel registration, service startup/shutdown
+- `ui/indicator.js`: panel indicator rendering
+- `services/quotes.js`: quote fetching, Kraken WebSocket lifecycle, cache management, update scheduling
+- `utils/format.js`: display-entry formatting and color helpers
 - `metadata.json`: GNOME Shell extension metadata and compatibility
-- `install.sh`: copy-based local install
+- `install.sh`: copy-based local install, including runtime module directories
 - `install-dev.sh`: symlink-based development install
 - `remove.sh`: remove installed extension
 - `DEBUGGING_GUIDE.md`: debugging notes for extension behavior and API parsing
@@ -20,8 +23,12 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 
 ## Data And API Conventions
 
-- Market data is fetched from Stooq.
+- Market data is fetched from Stooq, with Kraken WebSocket v2 used for live BTC/USD and ETH/USD updates.
 - Prefer the batched quote endpoint for current prices.
+- Maintain one persistent Kraken public WebSocket connection for BTC/USD and ETH/USD rather than opening one socket per ticker.
+- Keep REST fallback behavior on the normal polling cadence if the crypto socket disconnects; do not increase REST frequency because the socket is down.
+- Throttle crypto-driven UI updates so the top bar is not repainted on every trade.
+- Reconnect the Kraken socket conservatively and avoid aggressive retry loops.
 - Previous close should be cached per symbol and invalidated based on the provider quote date, not the user's local timezone.
 - Do not hard-code market open, pre-market, or rollover times using the local system clock.
 - Treat crypto and index session boundaries according to the provider's returned date.

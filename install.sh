@@ -7,7 +7,9 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="${HOME}/.local/share/gnome-shell/extensions/${UUID}"
 
 mkdir -p "${TARGET_DIR}"
+rm -rf "${TARGET_DIR}/ui" "${TARGET_DIR}/services" "${TARGET_DIR}/utils"
 cp "${SOURCE_DIR}/metadata.json" "${SOURCE_DIR}/extension.js" "${TARGET_DIR}/"
+cp -r "${SOURCE_DIR}/ui" "${SOURCE_DIR}/services" "${SOURCE_DIR}/utils" "${TARGET_DIR}/"
 
 printf 'Installed extension to %s\n' "${TARGET_DIR}"
 

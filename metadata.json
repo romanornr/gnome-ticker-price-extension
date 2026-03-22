@@ -1,7 +1,7 @@
 {
   "uuid": "ticker-price-extension@romano",
   "name": "Ticker Price Extension",
-  "description": "Adds a simple 'hello world' label to the GNOME Shell top bar.",
+  "description": "Shows market tickers in the GNOME Shell top bar with live crypto updates.",
   "shell-version": [
     "49",
     "49.5"
