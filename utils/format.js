@@ -5,6 +5,7 @@ export const NEGATIVE_COLOR = '#F85149';
 export function createLoadingEntries(tickers) {
     return tickers.map(ticker => ({
         label: ticker.label,
+        separatorBefore: ticker.separatorBefore ?? '',
         priceText: '...',
         displayPrice: null,
         arrow: '',
@@ -14,9 +15,10 @@ export function createLoadingEntries(tickers) {
     }));
 }
 
-export function createErrorEntry(label) {
+export function createErrorEntry(ticker) {
     return {
-        label,
+        label: ticker.label,
+        separatorBefore: ticker.separatorBefore ?? '',
         priceText: '--',
         displayPrice: null,
         arrow: '',
@@ -31,6 +33,7 @@ export function createDisplayEntry(ticker, quote, previousClose) {
 
     return {
         label: ticker.label,
+        separatorBefore: ticker.separatorBefore ?? '',
         priceText: formatPrice(quote.price, ticker.priceDecimals),
         displayPrice: quote.price,
         arrow: getArrow(percentChange),

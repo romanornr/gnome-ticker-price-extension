@@ -24,6 +24,7 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 ## Data And API Conventions
 
 - Market data is fetched from Stooq, with Kraken WebSocket v2 used for live BTC/USD and ETH/USD updates.
+- The current supported non-crypto tickers are SPX, NDX, DXY, EUR/USD, Gold, and WTI; verify Stooq symbol availability with `curl` before adding more.
 - Prefer the batched quote endpoint for current prices.
 - Maintain one persistent Kraken public WebSocket connection for BTC/USD and ETH/USD rather than opening one socket per ticker.
 - Keep REST fallback behavior on the normal polling cadence if the crypto socket disconnects; do not increase REST frequency because the socket is down.
@@ -34,6 +35,7 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 - Treat crypto and index session boundaries according to the provider's returned date.
 - Do an initial fetch for all tickers on startup so the panel can render immediately.
 - Ongoing polling may skip US-session tickers on weekends using `America/New_York`, but always-open tickers like crypto should continue refreshing.
+- Weekday-session tickers such as DXY, EUR/USD, and Gold should refresh on weekdays and skip weekend polling.
 - On weekday overnights outside the U.S. extended-hours window, US-session tickers may refresh less frequently than the normal polling cadence, using `America/New_York` rather than the local system clock.
 - When polling is skipped for a ticker, preserve and render its last known quote from in-memory cache.
 

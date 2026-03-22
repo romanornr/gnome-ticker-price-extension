@@ -30,7 +30,11 @@ const KRAKEN_SYMBOL_TO_TICKER_SYMBOL = new Map([
 export const TICKERS = [
     {label: 'SPX', symbol: '^spx', priceDecimals: 0, marketType: 'us-session'},
     {label: 'NDX', symbol: '^ndq', priceDecimals: 0, marketType: 'us-session'},
-    {label: 'ETH', symbol: 'eth.v', priceDecimals: 0, marketType: 'always-open'},
+    {label: 'DXY', symbol: 'dx.f', priceDecimals: 2, marketType: 'weekday-session'},
+    {label: 'EUR/USD', symbol: 'eurusd', priceDecimals: 4, marketType: 'weekday-session'},
+    {label: 'Gold', symbol: 'gc.f', priceDecimals: 0, marketType: 'weekday-session'},
+    {label: 'WTI', symbol: 'cl.f', priceDecimals: 2, marketType: 'us-session'},
+    {label: 'ETH', symbol: 'eth.v', priceDecimals: 0, marketType: 'always-open', separatorBefore: ' || '},
     {label: 'BTC', symbol: 'btc.v', priceDecimals: 0, marketType: 'always-open'},
 ];
 
@@ -198,7 +202,7 @@ export const QuotesService = GObject.registerClass({
                         if (this._running)
                             logError(error, `${this._uuid}: failed to refresh ${ticker.label}`);
 
-                        return createErrorEntry(ticker.label);
+                        return createErrorEntry(ticker);
                     }
                 })
             );
@@ -506,6 +510,9 @@ export const QuotesService = GObject.registerClass({
     _shouldRefreshTicker(ticker) {
         if (ticker.marketType === 'always-open')
             return true;
+
+        if (ticker.marketType === 'weekday-session')
+            return !this._isUsMarketWeekend();
 
         if (ticker.marketType === 'us-session') {
             if (this._isUsMarketWeekend())

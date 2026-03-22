@@ -24,7 +24,7 @@ class TickerIndicator extends PanelMenu.Button {
         entries.forEach((entry, index) => {
             if (index > 0) {
                 this._content.add_child(new St.Label({
-                    text: ' \u00b7 ',
+                    text: entry.separatorBefore || ' \u00b7 ',
                     y_align: Clutter.ActorAlign.CENTER,
                     style: `color: ${DEFAULT_TEXT_COLOR};`,
                 }));
