@@ -13,7 +13,6 @@ import {
 
 const REFRESH_INTERVAL_SECONDS = 300;
 const US_SESSION_OVERNIGHT_REFRESH_INTERVAL_SECONDS = 1800;
-const HISTORY_LOOKBACK_DAYS = 7;
 const KRAKEN_WEBSOCKET_URL = 'wss://ws.kraken.com/v2';
 const KRAKEN_TICKER_SYMBOLS = ['BTC/USD', 'ETH/USD'];
 const KRAKEN_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
@@ -50,7 +49,6 @@ export const QuotesService = GObject.registerClass({
         this._running = false;
         this._entries = createLoadingEntries(TICKERS);
         this._latestQuotesBySymbol = new Map();
-        this._previousCloseCache = new Map();
         this._lastRefreshTimeBySymbol = new Map();
         this._refreshTimeoutId = 0;
         this._entriesUpdateTimeoutId = 0;
@@ -107,7 +105,6 @@ export const QuotesService = GObject.registerClass({
         this._session = null;
 
         this._latestQuotesBySymbol.clear();
-        this._previousCloseCache.clear();
         this._lastRefreshTimeBySymbol.clear();
         this._entries = createLoadingEntries(TICKERS);
     }
@@ -230,39 +227,7 @@ export const QuotesService = GObject.registerClass({
         if (!quote)
             throw new Error(`Missing batched quote for ${ticker.symbol}`);
 
-        const previousClose = await this._getPreviousClose(ticker, quote.quoteDate);
-        return createDisplayEntry(ticker, quote, previousClose);
-    }
-
-    async _getPreviousClose(ticker, quoteDate) {
-        const cacheKey = ticker.symbol.toUpperCase();
-        const cachedEntry = this._previousCloseCache.get(cacheKey);
-
-        if (cachedEntry?.quoteDate === quoteDate)
-            return cachedEntry.previousClose;
-
-        try {
-            const historyCsv = await this._fetchText(this._buildHistoryUrl(ticker.symbol));
-            if (!this._running)
-                throw new Error(`History request aborted for ${ticker.symbol}`);
-
-            const previousClose = this._parsePreviousClose(historyCsv, quoteDate);
-            this._previousCloseCache.set(cacheKey, {
-                quoteDate,
-                previousClose,
-            });
-
-            return previousClose;
-        } catch (error) {
-            if (this._running) {
-                logError(
-                    error,
-                    `${this._uuid}: previous close unavailable for ${ticker.label}; showing price without change`
-                );
-            }
-
-            return null;
-        }
+        return createDisplayEntry(ticker, quote, quote.previousClose);
     }
 
     async _fetchText(url) {
@@ -426,7 +391,12 @@ export const QuotesService = GObject.registerClass({
             if (!tickerSymbol || !Number.isFinite(price) || !quoteDate)
                 return;
 
-            this._latestQuotesBySymbol.set(tickerSymbol, {price, quoteDate});
+            const existingQuote = this._latestQuotesBySymbol.get(tickerSymbol);
+            this._latestQuotesBySymbol.set(tickerSymbol, {
+                price,
+                quoteDate,
+                previousClose: existingQuote?.previousClose ?? null,
+            });
             updated = true;
         });
 
@@ -441,22 +411,7 @@ export const QuotesService = GObject.registerClass({
             .map(ticker => ticker.symbol)
             .join('+');
 
-        return `https://stooq.com/q/l/?s=${encodeURIComponent(joinedSymbols).replace(/%2B/g, '+')}&i=d`;
-    }
-
-    _buildHistoryUrl(symbol) {
-        const endDate = new Date();
-        const startDate = new Date(endDate);
-        startDate.setUTCDate(startDate.getUTCDate() - HISTORY_LOOKBACK_DAYS);
-
-        return `https://stooq.com/q/d/l/?s=${encodeURIComponent(symbol)}&d1=${this._formatApiDate(startDate)}&d2=${this._formatApiDate(endDate)}&i=d`;
-    }
-
-    _formatApiDate(date) {
-        const year = date.getUTCFullYear();
-        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(date.getUTCDate()).padStart(2, '0');
-        return `${year}${month}${day}`;
+        return `https://stooq.com/q/l/?s=${encodeURIComponent(joinedSymbols).replace(/%2B/g, '+')}&f=sd2t2cp&i=d`;
     }
 
     _parseBatchQuotes(csv, expectedCount) {
@@ -470,43 +425,23 @@ export const QuotesService = GObject.registerClass({
             const fields = row.split(',');
             const symbol = fields[0]?.trim().toUpperCase();
             const quoteDate = this._normalizeQuoteDate(fields[1]?.trim() ?? '');
-            const price = Number.parseFloat(fields[6]?.trim() ?? '');
+            const price = Number.parseFloat(fields[3]?.trim() ?? '');
+            const previousClose = Number.parseFloat(fields[4]?.trim() ?? '');
 
             if (!symbol || !quoteDate || !Number.isFinite(price))
                 throw new Error(`Unexpected batched quote row: ${row}`);
 
-            quotesBySymbol.set(symbol, {price, quoteDate});
+            quotesBySymbol.set(symbol, {
+                price,
+                quoteDate,
+                previousClose: Number.isFinite(previousClose) ? previousClose : null,
+            });
         });
 
         if (quotesBySymbol.size !== expectedCount)
             throw new Error(`Unexpected batched quote response: ${csv}`);
 
         return quotesBySymbol;
-    }
-
-    _parsePreviousClose(csv, quoteDate) {
-        const rows = csv
-            .split('\n')
-            .slice(1)
-            .filter(line => line.trim() !== '')
-            .map(line => {
-                const fields = line.split(',');
-                return {
-                    date: this._normalizeQuoteDate(fields[0]?.trim() ?? ''),
-                    close: Number.parseFloat(fields[4]?.trim() ?? ''),
-                };
-            });
-
-        if (rows.length < 2)
-            throw new Error(`Not enough history rows: ${csv}`);
-
-        const previousRow = rows.findLast(row => row.date && row.date < quoteDate);
-        const previousClose = previousRow?.close;
-
-        if (!Number.isFinite(previousClose))
-            throw new Error(`Unexpected history response: ${csv}`);
-
-        return previousClose;
     }
 
     _normalizeQuoteDate(dateText) {
