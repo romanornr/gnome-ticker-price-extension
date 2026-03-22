@@ -1,9 +1,10 @@
-import GLib from 'gi://GLib';
-import Soup from 'gi://Soup?version=3.0';
-
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
+import {CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
 import {krakenAdapter} from '../../utils/crypto-providers/kraken-adapter.js';
-import {LiveWebsocketProvider} from './live-websocket-provider.js';
+import {isLiveCryptoTickerForProvider} from './live-quote-provider.js';
+import {
+    LiveWebsocketProvider,
+    openWebsocketConnection,
+} from './live-websocket-provider.js';
 
 /*
  * KrakenLiveProvider plugs Kraken-specific transport details into the shared
@@ -28,23 +29,7 @@ export class KrakenLiveProvider extends LiveWebsocketProvider {
 
     /* Kraken connection setup is just the provider-specific websocket endpoint for the shared base lifecycle. */
     async _openConnection(session) {
-        const message = Soup.Message.new('GET', krakenAdapter.websocketUrl);
-        return new Promise((resolve, reject) => {
-            session.websocket_connect_async(
-                message,
-                null,
-                [],
-                GLib.PRIORITY_DEFAULT,
-                null,
-                (_session, result) => {
-                    try {
-                        resolve(session.websocket_connect_finish(result));
-                    } catch (error) {
-                        reject(error);
-                    }
-                }
-            );
-        });
+        return openWebsocketConnection(session, krakenAdapter.websocketUrl);
     }
 
     /* Kraken uses one subscribe request containing the full symbol list. */
@@ -86,20 +71,12 @@ export class KrakenLiveProvider extends LiveWebsocketProvider {
 
         payload.data.forEach(entry => {
             const tickerSymbol = liveSymbolMap.get(entry?.symbol ?? '');
-            const price = Number.parseFloat(`${entry?.last ?? ''}`);
-            const quoteDate = normalizeTimestampDate(entry?.timestamp ?? '');
-            const change = Number.parseFloat(`${entry?.change ?? ''}`);
-            const changePct = Number.parseFloat(`${entry?.change_pct ?? ''}`);
+            const quote = krakenAdapter.createQuote(entry);
 
-            if (!tickerSymbol || !Number.isFinite(price) || !quoteDate)
+            if (!tickerSymbol || !quote)
                 return;
 
-            const previousClose = deriveKrakenPreviousClose(price, change, changePct);
-            updatedQuotes.set(tickerSymbol, {
-                price,
-                quoteDate,
-                previousClose,
-            });
+            updatedQuotes.set(tickerSymbol, quote);
         });
 
         return {
@@ -111,31 +88,5 @@ export class KrakenLiveProvider extends LiveWebsocketProvider {
 
 /* Kraken live support is limited to crypto tickers with a valid live symbol. */
 function isKrakenTicker(ticker) {
-    return ticker?.assetCategory === ASSET_CATEGORIES.CRYPTO &&
-        typeof ticker.liveSymbol === 'string' &&
-        ticker.liveSymbol !== '' &&
-        (ticker.cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN) === CRYPTO_PROVIDERS.KRAKEN;
-}
-
-/* Kraken can derive previous close from either absolute change or percent change. */
-function deriveKrakenPreviousClose(price, change, changePct) {
-    if (Number.isFinite(change)) {
-        const previousClose = price - change;
-        if (Number.isFinite(previousClose) && previousClose > 0)
-            return previousClose;
-    }
-
-    if (Number.isFinite(changePct) && changePct > -100) {
-        const previousClose = price / (1 + (changePct / 100));
-        if (Number.isFinite(previousClose) && previousClose > 0)
-            return previousClose;
-    }
-
-    return null;
-}
-
-/* Kraken timestamps are normalized to the shared YYYYMMDD quote-date shape here. */
-function normalizeTimestampDate(timestampText) {
-    const normalized = timestampText.slice(0, 10).replaceAll('-', '');
-    return /^\d{8}$/.test(normalized) ? normalized : '';
+    return isLiveCryptoTickerForProvider(ticker, CRYPTO_PROVIDERS.KRAKEN);
 }

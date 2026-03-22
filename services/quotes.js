@@ -5,13 +5,11 @@ import {buildEntries} from './entry-model.js';
 import {QuotesCoordinator} from './quotes-coordinator.js';
 import {QuoteStore} from './quote-store.js';
 import {
-    HyperliquidLiveProvider,
-    refresh as refreshHyperliquidQuotes,
-} from './providers/hyperliquid-live.js';
-import {KrakenLiveProvider} from './providers/kraken-live.js';
-import {refresh as refreshStooqQuotes} from './providers/stooq.js';
+    createRuntimeProviderRegistry,
+    getProviderRefreshPlan,
+} from './providers/runtime-provider-registry.js';
 import {createLoadingEntries} from '../utils/format.js';
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, SETTINGS_KEYS} from '../utils/settings.js';
+import {SETTINGS_KEYS} from '../utils/settings.js';
 import {
     loadDisplaySettings,
     loadRefreshIntervalSeconds,
@@ -84,18 +82,12 @@ export const QuotesService = GObject.registerClass({
                 this.emit('entries-changed');
             },
         });
-        this._krakenProvider = new KrakenLiveProvider({
+        this._runtimeProviders = createRuntimeProviderRegistry({
             uuid,
             onQuotes: quotesBySymbol => {
                 this._handleLiveQuotes(quotesBySymbol);
             },
-        });
-        this._hyperliquidProvider = new HyperliquidLiveProvider({
-            uuid,
             quoteStore: this._quoteStore,
-            onQuotes: quotesBySymbol => {
-                this._handleLiveQuotes(quotesBySymbol);
-            },
         });
     }
 
@@ -111,8 +103,7 @@ export const QuotesService = GObject.registerClass({
         this._entries = createLoadingEntries(this._tickers, this._displaySettings);
         this.emit('entries-changed');
 
-        this._krakenProvider.start(this._session);
-        this._hyperliquidProvider.start(this._session);
+        this._runtimeProviders.forEach(({provider}) => provider?.start(this._session));
         this._updateProviderSubscriptions();
 
         void this._refreshQuotes(true);
@@ -129,8 +120,7 @@ export const QuotesService = GObject.registerClass({
         this._disconnectSettingsSignals();
         this._coordinator.stop();
 
-        this._krakenProvider.stop();
-        this._hyperliquidProvider.stop();
+        this._runtimeProviders.forEach(({provider}) => provider?.stop());
         this._session?.abort();
         this._session = null;
 
@@ -145,9 +135,9 @@ export const QuotesService = GObject.registerClass({
 
     /*
      * A refresh pass first decides what needs data right now, then delegates to
-     * the right provider layer. REST and live sources can coexist: Stooq handles
-     * non-live symbols, while Hyperliquid can fall back to REST if its live
-     * socket is not available.
+     * the right provider layer. The provider registry owns refresh entrypoints
+     * for both normal polling providers such as Stooq and live providers that
+     * expose a fallback REST path when their socket is unavailable.
      */
     async _refreshQuotes(forceRefreshAll = false) {
         if (!this._running)
@@ -157,17 +147,12 @@ export const QuotesService = GObject.registerClass({
         const tickersToRefresh = forceRefreshAll
             ? this._tickers
             : this._tickers.filter(ticker => this._shouldRefreshTicker(ticker, now));
+        const providerRefreshPlan = getProviderRefreshPlan(tickersToRefresh, this._runtimeProviders);
 
-        const stooqTickers = tickersToRefresh.filter(ticker => !this._isLiveCryptoTicker(ticker));
-        const hyperliquidTickers = tickersToRefresh.filter(ticker => this._isHyperliquidTicker(ticker));
+        for (const {providerEntry, tickers} of providerRefreshPlan)
+            await this._refreshProviderFallback(providerEntry, tickers);
 
-        if (stooqTickers.length > 0)
-            await this._refreshStooqQuotes(stooqTickers);
-
-        if (hyperliquidTickers.length > 0 && !this._hasHyperliquidSocketConnected())
-            await this._refreshHyperliquidQuotes(hyperliquidTickers);
-
-        if (stooqTickers.length > 0 || hyperliquidTickers.length > 0)
+        if (providerRefreshPlan.length > 0)
             this._coordinator.requestEntriesUpdate(true);
     }
 
@@ -224,25 +209,10 @@ export const QuotesService = GObject.registerClass({
      * Provider refreshes always normalize into the same in-memory quote shape so
      * the rest of the system can stay provider-agnostic after this point.
      */
-    /* Stooq refresh is the normal REST path for non-live symbols and any manual quote polling. */
-    async _refreshStooqQuotes(tickers) {
+    /* Provider fallback refreshes are only used by runtime entries that explicitly define a polling path. */
+    async _refreshProviderFallback(providerEntry, tickers) {
         try {
-            const quotesBySymbol = await refreshStooqQuotes(tickers, {session: this._session});
-            if (!this._running)
-                return;
-
-            this._mergeQuotes(quotesBySymbol);
-            this._quoteStore.markRefreshed(tickers);
-        } catch (error) {
-            if (this._running)
-                logError(error, `${this._uuid}: failed to refresh Stooq quotes`);
-        }
-    }
-
-    /* Hyperliquid REST refresh is only the fallback path when live transport is not currently connected. */
-    async _refreshHyperliquidQuotes(tickers) {
-        try {
-            const quotesBySymbol = await refreshHyperliquidQuotes(tickers, {
+            const quotesBySymbol = await providerEntry.refreshFallback(tickers, {
                 session: this._session,
                 quoteStore: this._quoteStore,
             });
@@ -253,7 +223,7 @@ export const QuotesService = GObject.registerClass({
             this._quoteStore.markRefreshed(tickers);
         } catch (error) {
             if (this._running)
-                logError(error, `${this._uuid}: failed to refresh Hyperliquid quotes`);
+                logError(error, `${this._uuid}: failed to refresh ${providerEntry.id} fallback quotes`);
         }
     }
 
@@ -286,13 +256,7 @@ export const QuotesService = GObject.registerClass({
 
     /* Saved ticker changes are reconciled into both live providers through this shared handoff. */
     _updateProviderSubscriptions() {
-        this._krakenProvider.updateSubscriptions(this._tickers);
-        this._hyperliquidProvider.updateSubscriptions(this._tickers);
-    }
-
-    /* Hyperliquid REST snapshots are only used when live data for those symbols is currently unavailable. */
-    _hasHyperliquidSocketConnected() {
-        return this._hyperliquidProvider.isConnected();
+        this._runtimeProviders.forEach(({provider}) => provider?.updateSubscriptions(this._tickers));
     }
 
     /*
@@ -309,16 +273,4 @@ export const QuotesService = GObject.registerClass({
         );
     }
 
-    /* Saved ticker metadata determines whether a symbol belongs to the live-crypto branch of the pipeline. */
-    _isLiveCryptoTicker(ticker) {
-        return ticker?.assetCategory === ASSET_CATEGORIES.CRYPTO &&
-            typeof ticker.liveSymbol === 'string' &&
-            ticker.liveSymbol !== '';
-    }
-
-    /* Hyperliquid-specific branching is kept here so the rest of refresh orchestration stays provider-agnostic. */
-    _isHyperliquidTicker(ticker) {
-        return this._isLiveCryptoTicker(ticker) &&
-            ticker.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID;
-    }
 });

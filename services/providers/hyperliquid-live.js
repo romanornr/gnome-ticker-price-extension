@@ -1,9 +1,10 @@
-import GLib from 'gi://GLib';
-import Soup from 'gi://Soup?version=3.0';
-
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
+import {CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
 import {hyperliquidAdapter} from '../../utils/crypto-providers/hyperliquid-adapter.js';
-import {LiveWebsocketProvider} from './live-websocket-provider.js';
+import {isLiveCryptoTickerForProvider} from './live-quote-provider.js';
+import {
+    LiveWebsocketProvider,
+    openWebsocketConnection,
+} from './live-websocket-provider.js';
 
 /*
  * Hyperliquid uses both REST snapshots and a live websocket in the same provider
@@ -55,23 +56,7 @@ export class HyperliquidLiveProvider extends LiveWebsocketProvider {
 
     /* Hyperliquid connection setup is just the provider-specific websocket endpoint for the shared base lifecycle. */
     async _openConnection(session) {
-        const message = Soup.Message.new('GET', hyperliquidAdapter.websocketUrl);
-        return new Promise((resolve, reject) => {
-            session.websocket_connect_async(
-                message,
-                null,
-                [],
-                GLib.PRIORITY_DEFAULT,
-                null,
-                (_session, result) => {
-                    try {
-                        resolve(session.websocket_connect_finish(result));
-                    } catch (error) {
-                        reject(error);
-                    }
-                }
-            );
-        });
+        return openWebsocketConnection(session, hyperliquidAdapter.websocketUrl);
     }
 
     /* Hyperliquid requires one subscribe message per live market symbol. */
@@ -118,8 +103,5 @@ export class HyperliquidLiveProvider extends LiveWebsocketProvider {
 
 /* Hyperliquid live updates only apply to crypto tickers explicitly assigned there. */
 function isHyperliquidTicker(ticker) {
-    return ticker?.assetCategory === ASSET_CATEGORIES.CRYPTO &&
-        typeof ticker.liveSymbol === 'string' &&
-        ticker.liveSymbol !== '' &&
-        ticker.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID;
+    return isLiveCryptoTickerForProvider(ticker, CRYPTO_PROVIDERS.HYPERLIQUID);
 }

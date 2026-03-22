@@ -1,4 +1,5 @@
 import GLib from 'gi://GLib';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
 
 /*
  * LiveQuoteProvider shape contract
@@ -39,6 +40,24 @@ export function createTickerSymbolMap(tickers) {
             .filter(ticker => typeof ticker.liveSymbol === 'string' && ticker.liveSymbol !== '')
             .map(ticker => [ticker.liveSymbol, ticker.symbol.toUpperCase()])
     );
+}
+
+/* Runtime provider ownership only applies to crypto tickers with a valid live symbol. */
+export function isLiveCryptoTicker(ticker) {
+    return ticker?.assetCategory === ASSET_CATEGORIES.CRYPTO &&
+        typeof ticker.liveSymbol === 'string' &&
+        ticker.liveSymbol !== '';
+}
+
+/* Provider-specific ownership resolves through one helper so runtime/provider filters stay parallel. */
+export function isLiveCryptoTickerForProvider(ticker, cryptoProvider) {
+    if (!isLiveCryptoTicker(ticker))
+        return false;
+
+    if (cryptoProvider === CRYPTO_PROVIDERS.KRAKEN)
+        return (ticker.cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN) === CRYPTO_PROVIDERS.KRAKEN;
+
+    return ticker.cryptoProvider === cryptoProvider;
 }
 
 /* Shared timeout cleanup keeps provider lifecycle helpers using one consistent convention. */

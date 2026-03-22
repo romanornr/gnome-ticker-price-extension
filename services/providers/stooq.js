@@ -68,7 +68,7 @@ async function fetchText(session, url) {
 }
 
 /* Raw Stooq CSV rows are converted here into the normalized quote shape used by the rest of the system. */
-function parseBatchQuotes(csv, expectedCount) {
+export function parseBatchQuotes(csv, expectedCount) {
     const quotesBySymbol = new Map();
     const rows = csv
         .split('\n')
@@ -99,7 +99,7 @@ function parseBatchQuotes(csv, expectedCount) {
 }
 
 /* Stooq dates are normalized once here so callers never reason about provider-specific date formatting. */
-function normalizeQuoteDate(dateText) {
+export function normalizeQuoteDate(dateText) {
     const normalized = dateText.replaceAll('-', '');
     return /^\d{8}$/.test(normalized) ? normalized : '';
 }

@@ -9,6 +9,27 @@ import {
 
 const LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
 
+/* Concrete live providers share one websocket-connect helper because only the URL differs. */
+export function openWebsocketConnection(session, websocketUrl) {
+    const message = Soup.Message.new('GET', websocketUrl);
+    return new Promise((resolve, reject) => {
+        session.websocket_connect_async(
+            message,
+            null,
+            [],
+            GLib.PRIORITY_DEFAULT,
+            null,
+            (_session, result) => {
+                try {
+                    resolve(session.websocket_connect_finish(result));
+                } catch (error) {
+                    reject(error);
+                }
+            }
+        );
+    });
+}
+
 /*
  * LiveWebsocketProvider is the shared lifecycle shell for concrete live quote
  * providers such as Kraken and Hyperliquid.
