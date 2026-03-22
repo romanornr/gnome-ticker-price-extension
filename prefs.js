@@ -9,7 +9,10 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 import {
     getAssetCategoryOptions,
     cloneTicker,
+    CRYPTO_PROVIDERS,
     formatRefreshIntervalLabel,
+    getCryptoProviderOptions,
+    getDefaultCryptoProvider,
     getFormatPresetOptions,
     getMarketTypeForAssetCategory,
     getMarketTypeOptions,
@@ -25,6 +28,9 @@ import {
     saveTickerConfigs,
     SETTINGS_KEYS,
 } from './utils/settings.js';
+import {
+    loadHyperliquidMarkets,
+} from './utils/hyperliquid.js';
 import {
     findCuratedTicker,
     matchCuratedTickers,
@@ -53,6 +59,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         this._tickerRows = [];
         this._refreshOptions = getRefreshIntervalOptions();
         this._assetCategoryOptions = getAssetCategoryOptions();
+        this._cryptoProviderOptions = getCryptoProviderOptions();
         this._marketTypeOptions = getMarketTypeOptions();
 
         this._build();
@@ -326,7 +333,11 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
         let activeAssetCategory = initialTicker.assetCategory ?? this._assetCategoryOptions[0].value;
         let activeMarketType = getMarketTypeForAssetCategory(activeAssetCategory);
+        let activeCryptoProvider = activeAssetCategory === 'crypto'
+            ? (initialTicker.cryptoProvider ?? getDefaultCryptoProvider())
+            : '';
         let cryptoCatalog = null;
+        let cryptoCatalogProvider = '';
         let cryptoCatalogError = '';
         let cryptoCatalogLoading = false;
         let cryptoCatalogRequestId = 0;
@@ -346,6 +357,16 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             subtitle: this._getMarketTypeTitle(activeMarketType),
         });
         formGroup.add(marketTypeRow);
+
+        const cryptoProviderRow = this._createComboRow({
+            title: 'Crypto API',
+            subtitle: 'Kraken supports spot pairs. Hyperliquid supports spot symbols and perps.',
+            options: this._cryptoProviderOptions,
+            selectedValue: activeCryptoProvider || getDefaultCryptoProvider(),
+            onSelected: () => {},
+        });
+        cryptoProviderRow.visible = activeAssetCategory === 'crypto';
+        formGroup.add(cryptoProviderRow);
 
         const labelRow = new Adw.EntryRow({
             title: 'Label',
@@ -421,14 +442,19 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         const suggestionRows = [];
         const applyCuratedTicker = curatedTicker => {
             labelRow.text = curatedTicker.label;
-            symbolRow.text = activeAssetCategory === 'crypto'
+            symbolRow.text = curatedTicker.assetCategory === 'crypto'
                 ? (curatedTicker.liveSymbol ?? curatedTicker.symbol)
                 : curatedTicker.symbol;
             decimalsRow.value = curatedTicker.priceDecimals;
             activeAssetCategory = curatedTicker.assetCategory;
             activeMarketType = curatedTicker.marketType;
+            activeCryptoProvider = curatedTicker.assetCategory === 'crypto'
+                ? (curatedTicker.cryptoProvider ?? getDefaultCryptoProvider())
+                : '';
             assetCategoryRow.selected = this._findOptionIndex(this._assetCategoryOptions, curatedTicker.assetCategory);
+            cryptoProviderRow.selected = this._findOptionIndex(this._cryptoProviderOptions, activeCryptoProvider);
             marketTypeRow.subtitle = this._getMarketTypeTitle(activeMarketType);
+            cryptoProviderRow.visible = activeAssetCategory === 'crypto';
             if (activeAssetCategory === 'crypto')
                 autoFilledCryptoLabel = curatedTicker.label;
             updateSaveSensitivity();
@@ -453,12 +479,23 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             suggestionRows.splice(0).forEach(row => suggestionsGroup.remove(row));
         };
 
+        const resetCryptoCatalogState = () => {
+            cryptoCatalog = null;
+            cryptoCatalogProvider = '';
+            cryptoCatalogError = '';
+            cryptoCatalogLoading = false;
+            cryptoCatalogRequestId += 1;
+        };
+
         const getCatalogOptions = () => ({
             cryptoCatalog: Array.isArray(cryptoCatalog) ? cryptoCatalog : [],
+            cryptoProvider: activeCryptoProvider,
         });
         const updateSuggestionsDescription = () => {
             suggestionsGroup.description = activeAssetCategory === 'crypto'
-                ? 'Search live Kraken WebSocket pairs. Non-crypto assets still use the built-in catalog.'
+                ? activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                    ? 'Search live Hyperliquid spot symbols and perps. Non-crypto assets still use the built-in catalog.'
+                    : 'Search live Kraken WebSocket pairs. Non-crypto assets still use the built-in catalog.'
                 : 'Type a label or symbol above to search the built-in catalog. You can still save any custom Stooq symbol.';
         };
 
@@ -478,11 +515,14 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 assetCategory: activeAssetCategory,
             }, getCatalogOptions());
 
-            return exactMatch ?? resolveCryptoCatalogTicker(query, cryptoCatalog);
+            return exactMatch ?? resolveCryptoCatalogTicker(query, cryptoCatalog, activeCryptoProvider);
         };
 
         const ensureCryptoCatalogLoaded = async () => {
-            if (activeAssetCategory !== 'crypto' || Array.isArray(cryptoCatalog) || cryptoCatalogLoading)
+            if (activeAssetCategory !== 'crypto' || cryptoCatalogLoading)
+                return;
+
+            if (Array.isArray(cryptoCatalog) && cryptoCatalogProvider === activeCryptoProvider)
                 return;
 
             cryptoCatalogLoading = true;
@@ -490,25 +530,45 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             renderCuratedSuggestions();
             updateSaveSensitivity();
 
+            const requestedCryptoProvider = activeCryptoProvider;
             cryptoCatalogRequestId += 1;
             const requestId = cryptoCatalogRequestId;
 
             try {
-                const loadedCryptoCatalog = await loadKrakenSpotPairs();
-                if (isDialogDestroyed || requestId !== cryptoCatalogRequestId)
+                const loadedCryptoCatalog = requestedCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                    ? await loadHyperliquidMarkets()
+                    : await loadKrakenSpotPairs();
+                if (
+                    isDialogDestroyed ||
+                    requestId !== cryptoCatalogRequestId ||
+                    activeCryptoProvider !== requestedCryptoProvider
+                ) {
                     return;
+                }
 
                 cryptoCatalog = loadedCryptoCatalog;
+                cryptoCatalogProvider = requestedCryptoProvider;
                 cryptoCatalogError = '';
             } catch (error) {
-                if (isDialogDestroyed || requestId !== cryptoCatalogRequestId)
+                if (
+                    isDialogDestroyed ||
+                    requestId !== cryptoCatalogRequestId ||
+                    activeCryptoProvider !== requestedCryptoProvider
+                ) {
                     return;
+                }
 
                 cryptoCatalog = null;
+                cryptoCatalogProvider = '';
                 cryptoCatalogError = error.message;
             } finally {
-                if (isDialogDestroyed || requestId !== cryptoCatalogRequestId)
+                if (
+                    isDialogDestroyed ||
+                    requestId !== cryptoCatalogRequestId ||
+                    activeCryptoProvider !== requestedCryptoProvider
+                ) {
                     return;
+                }
 
                 cryptoCatalogLoading = false;
                 renderCuratedSuggestions();
@@ -527,7 +587,9 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 if (cryptoCatalogLoading) {
                     const loadingRow = new Adw.ActionRow({
                         title: 'Loading crypto pairs',
-                        subtitle: 'Fetching active Kraken WebSocket pairs for search and verification.',
+                        subtitle: activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                            ? 'Fetching live Hyperliquid spot symbols and perps for search and verification.'
+                            : 'Fetching active Kraken WebSocket pairs for search and verification.',
                         sensitive: false,
                     });
                     suggestionsGroup.add(loadingRow);
@@ -537,7 +599,9 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
                 if (cryptoCatalogError !== '') {
                     const unavailableRow = new Adw.ActionRow({
-                        title: 'Kraken crypto catalog unavailable',
+                        title: activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                            ? 'Hyperliquid crypto catalog unavailable'
+                            : 'Kraken crypto catalog unavailable',
                         subtitle: cryptoCatalogError,
                         sensitive: false,
                     });
@@ -551,7 +615,9 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 const promptRow = new Adw.ActionRow({
                     title: 'Start typing to search',
                     subtitle: activeAssetCategory === 'crypto'
-                        ? 'Type a base asset or pair like SOL, SOLUSD, or SOL/USD.'
+                        ? activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                            ? 'Type a perp like BTC or a spot pair like PURR/USDC.'
+                            : 'Type a base asset or pair like SOL, SOLUSD, or SOL/USD.'
                         : 'Curated matches stay hidden until you enter a label or symbol.',
                     sensitive: false,
                 });
@@ -565,7 +631,9 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 const emptyRow = new Adw.ActionRow({
                     title: 'No curated matches',
                     subtitle: activeAssetCategory === 'crypto'
-                        ? 'Type an exact Kraken WebSocket pair like SOL/USD, or keep searching.'
+                        ? activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                            ? 'Type an exact Hyperliquid perp like BTC or a spot pair like PURR/USDC.'
+                            : 'Type an exact Kraken WebSocket pair like SOL/USD, or keep searching.'
                         : 'Keep your manual symbol and use Verify to check whether Stooq returns data for it.',
                     sensitive: false,
                 });
@@ -624,13 +692,22 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
                 const resolvedCryptoTicker = getResolvedCryptoTicker();
                 if (!resolvedCryptoTicker) {
-                    setVerificationMessage('Choose a Kraken-supported pair before saving.', true);
+                    setVerificationMessage(
+                        activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                            ? 'Choose a Hyperliquid-supported spot symbol or perp before saving.'
+                            : 'Choose a Kraken-supported pair before saving.',
+                        true
+                    );
                     updateVerifyButtonSensitivity();
                     return;
                 }
 
                 lastVerifiedSymbol = resolvedCryptoTicker.liveSymbol;
-                setVerificationMessage(`Verified ${resolvedCryptoTicker.liveSymbol}. Kraken WebSocket supports this pair.`);
+                setVerificationMessage(
+                    activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                        ? `Verified ${resolvedCryptoTicker.liveSymbol}. Hyperliquid supports this market.`
+                        : `Verified ${resolvedCryptoTicker.liveSymbol}. Kraken WebSocket supports this pair.`
+                );
                 updateVerifyButtonSensitivity();
                 return;
             }
@@ -674,11 +751,15 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         };
 
         const updateSaveSensitivity = () => {
+            const hasCryptoCatalogMatches = activeAssetCategory === 'crypto' &&
+                matchCuratedTickers(activeAssetCategory, getCryptoSearchQuery(), getCatalogOptions()).length > 0;
             const validationMessage = this._validateTickerDraft(labelRow.text, symbolRow.text, {
                 assetCategory: activeAssetCategory,
+                cryptoProvider: activeCryptoProvider,
                 cryptoCatalogLoading,
                 cryptoCatalogError,
                 resolvedCryptoTicker: getResolvedCryptoTicker(),
+                hasCryptoCatalogMatches,
             });
             const isValid = validationMessage === '';
             saveButton.set_sensitive(isValid);
@@ -694,7 +775,29 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
             activeAssetCategory = option.value;
             activeMarketType = getMarketTypeForAssetCategory(activeAssetCategory);
+            activeCryptoProvider = activeAssetCategory === 'crypto'
+                ? (activeCryptoProvider || getDefaultCryptoProvider())
+                : '';
+            resetCryptoCatalogState();
+            clearVerificationState();
             marketTypeRow.subtitle = this._getMarketTypeTitle(activeMarketType);
+            cryptoProviderRow.visible = activeAssetCategory === 'crypto';
+            if (activeAssetCategory === 'crypto')
+                cryptoProviderRow.selected = this._findOptionIndex(this._cryptoProviderOptions, activeCryptoProvider);
+            updateSuggestionsDescription();
+            if (activeAssetCategory === 'crypto')
+                void ensureCryptoCatalogLoaded();
+            renderCuratedSuggestions();
+            updateSaveSensitivity();
+        });
+        cryptoProviderRow.connect('notify::selected', widget => {
+            const option = this._cryptoProviderOptions[widget.selected];
+            if (!option)
+                return;
+
+            activeCryptoProvider = option.value;
+            resetCryptoCatalogState();
+            clearVerificationState();
             updateSuggestionsDescription();
             if (activeAssetCategory === 'crypto')
                 void ensureCryptoCatalogLoaded();
@@ -765,11 +868,14 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 };
 
                 if (activeAssetCategory === 'crypto') {
+                    nextTicker.cryptoProvider = activeCryptoProvider || getDefaultCryptoProvider();
                     nextTicker.liveSymbol = resolvedCryptoTicker?.liveSymbol ?? matchingCuratedTicker?.liveSymbol ?? '';
-                } else if (matchingCuratedTicker?.liveSymbol) {
-                    nextTicker.liveSymbol = matchingCuratedTicker.liveSymbol;
                 } else {
-                    delete nextTicker.liveSymbol;
+                    delete nextTicker.cryptoProvider;
+                    if (matchingCuratedTicker?.liveSymbol)
+                        nextTicker.liveSymbol = matchingCuratedTicker.liveSymbol;
+                    else
+                        delete nextTicker.liveSymbol;
                 }
 
                 onSave(nextTicker);
@@ -787,13 +893,25 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 return 'Symbol is required.';
 
             if (options.cryptoCatalogLoading)
-                return 'Kraken crypto pairs are still loading.';
+                return options.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                    ? 'Hyperliquid crypto symbols are still loading.'
+                    : 'Kraken crypto pairs are still loading.';
 
             if (options.cryptoCatalogError)
-                return 'Kraken crypto pairs could not be loaded.';
+                return options.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                    ? 'Hyperliquid crypto symbols could not be loaded.'
+                    : 'Kraken crypto pairs could not be loaded.';
+
+            if (!options.resolvedCryptoTicker && options.hasCryptoCatalogMatches) {
+                return options.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                    ? 'Keep typing or choose a suggested Hyperliquid spot symbol or perp.'
+                    : 'Keep typing or choose a suggested Kraken pair.';
+            }
 
             if (!options.resolvedCryptoTicker)
-                return 'Choose a Kraken-supported crypto pair.';
+                return options.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
+                    ? 'Choose a Hyperliquid-supported spot symbol or perp.'
+                    : 'Choose a Kraken-supported crypto pair.';
 
             return '';
         }

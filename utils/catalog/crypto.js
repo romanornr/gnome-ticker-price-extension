@@ -1,8 +1,9 @@
-import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../asset-categories.js';
 
 export const CRYPTO_TICKERS = [
     {
         assetCategory: ASSET_CATEGORIES.CRYPTO,
+        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         label: 'BTC',
         symbol: 'btcusd',
         priceDecimals: 0,
@@ -12,6 +13,7 @@ export const CRYPTO_TICKERS = [
     },
     {
         assetCategory: ASSET_CATEGORIES.CRYPTO,
+        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         label: 'ETH',
         symbol: 'ethusd',
         priceDecimals: 0,

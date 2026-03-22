@@ -1,6 +1,6 @@
 # Ticker Price Extension
 
-GNOME Shell extension that shows market tickers in the top bar, with curated suggestions for common equities, ETFs, commodities, FX pairs, and a Kraken-backed crypto catalog.
+GNOME Shell extension that shows market tickers in the top bar, with curated suggestions for common equities, ETFs, commodities, FX pairs, and crypto catalogs backed by Kraken and Hyperliquid.
 
 ## Adding Tickers
 
@@ -8,8 +8,10 @@ You can add tickers in two ways:
 
 1. Open the extension preferences and use `+ Add ticker`.
 2. Search the built-in catalog by label, symbol, or broad category terms such as `energy`, `metals`, `forex`, or `crypto`.
-3. Crypto suggestions are loaded dynamically from Kraken WebSocket instrument metadata, so you can search pairs like `SOL`, `SOLUSD`, or `SOL/USD`.
-4. If your non-crypto symbol is not in the catalog, enter any Stooq symbol manually and use `Verify` before saving. Crypto verification checks whether Kraken currently supports the pair.
+3. Crypto tickers support both Kraken spot pairs and Hyperliquid spot/perp markets through the `Crypto API` selector in prefs.
+4. Kraken suggestions are loaded dynamically from Kraken WebSocket instrument metadata, so you can search pairs like `SOL`, `SOLUSD`, or `SOL/USD`.
+5. Hyperliquid suggestions are loaded dynamically from the official spot/perp metadata endpoints, so you can search perps like `BTC` and spot pairs like `PURR/USDC`.
+6. If your non-crypto symbol is not in the catalog, enter any Stooq symbol manually and use `Verify` before saving. Crypto verification checks whether the selected provider currently supports the market.
 
 Examples: `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD`, `USO`.
 
@@ -29,7 +31,7 @@ When adding a curated ticker:
 - keep `assetCategory`, `marketType`, and `priceDecimals` aligned with similar entries
 - add a few helpful `keywords` so catalog search is forgiving
 - verify the Stooq symbol first for non-crypto instruments
-- crypto suggestions come from Kraken at runtime rather than a manually maintained static catalog
+- crypto suggestions come from the selected live provider at runtime rather than a manually maintained static catalog
 
 ## Local Install
 

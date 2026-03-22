@@ -1,9 +1,16 @@
 import {
     ASSET_CATEGORIES,
+    CRYPTO_PROVIDERS,
     MARKET_TYPES,
     getAssetCategoryDefaultMarketType,
     getAssetCategoryOptions,
+    getCryptoProviderOptions,
+    getDefaultCryptoProvider,
 } from './asset-categories.js';
+import {
+    normalizeHyperliquidLiveSymbol,
+    normalizeHyperliquidTickerSymbol,
+} from './hyperliquid.js';
 import {
     normalizeKrakenLiveSymbol,
     normalizeKrakenTickerSymbol,
@@ -23,6 +30,11 @@ export const LEFT_PANEL_SIDE = 'left';
 export const RIGHT_PANEL_SIDE = 'right';
 
 export {ASSET_CATEGORIES, MARKET_TYPES, getAssetCategoryOptions};
+export {
+    CRYPTO_PROVIDERS,
+    getCryptoProviderOptions,
+    getDefaultCryptoProvider,
+};
 
 export const FORMAT_PRESETS = {
     DEFAULT: 'default',
@@ -93,6 +105,7 @@ export const DEFAULT_TICKERS = [
         priceDecimals: 0,
         marketType: MARKET_TYPES.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
+        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         panelSide: RIGHT_PANEL_SIDE,
         separatorBefore: ' || ',
         liveSymbol: 'ETH/USD',
@@ -103,6 +116,7 @@ export const DEFAULT_TICKERS = [
         priceDecimals: 0,
         marketType: MARKET_TYPES.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
+        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         panelSide: RIGHT_PANEL_SIDE,
         liveSymbol: 'BTC/USD',
     },
@@ -122,6 +136,7 @@ const SUPPORTED_LIVE_TICKERS = [
         symbol: 'btcusd',
         marketType: MARKET_TYPES.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
+        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         liveSymbol: 'BTC/USD',
     },
     {
@@ -129,6 +144,7 @@ const SUPPORTED_LIVE_TICKERS = [
         symbol: 'ethusd',
         marketType: MARKET_TYPES.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
+        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         liveSymbol: 'ETH/USD',
     },
 ];
@@ -261,19 +277,21 @@ function normalizeTickerConfig(rawTicker) {
         return null;
 
     const label = `${rawTicker.label ?? ''}`.trim();
-    const rawLiveSymbol = normalizeKrakenLiveSymbol(rawTicker.liveSymbol);
-    const symbol = normalizeTickerSymbol(`${rawTicker.symbol ?? ''}`.trim().toLowerCase(), rawLiveSymbol);
+    const marketType = normalizeMarketType(rawTicker.marketType);
+    const assetCategory = normalizeAssetCategory(rawTicker.assetCategory, {
+        label,
+        symbol: `${rawTicker.symbol ?? ''}`.trim().toLowerCase(),
+        marketType,
+        liveSymbol: `${rawTicker.liveSymbol ?? ''}`.trim(),
+        cryptoProvider: rawTicker.cryptoProvider,
+    });
+    const cryptoProvider = normalizeCryptoProvider(rawTicker.cryptoProvider, assetCategory);
+    const rawLiveSymbol = normalizeCryptoLiveSymbol(rawTicker.liveSymbol, cryptoProvider);
+    const symbol = normalizeTickerSymbol(`${rawTicker.symbol ?? ''}`.trim().toLowerCase(), rawLiveSymbol, cryptoProvider);
     if (label === '' || symbol === '')
         return null;
 
     const priceDecimals = clampInteger(rawTicker.priceDecimals, 0, 6, 0);
-    const marketType = normalizeMarketType(rawTicker.marketType);
-    const assetCategory = normalizeAssetCategory(rawTicker.assetCategory, {
-        label,
-        symbol,
-        marketType,
-        liveSymbol: rawLiveSymbol,
-    });
     const panelSide = normalizePanelSide(rawTicker.panelSide);
     const separatorBefore = typeof rawTicker.separatorBefore === 'string'
         ? rawTicker.separatorBefore
@@ -290,6 +308,9 @@ function normalizeTickerConfig(rawTicker) {
 
     if (separatorBefore !== '')
         ticker.separatorBefore = separatorBefore;
+
+    if (assetCategory === ASSET_CATEGORIES.CRYPTO)
+        ticker.cryptoProvider = cryptoProvider;
 
     const liveSymbol = getSupportedLiveSymbol(ticker, rawLiveSymbol);
     if (liveSymbol)
@@ -311,6 +332,9 @@ function serializeTickerConfig(ticker) {
 
     if (ticker.separatorBefore)
         serialized.separatorBefore = ticker.separatorBefore;
+
+    if (assetCategory === ASSET_CATEGORIES.CRYPTO)
+        serialized.cryptoProvider = normalizeCryptoProvider(ticker.cryptoProvider, assetCategory);
 
     if (ticker.liveSymbol)
         serialized.liveSymbol = ticker.liveSymbol;
@@ -368,6 +392,19 @@ function normalizeSeparatorStyle(separatorStyle) {
     }
 }
 
+function normalizeCryptoProvider(cryptoProvider, assetCategory) {
+    if (assetCategory !== ASSET_CATEGORIES.CRYPTO)
+        return '';
+
+    switch (cryptoProvider) {
+    case CRYPTO_PROVIDERS.KRAKEN:
+    case CRYPTO_PROVIDERS.HYPERLIQUID:
+        return cryptoProvider;
+    default:
+        return getDefaultCryptoProvider();
+    }
+}
+
 function clampInteger(value, min, max, fallback) {
     const parsed = Number.parseInt(`${value ?? ''}`, 10);
     if (!Number.isInteger(parsed))
@@ -376,11 +413,15 @@ function clampInteger(value, min, max, fallback) {
     return Math.min(max, Math.max(min, parsed));
 }
 
-function normalizeTickerSymbol(symbol, rawLiveSymbol) {
-    const liveSymbol = normalizeKrakenLiveSymbol(rawLiveSymbol);
+function normalizeTickerSymbolForProvider(symbol, rawLiveSymbol, cryptoProvider) {
+    const liveSymbol = normalizeCryptoLiveSymbol(rawLiveSymbol, cryptoProvider);
 
-    if (liveSymbol !== '')
+    if (liveSymbol !== '') {
+        if (cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID)
+            return normalizeHyperliquidTickerSymbol(liveSymbol);
+
         return normalizeKrakenTickerSymbol(liveSymbol);
+    }
 
     if (symbol === 'btc.v' && liveSymbol === 'BTC/USD')
         return 'btcusd';
@@ -391,17 +432,26 @@ function normalizeTickerSymbol(symbol, rawLiveSymbol) {
     return symbol;
 }
 
-function getSupportedLiveSymbol(ticker, rawLiveSymbol) {
-    const explicitLiveSymbol = normalizeKrakenLiveSymbol(rawLiveSymbol);
+function normalizeTickerSymbol(symbol, rawLiveSymbol, cryptoProvider = CRYPTO_PROVIDERS.KRAKEN) {
+    return normalizeTickerSymbolForProvider(symbol, rawLiveSymbol, cryptoProvider);
+}
 
-    if (ticker.assetCategory === ASSET_CATEGORIES.CRYPTO && explicitLiveSymbol !== '')
+function getSupportedLiveSymbol(ticker, rawLiveSymbol) {
+    const explicitLiveSymbol = normalizeCryptoLiveSymbol(rawLiveSymbol, ticker.cryptoProvider);
+
+    if (
+        ticker.assetCategory === ASSET_CATEGORIES.CRYPTO &&
+        explicitLiveSymbol !== ''
+    ) {
         return explicitLiveSymbol;
+    }
 
     const supportedTicker = SUPPORTED_LIVE_TICKERS.find(candidate =>
         candidate.label === ticker.label &&
         candidate.symbol === ticker.symbol &&
         candidate.marketType === ticker.marketType &&
         candidate.assetCategory === ticker.assetCategory &&
+        candidate.cryptoProvider === ticker.cryptoProvider &&
         (explicitLiveSymbol === '' || explicitLiveSymbol === candidate.liveSymbol)
     );
 
@@ -415,9 +465,13 @@ function inferAssetCategory(ticker) {
     const liveSymbol = typeof ticker?.liveSymbol === 'string'
         ? ticker.liveSymbol
         : '';
-
-    if (marketType === MARKET_TYPES.ALWAYS_OPEN || normalizeKrakenLiveSymbol(liveSymbol) !== '')
+    if (
+        marketType === MARKET_TYPES.ALWAYS_OPEN ||
+        normalizeCryptoLiveSymbol(liveSymbol, ticker?.cryptoProvider) !== '' ||
+        hasKnownCryptoProvider(ticker?.cryptoProvider)
+    ) {
         return ASSET_CATEGORIES.CRYPTO;
+    }
 
     if (marketType === MARKET_TYPES.WEEKDAY_SESSION) {
         if (['xauusd', 'xagusd', 'wticrud.f', 'brent.f', 'hg.f', 'ng.f'].includes(symbol))
@@ -436,4 +490,21 @@ function inferAssetCategory(ticker) {
         return ASSET_CATEGORIES.US_ETF;
 
     return ASSET_CATEGORIES.US_EQUITY;
+}
+
+function hasKnownCryptoProvider(cryptoProvider) {
+    switch (cryptoProvider) {
+    case CRYPTO_PROVIDERS.KRAKEN:
+    case CRYPTO_PROVIDERS.HYPERLIQUID:
+        return true;
+    default:
+        return false;
+    }
+}
+
+function normalizeCryptoLiveSymbol(rawLiveSymbol, cryptoProvider) {
+    if (cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID)
+        return normalizeHyperliquidLiveSymbol(rawLiveSymbol);
+
+    return normalizeKrakenLiveSymbol(rawLiveSymbol);
 }

@@ -4,7 +4,8 @@ import {CRYPTO_TICKERS} from './catalog/crypto.js';
 import {FX_TICKERS} from './catalog/fx.js';
 import {US_ETF_TICKERS} from './catalog/us-etf.js';
 import {US_EQUITY_TICKERS} from './catalog/us-equity.js';
-import {ASSET_CATEGORIES} from './asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from './asset-categories.js';
+import {scoreHyperliquidCatalogEntry} from './hyperliquid.js';
 import {scoreKrakenCatalogEntry} from './kraken.js';
 
 const CATALOG = [
@@ -60,8 +61,8 @@ export function matchCuratedTickers(assetCategory, query, options = {}) {
         .map(match => cloneCatalogEntry(match.entry));
 }
 
-export function resolveCryptoCatalogTicker(query, cryptoCatalog = []) {
-    const matches = matchCuratedTickers(ASSET_CATEGORIES.CRYPTO, query, {cryptoCatalog});
+export function resolveCryptoCatalogTicker(query, cryptoCatalog = [], cryptoProvider = CRYPTO_PROVIDERS.KRAKEN) {
+    const matches = matchCuratedTickers(ASSET_CATEGORIES.CRYPTO, query, {cryptoCatalog, cryptoProvider});
     if (matches.length === 0)
         return null;
 
@@ -72,8 +73,8 @@ export function resolveCryptoCatalogTicker(query, cryptoCatalog = []) {
     if (!secondMatch)
         return firstMatch;
 
-    const firstScore = scoreKrakenCatalogEntry(firstMatch, query);
-    const secondScore = scoreKrakenCatalogEntry(secondMatch, query);
+    const firstScore = scoreCryptoCatalogEntry(firstMatch, query, cryptoProvider);
+    const secondScore = scoreCryptoCatalogEntry(secondMatch, query, cryptoProvider);
 
     return firstScore > secondScore ? firstMatch : null;
 }
@@ -83,7 +84,7 @@ function scoreCuratedTicker(entry, assetCategory, normalizedQuery) {
         return Number.NEGATIVE_INFINITY;
 
     if (assetCategory === ASSET_CATEGORIES.CRYPTO && entry.liveSymbol)
-        return scoreKrakenCatalogEntry(entry, normalizedQuery);
+        return scoreCryptoCatalogEntry(entry, normalizedQuery, entry.cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN);
 
     const haystack = [
         entry.label,
@@ -105,6 +106,13 @@ function scoreCuratedTicker(entry, assetCategory, normalizedQuery) {
         return 150;
 
     return -1;
+}
+
+function scoreCryptoCatalogEntry(entry, query, cryptoProvider) {
+    if ((cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN) === CRYPTO_PROVIDERS.HYPERLIQUID)
+        return scoreHyperliquidCatalogEntry(entry, query);
+
+    return scoreKrakenCatalogEntry(entry, query);
 }
 
 function getCatalogForCategory(assetCategory, options = {}) {

@@ -12,7 +12,14 @@ import {
     POSITIVE_COLOR,
 } from '../utils/format.js';
 import {
+    createHyperliquidQuote,
+    fetchHyperliquidMarketSnapshots,
+    HYPERLIQUID_WEBSOCKET_URL,
+    normalizeHyperliquidLiveSymbol,
+} from '../utils/hyperliquid.js';
+import {
     ASSET_CATEGORIES,
+    CRYPTO_PROVIDERS,
     DEFAULT_REFRESH_INTERVAL_SECONDS,
     loadDisplaySettings,
     loadRefreshIntervalSeconds,
@@ -23,7 +30,7 @@ import {
 import {KRAKEN_WEBSOCKET_URL} from '../utils/kraken.js';
 
 const US_SESSION_OVERNIGHT_REFRESH_INTERVAL_SECONDS = 1800;
-const KRAKEN_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
+const LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
 const CRYPTO_UI_UPDATE_INTERVAL_SECONDS = 4;
 const PRICE_FLASH_DURATION_MS = 700;
 const US_MARKET_TIME_ZONE = 'America/New_York';
@@ -59,6 +66,11 @@ export const QuotesService = GObject.registerClass({
         this._krakenReconnectTimeoutId = 0;
         this._krakenReconnectAttempt = 0;
         this._krakenSubscribedSymbols = [];
+        this._hyperliquidWebsocket = null;
+        this._hyperliquidWebsocketSignalIds = [];
+        this._hyperliquidReconnectTimeoutId = 0;
+        this._hyperliquidReconnectAttempt = 0;
+        this._hyperliquidSubscribedSymbols = [];
     }
 
     start() {
@@ -74,6 +86,7 @@ export const QuotesService = GObject.registerClass({
 
         void this._refreshQuotes(true);
         void this._connectKrakenWebsocket();
+        void this._connectHyperliquidWebsocket();
         this._scheduleRefreshTimer();
     }
 
@@ -87,6 +100,7 @@ export const QuotesService = GObject.registerClass({
         this._removeTimeout('_refreshTimeoutId');
         this._removeTimeout('_entriesUpdateTimeoutId');
         this._removeTimeout('_krakenReconnectTimeoutId');
+        this._removeTimeout('_hyperliquidReconnectTimeoutId');
         this._removeTimeout('_priceFlashTimeoutId');
 
         this._entriesUpdateInProgress = false;
@@ -94,8 +108,11 @@ export const QuotesService = GObject.registerClass({
         this._lastEntriesUpdateUsec = 0;
         this._krakenReconnectAttempt = 0;
         this._krakenSubscribedSymbols = [];
+        this._hyperliquidReconnectAttempt = 0;
+        this._hyperliquidSubscribedSymbols = [];
 
         this._disconnectKrakenWebsocket();
+        this._disconnectHyperliquidWebsocket();
         this._session?.abort();
         this._session = null;
 
@@ -116,12 +133,16 @@ export const QuotesService = GObject.registerClass({
             ? this._tickers
             : this._tickers.filter(ticker => this._shouldRefreshTicker(ticker));
 
-        const stooqTickers = tickersToRefresh.filter(ticker => !this._isKrakenTicker(ticker));
+        const stooqTickers = tickersToRefresh.filter(ticker => !this._isLiveCryptoTicker(ticker));
+        const hyperliquidTickers = tickersToRefresh.filter(ticker => this._isHyperliquidTicker(ticker));
 
         if (stooqTickers.length > 0)
             await this._refreshStooqQuotes(stooqTickers);
 
-        if (stooqTickers.length > 0)
+        if (hyperliquidTickers.length > 0 && !this._hyperliquidWebsocket)
+            await this._refreshHyperliquidQuotes(hyperliquidTickers);
+
+        if (stooqTickers.length > 0 || hyperliquidTickers.length > 0)
             this._requestEntriesUpdate(true);
     }
 
@@ -136,6 +157,7 @@ export const QuotesService = GObject.registerClass({
                 this.emit('entries-changed');
                 this._scheduleRefreshTimer();
                 this._reconnectKrakenWebsocketIfNeeded();
+                this._reconnectHyperliquidWebsocketIfNeeded();
                 void this._refreshQuotes(true);
             }),
             this._settings.connect(`changed::${SETTINGS_KEYS.REFRESH_INTERVAL_SECONDS}`, () => {
@@ -276,7 +298,7 @@ export const QuotesService = GObject.registerClass({
     async _buildTickerEntry(ticker, index) {
         const quote = this._latestQuotesBySymbol.get(ticker.symbol.toUpperCase());
 
-        if (!quote && this._isKrakenTicker(ticker))
+        if (!quote && this._isLiveCryptoTicker(ticker))
             return createLoadingEntry(ticker, index, this._displaySettings);
 
         if (!quote)
@@ -308,6 +330,35 @@ export const QuotesService = GObject.registerClass({
         } catch (error) {
             if (this._running)
                 logError(error, `${this._uuid}: failed to refresh Stooq quotes`);
+        }
+    }
+
+    async _refreshHyperliquidQuotes(tickers) {
+        if (!this._session)
+            return;
+
+        try {
+            const snapshots = await fetchHyperliquidMarketSnapshots(this._session);
+            if (!this._running)
+                return;
+
+            const perpsBySymbol = new Map(snapshots.perps.map(entry => [entry.liveSymbol, entry]));
+            const spotsBySymbol = new Map(snapshots.spots.map(entry => [entry.liveSymbol, entry]));
+
+            tickers.forEach(ticker => {
+                const entry = (ticker.liveSymbol ?? '').includes('/')
+                    ? spotsBySymbol.get(ticker.liveSymbol)
+                    : perpsBySymbol.get(ticker.liveSymbol);
+                const existingQuote = this._latestQuotesBySymbol.get(ticker.symbol.toUpperCase());
+                const quote = createHyperliquidQuote(entry, existingQuote?.previousClose);
+                if (quote)
+                    this._latestQuotesBySymbol.set(ticker.symbol.toUpperCase(), quote);
+            });
+
+            this._markTickersRefreshed(tickers);
+        } catch (error) {
+            if (this._running)
+                logError(error, `${this._uuid}: failed to refresh Hyperliquid quotes`);
         }
     }
 
@@ -405,9 +456,9 @@ export const QuotesService = GObject.registerClass({
 
         const index = Math.min(
             this._krakenReconnectAttempt,
-            KRAKEN_RECONNECT_DELAYS_SECONDS.length - 1
+            LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS.length - 1
         );
-        const delaySeconds = KRAKEN_RECONNECT_DELAYS_SECONDS[index];
+        const delaySeconds = LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS[index];
         this._krakenReconnectAttempt += 1;
 
         this._krakenReconnectTimeoutId = GLib.timeout_add_seconds(
@@ -507,6 +558,174 @@ export const QuotesService = GObject.registerClass({
         void this._connectKrakenWebsocket();
     }
 
+    async _connectHyperliquidWebsocket() {
+        const liveSymbols = this._getDesiredHyperliquidSymbols();
+        if (!this._running || !this._session || this._hyperliquidWebsocket || liveSymbols.length === 0)
+            return;
+
+        try {
+            const message = Soup.Message.new('GET', HYPERLIQUID_WEBSOCKET_URL);
+            const session = this._session;
+            const websocket = await new Promise((resolve, reject) => {
+                session.websocket_connect_async(
+                    message,
+                    null,
+                    [],
+                    GLib.PRIORITY_DEFAULT,
+                    null,
+                    (_session, result) => {
+                        try {
+                            resolve(session.websocket_connect_finish(result));
+                        } catch (error) {
+                            reject(error);
+                        }
+                    }
+                );
+            });
+
+            if (!this._running) {
+                websocket.close(1000, null);
+                return;
+            }
+
+            this._hyperliquidWebsocket = websocket;
+            this._hyperliquidWebsocketSignalIds = [
+                websocket.connect('message', (_connection, type, messageBytes) => {
+                    this._handleHyperliquidMessage(type, messageBytes);
+                }),
+                websocket.connect('error', (_connection, error) => {
+                    logError(error, `${this._uuid}: Hyperliquid websocket error`);
+                }),
+                websocket.connect('closed', () => {
+                    this._handleHyperliquidDisconnect();
+                }),
+            ];
+
+            this._hyperliquidSubscribedSymbols = liveSymbols;
+            liveSymbols.forEach(symbol => {
+                websocket.send_text(JSON.stringify({
+                    method: 'subscribe',
+                    subscription: {
+                        type: 'activeAssetCtx',
+                        coin: symbol,
+                    },
+                }));
+            });
+        } catch (error) {
+            if (!this._running)
+                return;
+
+            logError(error, `${this._uuid}: failed to connect Hyperliquid websocket`);
+            this._scheduleHyperliquidReconnect();
+        }
+    }
+
+    _disconnectHyperliquidWebsocket() {
+        const websocket = this._hyperliquidWebsocket;
+        this._hyperliquidWebsocket = null;
+
+        if (!websocket)
+            return;
+
+        this._hyperliquidWebsocketSignalIds.forEach(signalId => websocket.disconnect(signalId));
+        this._hyperliquidWebsocketSignalIds = [];
+
+        const state = websocket.get_state();
+        if (state !== Soup.WebsocketState.CLOSING && state !== Soup.WebsocketState.CLOSED)
+            websocket.close(1000, null);
+    }
+
+    _handleHyperliquidDisconnect() {
+        this._hyperliquidWebsocket = null;
+        this._hyperliquidWebsocketSignalIds = [];
+        this._hyperliquidSubscribedSymbols = [];
+
+        if (!this._running || this._getDesiredHyperliquidSymbols().length === 0)
+            return;
+
+        this._scheduleHyperliquidReconnect();
+    }
+
+    _scheduleHyperliquidReconnect() {
+        if (!this._running || this._hyperliquidReconnectTimeoutId !== 0 || this._getDesiredHyperliquidSymbols().length === 0)
+            return;
+
+        const index = Math.min(
+            this._hyperliquidReconnectAttempt,
+            LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS.length - 1
+        );
+        const delaySeconds = LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS[index];
+        this._hyperliquidReconnectAttempt += 1;
+
+        this._hyperliquidReconnectTimeoutId = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            delaySeconds,
+            () => {
+                this._hyperliquidReconnectTimeoutId = 0;
+                void this._connectHyperliquidWebsocket();
+                return GLib.SOURCE_REMOVE;
+            }
+        );
+    }
+
+    _handleHyperliquidMessage(type, messageBytes) {
+        if (type !== Soup.WebsocketDataType.TEXT)
+            return;
+
+        let payload;
+
+        try {
+            payload = JSON.parse(new TextDecoder().decode(messageBytes.get_data()));
+        } catch (error) {
+            logError(error, `${this._uuid}: failed to parse Hyperliquid websocket payload`);
+            return;
+        }
+
+        if (payload?.channel === 'subscriptionResponse' && payload?.data?.type === 'activeAssetCtx') {
+            this._hyperliquidReconnectAttempt = 0;
+            return;
+        }
+
+        if (payload?.channel !== 'activeAssetCtx' || !payload?.data?.coin || !payload?.data?.ctx)
+            return;
+
+        const liveSymbol = normalizeHyperliquidLiveSymbol(payload.data.coin);
+        const tickerSymbol = this._getHyperliquidSymbolToTickerSymbolMap().get(liveSymbol);
+        if (!tickerSymbol)
+            return;
+
+        const existingQuote = this._latestQuotesBySymbol.get(tickerSymbol);
+        const quote = createHyperliquidQuote({
+            liveSymbol,
+            ctx: payload.data.ctx,
+        }, existingQuote?.previousClose);
+
+        if (!quote)
+            return;
+
+        this._latestQuotesBySymbol.set(tickerSymbol, quote);
+        this._hyperliquidReconnectAttempt = 0;
+        this._requestEntriesUpdate(false);
+    }
+
+    _reconnectHyperliquidWebsocketIfNeeded() {
+        const desiredSymbols = this._getDesiredHyperliquidSymbols();
+        const currentSymbols = [...this._hyperliquidSubscribedSymbols].sort().join('|');
+        const nextSymbols = [...desiredSymbols].sort().join('|');
+
+        if (currentSymbols === nextSymbols && (desiredSymbols.length === 0 || this._hyperliquidWebsocket))
+            return;
+
+        this._removeTimeout('_hyperliquidReconnectTimeoutId');
+        this._hyperliquidReconnectAttempt = 0;
+        this._disconnectHyperliquidWebsocket();
+
+        if (desiredSymbols.length === 0)
+            return;
+
+        void this._connectHyperliquidWebsocket();
+    }
+
     _getDesiredKrakenSymbols() {
         return [...new Set(
             this._tickers
@@ -523,10 +742,36 @@ export const QuotesService = GObject.registerClass({
         );
     }
 
-    _isKrakenTicker(ticker) {
+    _getDesiredHyperliquidSymbols() {
+        return [...new Set(
+            this._tickers
+                .filter(ticker => this._isHyperliquidTicker(ticker))
+                .map(ticker => ticker.liveSymbol)
+        )];
+    }
+
+    _getHyperliquidSymbolToTickerSymbolMap() {
+        return new Map(
+            this._tickers
+                .filter(ticker => this._isHyperliquidTicker(ticker))
+                .map(ticker => [ticker.liveSymbol, ticker.symbol.toUpperCase()])
+        );
+    }
+
+    _isLiveCryptoTicker(ticker) {
         return ticker?.assetCategory === ASSET_CATEGORIES.CRYPTO &&
             typeof ticker.liveSymbol === 'string' &&
             ticker.liveSymbol !== '';
+    }
+
+    _isKrakenTicker(ticker) {
+        return this._isLiveCryptoTicker(ticker) &&
+            (ticker.cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN) === CRYPTO_PROVIDERS.KRAKEN;
+    }
+
+    _isHyperliquidTicker(ticker) {
+        return this._isLiveCryptoTicker(ticker) &&
+            ticker.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID;
     }
 
     _buildBatchQuoteUrl(tickers) {
