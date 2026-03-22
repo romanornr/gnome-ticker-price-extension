@@ -1,3 +1,9 @@
+/*
+ * Asset/category metadata is the shared taxonomy for the entire extension.
+ *
+ * These constants and metadata tables keep prefs, scheduling, search, and
+ * default ticker setup aligned on the same domain language.
+ */
 export const MARKET_TYPES = {
     ALWAYS_OPEN: 'always-open',
     WEEKDAY_SESSION: 'weekday-session',
@@ -76,6 +82,7 @@ const CRYPTO_PROVIDER_METADATA = {
     },
 };
 
+/* Callers read one normalized category descriptor here instead of touching the internal metadata tables directly. */
 export function getAssetCategoryMetadata(assetCategory) {
     const metadata = ASSET_CATEGORY_METADATA[assetCategory];
     if (!metadata)
@@ -88,6 +95,7 @@ export function getAssetCategoryMetadata(assetCategory) {
     };
 }
 
+/* prefs uses these options to keep UI labels and descriptions in sync with the shared metadata tables. */
 export function getAssetCategoryOptions() {
     return CATEGORY_ORDER.map(assetCategory => {
         const metadata = ASSET_CATEGORY_METADATA[assetCategory];
@@ -99,14 +107,17 @@ export function getAssetCategoryOptions() {
     });
 }
 
+/* Market defaults come from the taxonomy so ticker creation and normalization agree on session policy. */
 export function getAssetCategoryDefaultMarketType(assetCategory) {
     return ASSET_CATEGORY_METADATA[assetCategory]?.defaultMarketType ?? MARKET_TYPES.US_SESSION;
 }
 
+/* A single default crypto provider keeps new ticker flows deterministic when the user has not chosen one yet. */
 export function getDefaultCryptoProvider() {
     return CRYPTO_PROVIDERS.KRAKEN;
 }
 
+/* Provider metadata is exposed through one helper so prefs and runtime can share labels and availability. */
 export function getCryptoProviderMetadata(provider) {
     const metadata = CRYPTO_PROVIDER_METADATA[provider];
     if (!metadata)
@@ -118,6 +129,7 @@ export function getCryptoProviderMetadata(provider) {
     };
 }
 
+/* prefs uses provider options from here so the UI and runtime provider vocabulary never drift apart. */
 export function getCryptoProviderOptions() {
     return CRYPTO_PROVIDER_ORDER.map(provider => {
         const metadata = CRYPTO_PROVIDER_METADATA[provider];
@@ -130,6 +142,7 @@ export function getCryptoProviderOptions() {
     });
 }
 
+/* Catalog search broadens matches with taxonomy-level words instead of only per-ticker keywords. */
 export function getAssetCategorySearchTerms(assetCategory) {
     const metadata = ASSET_CATEGORY_METADATA[assetCategory];
     if (!metadata)

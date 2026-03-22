@@ -1,5 +1,6 @@
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../asset-categories.js';
 
+/* Static crypto entries provide a minimal curated seed; broader crypto discovery comes from live providers at runtime. */
 export const CRYPTO_TICKERS = [
     {
         assetCategory: ASSET_CATEGORIES.CRYPTO,

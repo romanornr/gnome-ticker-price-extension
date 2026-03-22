@@ -15,7 +15,19 @@ import {
 
 const LEFT_PANEL_POSITION = 999;
 
+/*
+ * This file is the GNOME Shell entrypoint for the extension as a whole.
+ *
+ * It does not fetch or format quotes itself. Its system role is to:
+ * - own extension lifecycle hooks from GNOME Shell
+ * - create and stop the QuotesService runtime
+ * - mirror the current entry set into left and right panel indicators
+ *
+ * In other words, this is the bridge between GNOME Shell lifecycle/events and
+ * the rest of the internal market-data system.
+ */
 export default class TickerPriceExtension extends Extension {
+    /* The extension object owns the shell-visible instances that survive between enable and disable. */
     constructor(metadata) {
         super(metadata);
         this._leftIndicator = null;
@@ -26,14 +38,17 @@ export default class TickerPriceExtension extends Extension {
         this._settingsSignalIds = [];
     }
 
+    /* enable() is the shell entry hook that boots the extension's runtime graph. */
     enable() {
         this._startup();
     }
 
+    /* disable() mirrors enable() and tears the runtime down from the shell boundary inward. */
     disable() {
         this._shutdown();
     }
 
+    /* Startup creates the runtime service, subscribes to entry changes, and seeds the panel with placeholders. */
     _startup() {
         this._shutdown();
 
@@ -54,17 +69,23 @@ export default class TickerPriceExtension extends Extension {
         this._quotesService.start();
     }
 
+    /* Before live data arrives, the shell still needs placeholder entries to render. */
     _getLoadingEntries() {
         const tickers = loadTickerConfigs(this._settings);
         const displaySettings = loadDisplaySettings(this._settings);
         return createLoadingEntries(tickers, displaySettings);
     }
 
+    /* Entry changes from QuotesService are fanned back out to both panel-side indicators here. */
     _syncIndicators(entries) {
         this._ensureIndicatorForSide(LEFT_PANEL_SIDE, entries);
         this._ensureIndicatorForSide(RIGHT_PANEL_SIDE, entries);
     }
 
+    /*
+     * The extension keeps separate indicator instances per panel side so ticker
+     * placement remains stable even as the saved list changes.
+     */
     _ensureIndicatorForSide(side, entries) {
         const sideEntries = this._getEntriesForSide(entries, side);
         const propertyName = side === LEFT_PANEL_SIDE ? '_leftIndicator' : '_rightIndicator';
@@ -85,6 +106,7 @@ export default class TickerPriceExtension extends Extension {
         this[propertyName].setEntries(sideEntries);
     }
 
+    /* Side filtering preserves saved ticker order per panel side before the indicator renders. */
     _getEntriesForSide(entries, side) {
         const tickersForSide = getTickersForSide(loadTickerConfigs(this._settings), side);
         const entriesBySymbol = new Map(entries.map(entry => [entry.symbol?.toUpperCase() ?? entry.label, entry]));
@@ -99,6 +121,7 @@ export default class TickerPriceExtension extends Extension {
         return sideEntries;
     }
 
+    /* Shutdown tears the shell-facing boundary down cleanly so a later enable starts from a blank slate. */
     _shutdown() {
         this._settingsSignalIds.forEach(signalId => this._settings?.disconnect(signalId));
         this._settingsSignalIds = [];

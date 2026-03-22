@@ -1,5 +1,6 @@
 import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
 
+/* This file is the large curated U.S. equity suggestion source used by prefs search and default market metadata. */
 const US_EQUITY_TICKER_DEFINITIONS = [
     {
         label: 'AAPL',

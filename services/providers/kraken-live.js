@@ -3,191 +3,71 @@ import Soup from 'gi://Soup?version=3.0';
 
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
 import {KRAKEN_WEBSOCKET_URL} from '../../utils/kraken.js';
+import {LiveWebsocketProvider} from './live-websocket-provider.js';
 
-const LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
-
-export class KrakenLiveProvider {
+/*
+ * KrakenLiveProvider plugs Kraken-specific transport details into the shared
+ * live-websocket lifecycle. It only needs to define:
+ * - how to connect to Kraken
+ * - how to subscribe to ticker updates
+ * - how Kraken payloads become normalized quote updates
+ *
+ * Everything else, including reconnect and subscription reconciliation, comes
+ * from LiveWebsocketProvider so it stays parallel with Hyperliquid.
+ */
+export class KrakenLiveProvider extends LiveWebsocketProvider {
+    /* Kraken only needs to supply its provider-specific hooks because lifecycle behavior comes from the base class. */
     constructor({uuid, onQuotes}) {
-        this._uuid = uuid;
-        this._onQuotes = onQuotes;
-        this._session = null;
-        this._running = false;
-        this._tickers = [];
-        this._websocket = null;
-        this._websocketSignalIds = [];
-        this._reconnectTimeoutId = 0;
-        this._reconnectAttempt = 0;
-        this._subscribedSymbols = [];
+        super({uuid, onQuotes, filterTicker: isKrakenTicker});
     }
 
-    start(session) {
-        this._session = session;
-        this._running = true;
-        void this._connectIfNeeded();
+    /* Shared websocket logging uses this provider name so errors stay distinguishable at runtime. */
+    get logPrefix() {
+        return 'Kraken';
     }
 
-    stop() {
-        this._running = false;
-        this._session = null;
-        this._tickers = [];
-        this._subscribedSymbols = [];
-        this._reconnectAttempt = 0;
-        this._removeReconnectTimeout();
-        this._disconnectWebsocket();
-    }
-
-    updateSubscriptions(tickers) {
-        this._tickers = tickers.filter(ticker => isKrakenTicker(ticker));
-
-        const desiredSymbols = this._getDesiredSymbols();
-        const currentSymbols = [...this._subscribedSymbols].sort().join('|');
-        const nextSymbols = [...desiredSymbols].sort().join('|');
-
-        if (currentSymbols === nextSymbols && (desiredSymbols.length === 0 || this._websocket))
-            return;
-
-        this._removeReconnectTimeout();
-        this._reconnectAttempt = 0;
-        this._disconnectWebsocket();
-
-        if (desiredSymbols.length === 0 || !this._running)
-            return;
-
-        void this._connectIfNeeded();
-    }
-
-    isConnected() {
-        return this._websocket !== null;
-    }
-
-    async _connectIfNeeded() {
-        const liveSymbols = this._getDesiredSymbols();
-        if (!this._running || !this._session || this._websocket || liveSymbols.length === 0)
-            return;
-
-        try {
-            const message = Soup.Message.new('GET', KRAKEN_WEBSOCKET_URL);
-            const session = this._session;
-            const websocket = await new Promise((resolve, reject) => {
-                session.websocket_connect_async(
-                    message,
-                    null,
-                    [],
-                    GLib.PRIORITY_DEFAULT,
-                    null,
-                    (_session, result) => {
-                        try {
-                            resolve(session.websocket_connect_finish(result));
-                        } catch (error) {
-                            reject(error);
-                        }
+    /* Kraken connection setup is just the provider-specific websocket endpoint for the shared base lifecycle. */
+    async _openConnection(session) {
+        const message = Soup.Message.new('GET', KRAKEN_WEBSOCKET_URL);
+        return new Promise((resolve, reject) => {
+            session.websocket_connect_async(
+                message,
+                null,
+                [],
+                GLib.PRIORITY_DEFAULT,
+                null,
+                (_session, result) => {
+                    try {
+                        resolve(session.websocket_connect_finish(result));
+                    } catch (error) {
+                        reject(error);
                     }
-                );
-            });
-
-            if (!this._running) {
-                websocket.close(1000, null);
-                return;
-            }
-
-            this._websocket = websocket;
-            this._websocketSignalIds = [
-                websocket.connect('message', (_connection, type, messageBytes) => {
-                    this._handleMessage(type, messageBytes);
-                }),
-                websocket.connect('error', (_connection, error) => {
-                    logError(error, `${this._uuid}: Kraken websocket error`);
-                }),
-                websocket.connect('closed', () => {
-                    this._handleDisconnect();
-                }),
-            ];
-
-            this._subscribedSymbols = liveSymbols;
-            websocket.send_text(JSON.stringify({
-                method: 'subscribe',
-                params: {
-                    channel: 'ticker',
-                    event_trigger: 'trades',
-                    symbol: liveSymbols,
-                    snapshot: true,
-                },
-            }));
-        } catch (error) {
-            if (!this._running)
-                return;
-
-            logError(error, `${this._uuid}: failed to connect Kraken websocket`);
-            this._scheduleReconnect();
-        }
+                }
+            );
+        });
     }
 
-    _disconnectWebsocket() {
-        const websocket = this._websocket;
-        this._websocket = null;
-
-        if (!websocket)
-            return;
-
-        this._websocketSignalIds.forEach(signalId => websocket.disconnect(signalId));
-        this._websocketSignalIds = [];
-
-        const state = websocket.get_state();
-        if (state !== Soup.WebsocketState.CLOSING && state !== Soup.WebsocketState.CLOSED)
-            websocket.close(1000, null);
+    /* Kraken uses one subscribe request containing the full symbol list. */
+    _subscribe(websocket, symbols) {
+        websocket.send_text(JSON.stringify({
+            method: 'subscribe',
+            params: {
+                channel: 'ticker',
+                event_trigger: 'trades',
+                symbol: symbols,
+                snapshot: true,
+            },
+        }));
     }
 
-    _handleDisconnect() {
-        this._websocket = null;
-        this._websocketSignalIds = [];
-        this._subscribedSymbols = [];
-
-        if (!this._running || this._getDesiredSymbols().length === 0)
-            return;
-
-        this._scheduleReconnect();
-    }
-
-    _scheduleReconnect() {
-        if (!this._running || this._reconnectTimeoutId !== 0 || this._getDesiredSymbols().length === 0)
-            return;
-
-        const index = Math.min(this._reconnectAttempt, LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS.length - 1);
-        const delaySeconds = LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS[index];
-        this._reconnectAttempt += 1;
-
-        this._reconnectTimeoutId = GLib.timeout_add_seconds(
-            GLib.PRIORITY_DEFAULT,
-            delaySeconds,
-            () => {
-                this._reconnectTimeoutId = 0;
-                void this._connectIfNeeded();
-                return GLib.SOURCE_REMOVE;
-            }
-        );
-    }
-
-    _handleMessage(type, messageBytes) {
-        if (type !== Soup.WebsocketDataType.TEXT)
-            return;
-
-        let payload;
-
-        try {
-            payload = JSON.parse(new TextDecoder().decode(messageBytes.get_data()));
-        } catch (error) {
-            logError(error, `${this._uuid}: failed to parse Kraken websocket payload`);
-            return;
-        }
-
+    /* Kraken payloads are converted here into the normalized quote map expected by QuotesService. */
+    _handlePayload(payload) {
         if (payload?.success === false) {
             logError(
                 new Error(payload.error ?? 'Kraken websocket subscription failed'),
                 `${this._uuid}: Kraken websocket rejected request`
             );
-            this._disconnectWebsocket();
-            this._scheduleReconnect();
-            return;
+            return {reconnect: true};
         }
 
         if (
@@ -195,12 +75,11 @@ export class KrakenLiveProvider {
             payload?.success === true &&
             payload?.result?.channel === 'ticker'
         ) {
-            this._reconnectAttempt = 0;
-            return;
+            return {resetReconnect: true};
         }
 
         if (payload?.channel !== 'ticker' || !Array.isArray(payload.data))
-            return;
+            return null;
 
         const updatedQuotes = new Map();
         const liveSymbolMap = this._getSymbolToTickerSymbolMap();
@@ -223,29 +102,14 @@ export class KrakenLiveProvider {
             });
         });
 
-        if (updatedQuotes.size > 0) {
-            this._reconnectAttempt = 0;
-            this._onQuotes?.(updatedQuotes);
-        }
-    }
-
-    _getDesiredSymbols() {
-        return [...new Set(this._tickers.map(ticker => ticker.liveSymbol).filter(Boolean))];
-    }
-
-    _getSymbolToTickerSymbolMap() {
-        return new Map(this._tickers.map(ticker => [ticker.liveSymbol, ticker.symbol.toUpperCase()]));
-    }
-
-    _removeReconnectTimeout() {
-        if (this._reconnectTimeoutId === 0)
-            return;
-
-        GLib.Source.remove(this._reconnectTimeoutId);
-        this._reconnectTimeoutId = 0;
+        return {
+            resetReconnect: updatedQuotes.size > 0,
+            quotesBySymbol: updatedQuotes,
+        };
     }
 }
 
+/* Kraken live support is limited to crypto tickers with a valid live symbol. */
 function isKrakenTicker(ticker) {
     return ticker?.assetCategory === ASSET_CATEGORIES.CRYPTO &&
         typeof ticker.liveSymbol === 'string' &&
@@ -253,6 +117,7 @@ function isKrakenTicker(ticker) {
         (ticker.cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN) === CRYPTO_PROVIDERS.KRAKEN;
 }
 
+/* Kraken can derive previous close from either absolute change or percent change. */
 function deriveKrakenPreviousClose(price, change, changePct) {
     if (Number.isFinite(change)) {
         const previousClose = price - change;
@@ -269,6 +134,7 @@ function deriveKrakenPreviousClose(price, change, changePct) {
     return null;
 }
 
+/* Kraken timestamps are normalized to the shared YYYYMMDD quote-date shape here. */
 function normalizeTimestampDate(timestampText) {
     const normalized = timestampText.slice(0, 10).replaceAll('-', '');
     return /^\d{8}$/.test(normalized) ? normalized : '';

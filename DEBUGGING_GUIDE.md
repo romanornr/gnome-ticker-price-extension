@@ -202,6 +202,39 @@ If you want a practical step-by-step workflow, use this:
 
 This is the main habit that keeps GNOME extension development manageable.
 
+## 11. Refactor regression checklist for this repository
+
+When the code has been reorganized or split across modules, do not stop at import checks. Run a short live checklist in the real GNOME host:
+
+1. Run `./check.sh`.
+2. Install with `./install-dev.sh` or `./install.sh`.
+3. Follow the session-specific reload instruction:
+   on Wayland, log out and back in;
+   on Xorg, reload GNOME Shell with `Alt+F2`, `r`, Enter.
+4. Watch logs with:
+
+```bash
+journalctl --user -f /usr/bin/gnome-shell
+```
+
+5. Verify these behaviors in the running extension:
+   the extension enables and disables cleanly;
+   the indicator appears and updates in the panel;
+   left and right panel tickers preserve their configured side and order;
+   loading and error states still render sensibly;
+   Stooq verification for non-crypto symbols still works;
+   prefs add/edit/remove/reorder/reset flows still persist;
+   Kraken and Hyperliquid provider selection still changes search and verification behavior;
+   live crypto updates continue arriving without shell warnings or reconnect loops;
+   price flash behavior still highlights a move and then resets.
+
+If any of these fail after a refactor, debug from the narrowest seam first:
+
+- provider adapter for transport or parsing problems
+- `services/quotes.js` for orchestration/subscription problems
+- prefs helper modules for validation or suggestion-state regressions
+- `services/entry-model.js` for rendering-state regressions
+
 ## Summary
 
 This project is not a black box. The main debugging tools are:

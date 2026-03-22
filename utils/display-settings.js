@@ -1,3 +1,10 @@
+/*
+ * This module centralizes display-oriented defaults and option catalogs.
+ *
+ * It exists so formatting/prefs code can share one definition of presets,
+ * separators, and refresh interval options without pushing that UI metadata back
+ * into the heavier settings-normalization module.
+ */
 export const FORMAT_PRESETS = {
     DEFAULT: 'default',
     CHANGE: 'change-only',
@@ -20,6 +27,7 @@ export const DEFAULT_DISPLAY_SETTINGS = {
     separatorStyle: SEPARATOR_STYLES.DOT,
 };
 
+/* Formatters call this helper to turn the saved separator style into the actual panel text fragment. */
 export function getSeparatorText(separatorStyle) {
     switch (separatorStyle) {
     case SEPARATOR_STYLES.PIPES:
@@ -32,6 +40,7 @@ export function getSeparatorText(separatorStyle) {
     }
 }
 
+/* prefs reads these presets to expose the supported coarse display modes of the entry-formatting layer. */
 export function getFormatPresetOptions() {
     return [
         {value: FORMAT_PRESETS.DEFAULT, title: 'Ticker + price + change'},
@@ -40,6 +49,7 @@ export function getFormatPresetOptions() {
     ];
 }
 
+/* Separator options stay centralized so formatting and prefs share the same allowed values and labels. */
 export function getSeparatorOptions() {
     return [
         {value: SEPARATOR_STYLES.DOT, title: '\u00b7'},
@@ -48,10 +58,12 @@ export function getSeparatorOptions() {
     ];
 }
 
+/* Refresh interval options live here because they are UI-facing choices, not runtime scheduling policy itself. */
 export function getRefreshIntervalOptions() {
     return [60, 120, 300, 600, 900, 1800, 3600];
 }
 
+/* prefs uses this formatter so interval labels stay consistent anywhere they are presented. */
 export function formatRefreshIntervalLabel(seconds) {
     if (seconds < 60)
         return `${seconds} sec`;

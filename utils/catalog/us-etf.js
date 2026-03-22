@@ -1,5 +1,6 @@
 import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
 
+/* This file is the curated U.S. ETF suggestion source used by prefs search and U.S.-session defaults. */
 const US_ETF_TICKER_DEFINITIONS = [
     {
         label: 'ARKK',

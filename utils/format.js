@@ -4,14 +4,21 @@ import {
     getSeparatorText,
 } from './display-settings.js';
 
+/*
+ * Formatting converts ticker + quote data into display fragments, colors, and
+ * visibility flags. It is intentionally dumb about where data came from and is
+ * reused by both loading/error states and the normal render path.
+ */
 export const DEFAULT_TEXT_COLOR = '#ffffff';
 export const POSITIVE_COLOR = '#3FB950';
 export const NEGATIVE_COLOR = '#F85149';
 
+/* Startup/loading flows build one placeholder entry per ticker through this batch helper. */
 export function createLoadingEntries(tickers, displaySettings = DEFAULT_DISPLAY_SETTINGS) {
     return tickers.map((ticker, index) => createLoadingEntry(ticker, index, displaySettings));
 }
 
+/* Loading entries are the optimistic placeholder state shown before the quote pipeline has produced data. */
 export function createLoadingEntry(ticker, index, displaySettings = DEFAULT_DISPLAY_SETTINGS) {
     return createBaseEntry({
         ticker,
@@ -26,6 +33,7 @@ export function createLoadingEntry(ticker, index, displaySettings = DEFAULT_DISP
     });
 }
 
+/* Error entries preserve layout while signaling that data for a ticker could not be produced right now. */
 export function createErrorEntry(ticker, index, displaySettings = DEFAULT_DISPLAY_SETTINGS) {
     return createBaseEntry({
         ticker,
@@ -40,6 +48,7 @@ export function createErrorEntry(ticker, index, displaySettings = DEFAULT_DISPLA
     });
 }
 
+/* Display entries are the normal success path from normalized quotes into panel-facing text fragments. */
 export function createDisplayEntry(ticker, quote, previousClose, index, displaySettings = DEFAULT_DISPLAY_SETTINGS) {
     const priceText = formatPrice(quote.price, ticker.priceDecimals);
 
@@ -72,6 +81,7 @@ export function createDisplayEntry(ticker, quote, previousClose, index, displayS
     });
 }
 
+/* Base entry construction keeps all render-state shapes uniform before the indicator consumes them. */
 function createBaseEntry({
     ticker,
     index,
@@ -103,6 +113,7 @@ function createBaseEntry({
     };
 }
 
+/* Presets define the system's coarse display modes before per-setting toggles are applied. */
 function resolveVisibility(displaySettings) {
     const settings = {...DEFAULT_DISPLAY_SETTINGS, ...displaySettings};
 
@@ -127,6 +138,7 @@ function resolveVisibility(displaySettings) {
     };
 }
 
+/* Price text formatting is centralized so all success states display numeric precision consistently. */
 function formatPrice(price, decimals) {
     return new Intl.NumberFormat('en-US', {
         minimumFractionDigits: decimals,
@@ -134,6 +146,7 @@ function formatPrice(price, decimals) {
     }).format(price);
 }
 
+/* Arrows are derived once here so all entry creators share the same directional language. */
 function getArrow(percentChange) {
     if (percentChange > 0)
         return '\u25b2';
@@ -144,6 +157,7 @@ function getArrow(percentChange) {
     return '\u25ba';
 }
 
+/* Change color policy stays centralized so panel rendering does not need to re-decide positive/negative semantics. */
 function getChangeColor(percentChange) {
     if (percentChange > 0)
         return POSITIVE_COLOR;

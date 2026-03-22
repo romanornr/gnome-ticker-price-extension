@@ -7,8 +7,16 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import {DEFAULT_TEXT_COLOR} from '../utils/format.js';
 
+/*
+ * TickerIndicator is the last step of the pipeline: it turns prebuilt entry
+ * models into actual GNOME Shell label actors.
+ *
+ * It deliberately expects already-formatted entries from the quote/entry-model
+ * layers, so it stays dumb about markets, providers, and formatting rules.
+ */
 export const TickerIndicator = GObject.registerClass(
 class TickerIndicator extends PanelMenu.Button {
+    /* The indicator initializes one reusable actor tree and one lightweight settings menu entry. */
     _init(openPreferences) {
         super._init(0.0, 'Ticker Indicator', false);
 
@@ -26,6 +34,11 @@ class TickerIndicator extends PanelMenu.Button {
         });
     }
 
+    /*
+     * setEntries() is the final projection from entry-model output into GNOME
+     * Shell actors. The indicator trusts upstream layers to have already
+     * decided formatting, visibility, and colors.
+     */
     setEntries(entries) {
         this._content.destroy_all_children();
 

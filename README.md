@@ -38,3 +38,45 @@ When adding a curated ticker:
 - `./install.sh` for a normal local install
 - `./install-dev.sh` for a symlinked development install
 - `./remove.sh` to uninstall
+
+## Local Checks
+
+Use one command for the current lightweight local safety net:
+
+```bash
+./check.sh
+```
+
+This runs:
+
+- `gjs -m tests/run.js`
+- focused `gjs -m` import checks for the runtime/provider/helper modules that should load outside the GNOME prefs host
+
+It intentionally does not import `prefs.js` directly, because the GNOME prefs resource path only exists when the real extension preferences host process launches it.
+
+## Refactor Regression Workflow
+
+After structural changes, run this end-to-end pass before starting more feature work:
+
+1. Run `./check.sh`.
+2. Install the current tree with `./install-dev.sh` for normal development or `./install.sh` for a copy-based install.
+3. If the install script says GNOME Shell has not picked up the extension yet:
+   on Wayland, log out and back in;
+   on Xorg, reload GNOME Shell with `Alt+F2`, `r`, Enter.
+4. Start a log tail in another terminal:
+
+```bash
+journalctl --user -f /usr/bin/gnome-shell
+```
+
+5. Open the extension preferences and walk through this regression checklist:
+   enable and disable the extension without errors;
+   confirm the indicator appears in the panel;
+   confirm left-panel tickers still stay left and right-panel tickers stay right;
+   confirm startup shows loading placeholders before live data arrives;
+   confirm non-crypto manual `Verify` still works;
+   confirm add, edit, remove, reorder, and reset-to-defaults still persist correctly;
+   confirm switching `Crypto API` changes the searchable markets and verification behavior;
+   confirm Kraken and Hyperliquid crypto entries receive live updates;
+   confirm price changes still flash briefly and then settle back to the default text color.
+6. If a runtime issue appears, add targeted `log()` or `logError()` statements near the relevant provider, orchestrator, or prefs path before doing more refactoring.

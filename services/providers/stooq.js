@@ -1,6 +1,14 @@
 import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
+/*
+ * Stooq is the REST provider for non-live symbols and the manual prefs
+ * verification flow.
+ *
+ * This module isolates the Stooq wire format from the rest of the system:
+ * QuotesService asks for normalized quotes, and prefs verification asks whether
+ * a symbol resolves, without either caller caring about raw CSV details.
+ */
 export async function refresh(tickers, {session}) {
     if (!session || tickers.length === 0)
         return new Map();
@@ -9,6 +17,7 @@ export async function refresh(tickers, {session}) {
     return parseBatchQuotes(csv, tickers.length);
 }
 
+/* prefs and runtime both use the same verification path so symbol validation stays consistent. */
 export async function verifySymbol(session, symbol) {
     const csv = await fetchText(session, buildLookupUrl(symbol));
     const rows = csv
@@ -37,6 +46,7 @@ export async function verifySymbol(session, symbol) {
     };
 }
 
+/* Runtime quote polling batches symbols into Stooq's multi-symbol lookup endpoint here. */
 export function buildBatchQuoteUrl(tickers) {
     const joinedSymbols = tickers
         .map(ticker => ticker.symbol)
@@ -45,16 +55,19 @@ export function buildBatchQuoteUrl(tickers) {
     return buildLookupUrl(joinedSymbols);
 }
 
+/* Both verification and batch refresh build their final Stooq URL through this helper. */
 export function buildLookupUrl(symbol) {
     return `https://stooq.com/q/l/?s=${encodeURIComponent(symbol).replace(/%2B/g, '+')}&f=sd2t2cp&i=d`;
 }
 
+/* All Stooq interaction ultimately passes through this transport helper. */
 async function fetchText(session, url) {
     const message = Soup.Message.new('GET', url);
     const bytes = await session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null);
     return new TextDecoder().decode(bytes.get_data()).trim();
 }
 
+/* Raw Stooq CSV rows are converted here into the normalized quote shape used by the rest of the system. */
 function parseBatchQuotes(csv, expectedCount) {
     const quotesBySymbol = new Map();
     const rows = csv
@@ -85,6 +98,7 @@ function parseBatchQuotes(csv, expectedCount) {
     return quotesBySymbol;
 }
 
+/* Stooq dates are normalized once here so callers never reason about provider-specific date formatting. */
 function normalizeQuoteDate(dateText) {
     const normalized = dateText.replaceAll('-', '');
     return /^\d{8}$/.test(normalized) ? normalized : '';

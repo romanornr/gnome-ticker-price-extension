@@ -13,10 +13,14 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `services/quotes.js`: quote fetching, Kraken WebSocket lifecycle, cache management, update scheduling
 - `services/quote-store.js`: in-memory quote cache and refresh-cadence timestamps for normalized symbols
 - `services/entry-model.js`: panel entry/view-model building, including loading/error states and price-flash decoration
+- `services/quotes-coordinator.js`: refresh timer, throttled entry rebuild scheduling, and price-flash reset coordination for `QuotesService`
 - `services/providers/stooq.js`: batched Stooq quote fetching/parsing plus symbol verification helpers
+- `services/providers/live-quote-provider.js`: shared live-provider contract notes and helper utilities for symbol subscription/state parity
+- `services/providers/live-websocket-provider.js`: shared websocket lifecycle base for connect/disconnect/reconnect mechanics across live crypto providers
 - `services/providers/kraken-live.js`: Kraken live quote adapter, subscription management, and reconnect handling
 - `services/providers/hyperliquid-live.js`: Hyperliquid live quote adapter plus REST fallback snapshot normalization
 - `README.md`: user-facing setup notes, ticker add flow, and curated catalog editing guide
+- `CODE_STYLE_GUIDE.md`: repo-local coding and commenting contract intended to be understandable by human contributors and coding agents
 - `utils/format.js`: display-entry formatting and color helpers
 - `utils/asset-categories.js`: shared asset-category metadata, category search terms, and default market-type mapping
 - `utils/display-settings.js`: display preset defaults, separator metadata, and refresh-interval option helpers
@@ -25,6 +29,8 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/market-schedule.js`: shared market-hours and refresh-cadence rules using `America/New_York`
 - `utils/settings.js`: shared settings defaults, validation, and settings-backed ticker/display loading
 - `utils/prefs/ticker-dialog-state.js`: pure ticker-dialog validation, crypto resolution, and form-to-config normalization helpers
+- `utils/prefs/catalog-suggestions.js`: prefs-side crypto catalog loading and suggestion row model generation
+- `utils/prefs/ticker-dialog-controller.js`: ticker dialog orchestration, state transitions, verification flow, and suggestion wiring for prefs
 - `utils/prefs/stooq-verifier.js`: prefs-side Stooq verification wrapper
 - `utils/ticker-catalog.js`: curated ticker aggregation and search helpers for guided prefs selection
 - `utils/catalog/*.js`: curated ticker data split by asset category for contributor-friendly maintenance
@@ -35,6 +41,7 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `metadata.json`: GNOME Shell extension metadata and compatibility
 - `install.sh`: copy-based local install, including runtime module directories
 - `install-dev.sh`: symlink-based development install
+- `check.sh`: canonical local test/import sanity entry point for the current lightweight developer workflow
 - `remove.sh`: remove installed extension
 - `DEBUGGING_GUIDE.md`: debugging notes for extension behavior and API parsing
 
@@ -71,6 +78,9 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 - Use `apply_patch` for manual file edits.
 - Keep code changes minimal and consistent with the current extension structure.
 - Avoid destructive git commands unless explicitly requested.
+- Follow `CODE_STYLE_GUIDE.md` when editing code comments and structure.
+- For meaningful JS source files, prefer system-level comments that explain module role, class/function responsibility, and how the code fits into the quote or prefs pipeline.
+- Do not rely on sparse token comments; comment coverage should be consistent enough that a new contributor can understand the architecture file by file.
 
 ## Verification Notes
 

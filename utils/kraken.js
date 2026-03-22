@@ -3,6 +3,11 @@ import Soup from 'gi://Soup?version=3.0';
 
 import {ASSET_CATEGORIES, MARKET_TYPES} from './asset-categories.js';
 
+/*
+ * Kraken helpers play the same role for Kraken that hyperliquid.js plays for
+ * Hyperliquid: they isolate provider-specific discovery, normalization, and
+ * search scoring from the prefs and provider runtime layers.
+ */
 export const KRAKEN_WEBSOCKET_URL = 'wss://ws.kraken.com/v2';
 
 const KRAKEN_INSTRUMENT_TIMEOUT_SECONDS = 15;
@@ -11,6 +16,7 @@ const KRAKEN_SPOT_PAIR_QUOTE_PRIORITY = ['USD', 'EUR', 'USDT', 'USDC', 'BTC', 'E
 
 let cachedKrakenSpotPairsPromise = null;
 
+/* prefs loads the cached Kraken spot catalog through this public entrypoint. */
 export async function loadKrakenSpotPairs() {
     if (!cachedKrakenSpotPairsPromise) {
         cachedKrakenSpotPairsPromise = _fetchKrakenSpotPairs().catch(error => {
@@ -22,6 +28,7 @@ export async function loadKrakenSpotPairs() {
     return cloneKrakenSpotPairs(await cachedKrakenSpotPairsPromise);
 }
 
+/* Kraken instrument metadata becomes the runtime crypto catalog through this normalizer. */
 export function createKrakenCatalogEntry(pair) {
     const liveSymbol = normalizeKrakenLiveSymbol(pair?.symbol ?? '');
     const base = `${pair?.base ?? ''}`.trim().toUpperCase();
@@ -41,6 +48,7 @@ export function createKrakenCatalogEntry(pair) {
     };
 }
 
+/* Kraken websocket pair symbols are normalized here so all layers compare the same live identifier. */
 export function normalizeKrakenLiveSymbol(value) {
     const compact = `${value ?? ''}`
         .trim()
@@ -53,10 +61,12 @@ export function normalizeKrakenLiveSymbol(value) {
     return '';
 }
 
+/* Saved ticker ids for Kraken are consistently derived from the websocket pair symbol here. */
 export function normalizeKrakenTickerSymbol(value) {
     return normalizeKrakenLiveSymbol(value).replace('/', '').toLowerCase();
 }
 
+/* Search scoring prefers strong Kraken pair matches while still supporting fuzzy asset/pair queries. */
 export function scoreKrakenCatalogEntry(entry, query) {
     const normalizedQuery = normalizeKrakenSearchQuery(query);
     if (normalizedQuery === '')
@@ -103,6 +113,7 @@ export function scoreKrakenCatalogEntry(entry, query) {
     return score;
 }
 
+/* Cached Kraken pair lists are cloned to keep callers from mutating shared provider state. */
 function cloneKrakenSpotPairs(pairs) {
     return pairs.map(entry => ({
         ...entry,
@@ -110,6 +121,7 @@ function cloneKrakenSpotPairs(pairs) {
     }));
 }
 
+/* Kraken spot pairs are discovered by subscribing to the instrument snapshot websocket channel once. */
 async function _fetchKrakenSpotPairs() {
     const session = new Soup.Session();
     let websocket = null;
@@ -226,6 +238,7 @@ async function _fetchKrakenSpotPairs() {
     }
 }
 
+/* Price precision is normalized into the extension's bounded decimals range here. */
 function clampDecimals(value) {
     const parsed = Number.parseInt(`${value ?? ''}`, 10);
     if (!Number.isInteger(parsed))
@@ -234,6 +247,7 @@ function clampDecimals(value) {
     return Math.min(6, Math.max(0, parsed));
 }
 
+/* Sorting keeps similar bases grouped while preferring common quote currencies first. */
 function compareKrakenCatalogEntries(left, right) {
     const priorityDifference = getKrakenQuotePriority(left.quote) - getKrakenQuotePriority(right.quote);
     if (left.base === right.base && priorityDifference !== 0)
@@ -242,11 +256,13 @@ function compareKrakenCatalogEntries(left, right) {
     return left.label.localeCompare(right.label);
 }
 
+/* Quote-priority is a search/ranking signal, not a market-data value. */
 function getKrakenQuotePriority(quote) {
     const index = KRAKEN_SPOT_PAIR_QUOTE_PRIORITY.indexOf(`${quote ?? ''}`.trim().toUpperCase());
     return index === -1 ? KRAKEN_SPOT_PAIR_QUOTE_PRIORITY.length : index;
 }
 
+/* Search normalization makes Kraken labels, compact symbols, and pair strings comparable. */
 function normalizeKrakenSearchQuery(value) {
     return `${value ?? ''}`
         .trim()

@@ -1,8 +1,8 @@
-import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Soup from 'gi://Soup?version=3.0';
 
-import {buildEntries, clearPriceFlash} from './entry-model.js';
+import {buildEntries} from './entry-model.js';
+import {QuotesCoordinator} from './quotes-coordinator.js';
 import {QuoteStore} from './quote-store.js';
 import {
     HyperliquidLiveProvider,
@@ -10,7 +10,6 @@ import {
 } from './providers/hyperliquid-live.js';
 import {KrakenLiveProvider} from './providers/kraken-live.js';
 import {refresh as refreshStooqQuotes} from './providers/stooq.js';
-import {DEFAULT_TEXT_COLOR} from '../utils/format.js';
 import {createLoadingEntries} from '../utils/format.js';
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, SETTINGS_KEYS} from '../utils/settings.js';
 import {
@@ -20,14 +19,33 @@ import {
 } from '../utils/settings.js';
 import {createMarketScheduleNow, shouldRefreshTicker} from '../utils/market-schedule.js';
 
-const CRYPTO_UI_UPDATE_INTERVAL_SECONDS = 4;
-const PRICE_FLASH_DURATION_MS = 700;
-
+/*
+ * QuotesService is the top-level runtime orchestrator for market data.
+ *
+ * It sits between GNOME settings/UI state and the lower-level quote plumbing:
+ * - loads ticker/display configuration from settings
+ * - decides which tickers need refreshes on each pass
+ * - coordinates REST and live websocket providers
+ * - stores normalized quotes in QuoteStore
+ * - asks the coordinator to rebuild panel entries at the right cadence
+ *
+ * It deliberately does not own provider-specific parsing, market schedule rules,
+ * or entry formatting details. Those responsibilities live in the provider,
+ * schedule, store, and entry-model modules so the whole quote pipeline reads as
+ * one system instead of one giant service class.
+ */
 export const QuotesService = GObject.registerClass({
     Signals: {
         'entries-changed': {},
     },
 }, class QuotesService extends GObject.Object {
+    /*
+     * The constructor wires the runtime graph together once:
+     * settings -> service -> providers/store/coordinator -> entries-changed.
+     *
+     * After startup, the rest of the system flows through those collaborators
+     * instead of accumulating more state machines inside this class.
+     */
     _init(uuid, settings) {
         super._init();
         this._uuid = uuid;
@@ -40,12 +58,32 @@ export const QuotesService = GObject.registerClass({
         this._refreshIntervalSeconds = loadRefreshIntervalSeconds(this._settings);
         this._entries = createLoadingEntries(this._tickers, this._displaySettings);
         this._quoteStore = new QuoteStore();
-        this._refreshTimeoutId = 0;
-        this._entriesUpdateTimeoutId = 0;
-        this._entriesUpdateInProgress = false;
-        this._entriesUpdateQueued = false;
-        this._lastEntriesUpdateUsec = 0;
-        this._priceFlashTimeoutId = 0;
+        this._coordinator = new QuotesCoordinator({
+            onRefresh: async () => {
+                if (this._running)
+                    await this._refreshQuotes(false);
+            },
+            onRebuildEntries: async () => {
+                if (!this._running)
+                    return;
+
+                this._entries = buildEntries(
+                    this._tickers,
+                    this._quoteStore,
+                    this._displaySettings,
+                    this._entries
+                );
+                this.emit('entries-changed');
+                this._coordinator.schedulePriceFlashReset(this._entries);
+            },
+            onResetPriceFlash: nextEntries => {
+                if (!this._running)
+                    return;
+
+                this._entries = nextEntries;
+                this.emit('entries-changed');
+            },
+        });
         this._krakenProvider = new KrakenLiveProvider({
             uuid,
             onQuotes: quotesBySymbol => {
@@ -61,6 +99,7 @@ export const QuotesService = GObject.registerClass({
         });
     }
 
+    /* start() boots the full quote pipeline: settings, providers, initial loading state, and timers. */
     start() {
         if (this._running)
             return;
@@ -77,9 +116,10 @@ export const QuotesService = GObject.registerClass({
         this._updateProviderSubscriptions();
 
         void this._refreshQuotes(true);
-        this._scheduleRefreshTimer();
+        this._coordinator.scheduleRefreshTimer(this._refreshIntervalSeconds);
     }
 
+    /* stop() shuts down the quote pipeline in reverse order so sockets, timers, and cache state cannot leak. */
     stop() {
         if (!this._running && !this._session)
             return;
@@ -87,13 +127,7 @@ export const QuotesService = GObject.registerClass({
         this._running = false;
 
         this._disconnectSettingsSignals();
-        this._removeTimeout('_refreshTimeoutId');
-        this._removeTimeout('_entriesUpdateTimeoutId');
-        this._removeTimeout('_priceFlashTimeoutId');
-
-        this._entriesUpdateInProgress = false;
-        this._entriesUpdateQueued = false;
-        this._lastEntriesUpdateUsec = 0;
+        this._coordinator.stop();
 
         this._krakenProvider.stop();
         this._hyperliquidProvider.stop();
@@ -104,10 +138,17 @@ export const QuotesService = GObject.registerClass({
         this._entries = createLoadingEntries(this._tickers, this._displaySettings);
     }
 
+    /* The extension reads the current entry snapshot through this accessor when indicators need to redraw. */
     getEntries() {
         return this._entries;
     }
 
+    /*
+     * A refresh pass first decides what needs data right now, then delegates to
+     * the right provider layer. REST and live sources can coexist: Stooq handles
+     * non-live symbols, while Hyperliquid can fall back to REST if its live
+     * socket is not available.
+     */
     async _refreshQuotes(forceRefreshAll = false) {
         if (!this._running)
             return;
@@ -127,9 +168,14 @@ export const QuotesService = GObject.registerClass({
             await this._refreshHyperliquidQuotes(hyperliquidTickers);
 
         if (stooqTickers.length > 0 || hyperliquidTickers.length > 0)
-            this._requestEntriesUpdate(true);
+            this._coordinator.requestEntriesUpdate(true);
     }
 
+    /*
+     * Settings changes feed back into the runtime here. Some changes trigger a
+     * full configuration reload, while display-only changes rebuild entries
+     * without touching network state.
+     */
     _connectSettingsSignals() {
         this._disconnectSettingsSignals();
 
@@ -139,13 +185,13 @@ export const QuotesService = GObject.registerClass({
                 this._quoteStore.prune(this._tickers.map(ticker => ticker.symbol));
                 this._entries = createLoadingEntries(this._tickers, this._displaySettings);
                 this.emit('entries-changed');
-                this._scheduleRefreshTimer();
+                this._coordinator.scheduleRefreshTimer(this._refreshIntervalSeconds);
                 this._updateProviderSubscriptions();
                 void this._refreshQuotes(true);
             }),
             this._settings.connect(`changed::${SETTINGS_KEYS.REFRESH_INTERVAL_SECONDS}`, () => {
                 this._refreshIntervalSeconds = loadRefreshIntervalSeconds(this._settings);
-                this._scheduleRefreshTimer();
+                this._coordinator.scheduleRefreshTimer(this._refreshIntervalSeconds);
             }),
             this._settings.connect(`changed::${SETTINGS_KEYS.FORMAT_PRESET}`, () => this._handleDisplaySettingsChanged()),
             this._settings.connect(`changed::${SETTINGS_KEYS.SHOW_PRICE}`, () => this._handleDisplaySettingsChanged()),
@@ -155,107 +201,30 @@ export const QuotesService = GObject.registerClass({
         ];
     }
 
+    /* Signal teardown is centralized so startup/shutdown and hot reconfiguration use the same cleanup path. */
     _disconnectSettingsSignals() {
         this._settingsSignalIds.forEach(signalId => this._settings?.disconnect(signalId));
         this._settingsSignalIds = [];
     }
 
+    /* Display-only settings do not require refetching quotes, only rebuilding the current entry models. */
     _handleDisplaySettingsChanged() {
         this._displaySettings = loadDisplaySettings(this._settings);
-        this._requestEntriesUpdate(true);
+        this._coordinator.requestEntriesUpdate(true);
     }
 
+    /* Configuration is always reloaded from settings before major orchestration steps. */
     _loadConfiguration() {
         this._tickers = loadTickerConfigs(this._settings);
         this._displaySettings = loadDisplaySettings(this._settings);
         this._refreshIntervalSeconds = loadRefreshIntervalSeconds(this._settings);
     }
 
-    _scheduleRefreshTimer() {
-        this._removeTimeout('_refreshTimeoutId');
-
-        if (!this._running)
-            return;
-
-        this._refreshTimeoutId = GLib.timeout_add_seconds(
-            GLib.PRIORITY_DEFAULT,
-            this._refreshIntervalSeconds,
-            () => {
-                void this._refreshQuotes(false);
-                return GLib.SOURCE_CONTINUE;
-            }
-        );
-    }
-
-    _requestEntriesUpdate(immediate = false) {
-        if (!this._running)
-            return;
-
-        if (this._entriesUpdateInProgress) {
-            this._entriesUpdateQueued = true;
-            return;
-        }
-
-        if (immediate) {
-            this._removeTimeout('_entriesUpdateTimeoutId');
-            void this._rebuildEntries();
-            return;
-        }
-
-        const elapsedSeconds = (GLib.get_monotonic_time() - this._lastEntriesUpdateUsec) / 1_000_000;
-        if (this._lastEntriesUpdateUsec === 0 || elapsedSeconds >= CRYPTO_UI_UPDATE_INTERVAL_SECONDS) {
-            void this._rebuildEntries();
-            return;
-        }
-
-        if (this._entriesUpdateTimeoutId !== 0)
-            return;
-
-        const remainingMs = Math.max(
-            1,
-            Math.round((CRYPTO_UI_UPDATE_INTERVAL_SECONDS - elapsedSeconds) * 1000)
-        );
-
-        this._entriesUpdateTimeoutId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT,
-            remainingMs,
-            () => {
-                this._entriesUpdateTimeoutId = 0;
-                void this._rebuildEntries();
-                return GLib.SOURCE_REMOVE;
-            }
-        );
-    }
-
-    async _rebuildEntries() {
-        if (!this._running || this._entriesUpdateInProgress)
-            return;
-
-        this._entriesUpdateInProgress = true;
-
-        try {
-            if (this._running) {
-                this._entries = buildEntries(
-                    this._tickers,
-                    this._quoteStore,
-                    this._displaySettings,
-                    this._entries
-                );
-                this._lastEntriesUpdateUsec = GLib.get_monotonic_time();
-                this.emit('entries-changed');
-                this._schedulePriceFlashReset();
-            }
-        } finally {
-            this._entriesUpdateInProgress = false;
-
-            if (!this._entriesUpdateQueued || !this._running)
-                return;
-
-            this._entriesUpdateQueued = false;
-            this._requestEntriesUpdate(false);
-        }
-    }
-
+    /*
+     * Provider refreshes always normalize into the same in-memory quote shape so
+     * the rest of the system can stay provider-agnostic after this point.
+     */
+    /* Stooq refresh is the normal REST path for non-live symbols and any manual quote polling. */
     async _refreshStooqQuotes(tickers) {
         try {
             const quotesBySymbol = await refreshStooqQuotes(tickers, {session: this._session});
@@ -270,6 +239,7 @@ export const QuotesService = GObject.registerClass({
         }
     }
 
+    /* Hyperliquid REST refresh is only the fallback path when live transport is not currently connected. */
     async _refreshHyperliquidQuotes(tickers) {
         try {
             const quotesBySymbol = await refreshHyperliquidQuotes(tickers, {
@@ -287,14 +257,20 @@ export const QuotesService = GObject.registerClass({
         }
     }
 
+    /* Live providers push quote bursts through this path so the coordinator can throttle UI churn. */
     _handleLiveQuotes(quotesBySymbol) {
         if (!this._running || !quotesBySymbol || quotesBySymbol.size === 0)
             return;
 
         this._mergeQuotes(quotesBySymbol);
-        this._requestEntriesUpdate(false);
+        this._coordinator.requestEntriesUpdate(false);
     }
 
+    /*
+     * QuoteStore is the system boundary where provider-specific quote updates
+     * become a single normalized cache keyed by ticker symbol. From here onward,
+     * entry building and panel rendering no longer care where the quote came from.
+     */
     _mergeQuotes(quotesBySymbol) {
         quotesBySymbol.forEach((quote, symbol) => {
             const existingQuote = this._quoteStore.getQuote(symbol);
@@ -308,15 +284,22 @@ export const QuotesService = GObject.registerClass({
         });
     }
 
+    /* Saved ticker changes are reconciled into both live providers through this shared handoff. */
     _updateProviderSubscriptions() {
         this._krakenProvider.updateSubscriptions(this._tickers);
         this._hyperliquidProvider.updateSubscriptions(this._tickers);
     }
 
+    /* Hyperliquid REST snapshots are only used when live data for those symbols is currently unavailable. */
     _hasHyperliquidSocketConnected() {
         return this._hyperliquidProvider.isConnected();
     }
 
+    /*
+     * Schedule decisions are delegated so this service only asks "should this
+     * symbol refresh now?" rather than embedding time-zone and market-session
+     * rules directly in the orchestration flow.
+     */
     _shouldRefreshTicker(ticker, now) {
         return shouldRefreshTicker(
             ticker,
@@ -326,42 +309,14 @@ export const QuotesService = GObject.registerClass({
         );
     }
 
-    _schedulePriceFlashReset() {
-        this._removeTimeout('_priceFlashTimeoutId');
-
-        if (!this._entries.some(entry => entry.priceColor !== DEFAULT_TEXT_COLOR))
-            return;
-
-        this._priceFlashTimeoutId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT,
-            PRICE_FLASH_DURATION_MS,
-            () => {
-                this._priceFlashTimeoutId = 0;
-
-                if (!this._running)
-                    return GLib.SOURCE_REMOVE;
-
-                this._entries = clearPriceFlash(this._entries);
-                this.emit('entries-changed');
-                return GLib.SOURCE_REMOVE;
-            }
-        );
-    }
-
-    _removeTimeout(propertyName) {
-        if (this[propertyName] === 0)
-            return;
-
-        GLib.Source.remove(this[propertyName]);
-        this[propertyName] = 0;
-    }
-
+    /* Saved ticker metadata determines whether a symbol belongs to the live-crypto branch of the pipeline. */
     _isLiveCryptoTicker(ticker) {
         return ticker?.assetCategory === ASSET_CATEGORIES.CRYPTO &&
             typeof ticker.liveSymbol === 'string' &&
             ticker.liveSymbol !== '';
     }
 
+    /* Hyperliquid-specific branching is kept here so the rest of refresh orchestration stays provider-agnostic. */
     _isHyperliquidTicker(ticker) {
         return this._isLiveCryptoTicker(ticker) &&
             ticker.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID;

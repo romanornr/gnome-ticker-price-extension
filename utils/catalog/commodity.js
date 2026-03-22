@@ -1,5 +1,6 @@
 import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
 
+/* Curated commodity suggestions feed prefs search and sensible default metadata for weekday-session commodities. */
 export const COMMODITY_TICKERS = [
     {
         assetCategory: ASSET_CATEGORIES.COMMODITY,

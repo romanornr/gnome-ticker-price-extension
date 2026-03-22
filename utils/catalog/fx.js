@@ -1,5 +1,6 @@
 import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
 
+/* Curated FX suggestions give prefs a searchable baseline for common weekday currency markets. */
 export const FX_TICKERS = [
     {
         assetCategory: ASSET_CATEGORIES.FX,
