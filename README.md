@@ -54,7 +54,29 @@ When adding a curated ticker:
 
 - `./install.sh` for a normal local install
 - `./install-dev.sh` for a symlinked development install
-- `./remove.sh` to uninstall
+- `./remove.sh` to uninstall the extension files when you still have this checkout available
+
+### Manage The Installed Extension From The Browser
+
+After the extension is installed, open:
+
+- `https://extensions.gnome.org/local/`
+
+This page shows the extensions that GNOME Shell can currently see for your
+session. From there you can:
+
+- enable the extension
+- disable the extension
+- remove the installed extension from GNOME Shell
+
+Use this page when you just want to manage the installed extension and do not
+care where it originally came from. It is especially useful if you no longer
+have this repository checked out locally, do not remember how you installed it,
+or do not want to use `./remove.sh`.
+
+This browser-based flow requires the GNOME Shell Integration browser
+extension/add-on to be installed first. Without that browser integration, the
+website cannot control local GNOME Shell extensions.
 
 ## Local Checks
 
