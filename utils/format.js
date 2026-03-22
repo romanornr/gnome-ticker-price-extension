@@ -29,6 +29,19 @@ export function createErrorEntry(ticker) {
 }
 
 export function createDisplayEntry(ticker, quote, previousClose) {
+    if (!Number.isFinite(previousClose)) {
+        return {
+            label: ticker.label,
+            separatorBefore: ticker.separatorBefore ?? '',
+            priceText: formatPrice(quote.price, ticker.priceDecimals),
+            displayPrice: quote.price,
+            arrow: '',
+            percentText: '',
+            priceColor: DEFAULT_TEXT_COLOR,
+            changeColor: DEFAULT_TEXT_COLOR,
+        };
+    }
+
     const percentChange = ((quote.price - previousClose) / previousClose) * 100;
 
     return {

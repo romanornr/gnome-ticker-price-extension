@@ -241,17 +241,28 @@ export const QuotesService = GObject.registerClass({
         if (cachedEntry?.quoteDate === quoteDate)
             return cachedEntry.previousClose;
 
-        const historyCsv = await this._fetchText(this._buildHistoryUrl(ticker.symbol));
-        if (!this._running)
-            throw new Error(`History request aborted for ${ticker.symbol}`);
+        try {
+            const historyCsv = await this._fetchText(this._buildHistoryUrl(ticker.symbol));
+            if (!this._running)
+                throw new Error(`History request aborted for ${ticker.symbol}`);
 
-        const previousClose = this._parsePreviousClose(historyCsv, quoteDate);
-        this._previousCloseCache.set(cacheKey, {
-            quoteDate,
-            previousClose,
-        });
+            const previousClose = this._parsePreviousClose(historyCsv, quoteDate);
+            this._previousCloseCache.set(cacheKey, {
+                quoteDate,
+                previousClose,
+            });
 
-        return previousClose;
+            return previousClose;
+        } catch (error) {
+            if (this._running) {
+                logError(
+                    error,
+                    `${this._uuid}: previous close unavailable for ${ticker.label}; showing price without change`
+                );
+            }
+
+            return null;
+        }
     }
 
     async _fetchText(url) {
