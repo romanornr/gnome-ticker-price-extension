@@ -28,14 +28,14 @@ const KRAKEN_SYMBOL_TO_TICKER_SYMBOL = new Map([
 ]);
 
 export const TICKERS = [
-    {label: 'SPX', symbol: '^spx', priceDecimals: 0, marketType: 'us-session'},
-    {label: 'NDX', symbol: '^ndq', priceDecimals: 0, marketType: 'us-session'},
-    {label: 'DXY', symbol: 'dx.f', priceDecimals: 2, marketType: 'weekday-session'},
-    {label: 'EUR/USD', symbol: 'eurusd', priceDecimals: 4, marketType: 'weekday-session'},
-    {label: 'Gold', symbol: 'gc.f', priceDecimals: 0, marketType: 'weekday-session'},
-    {label: 'WTI', symbol: 'cl.f', priceDecimals: 2, marketType: 'us-session'},
-    {label: 'ETH', symbol: 'eth.v', priceDecimals: 0, marketType: 'always-open', separatorBefore: ' || '},
-    {label: 'BTC', symbol: 'btc.v', priceDecimals: 0, marketType: 'always-open'},
+    {label: 'SPX', symbol: '^spx', priceDecimals: 0, marketType: 'us-session', panelSide: 'right'},
+    {label: 'NDX', symbol: '^ndq', priceDecimals: 0, marketType: 'us-session', panelSide: 'right'},
+    {label: 'DXY', symbol: 'dx.f', priceDecimals: 2, marketType: 'weekday-session', panelSide: 'left'},
+    {label: 'EUR/USD', symbol: 'eurusd', priceDecimals: 4, marketType: 'weekday-session', panelSide: 'left'},
+    {label: 'Gold', symbol: 'xauusd', priceDecimals: 0, marketType: 'weekday-session', panelSide: 'right'},
+    {label: 'USO', symbol: 'uso.us', priceDecimals: 2, marketType: 'us-session', panelSide: 'right'},
+    {label: 'ETH', symbol: 'eth.v', priceDecimals: 0, marketType: 'always-open', panelSide: 'right', separatorBefore: ' || '},
+    {label: 'BTC', symbol: 'btc.v', priceDecimals: 0, marketType: 'always-open', panelSide: 'right'},
 ];
 
 export const QuotesService = GObject.registerClass({

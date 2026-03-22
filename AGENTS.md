@@ -24,7 +24,8 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 ## Data And API Conventions
 
 - Market data is fetched from Stooq, with Kraken WebSocket v2 used for live BTC/USD and ETH/USD updates.
-- The current supported non-crypto tickers are SPX, NDX, DXY, EUR/USD, Gold, and WTI; verify Stooq symbol availability with `curl` before adding more.
+- The current supported non-crypto tickers are SPX, NDX, DXY, EUR/USD, Gold, and USO; verify Stooq symbol availability with `curl` before adding more.
+- Tickers may be split across GNOME panel sides via per-ticker `panelSide` metadata; when adding indicators to the left panel, append them after existing left-side items so other extensions are not shifted unexpectedly.
 - Prefer the batched quote endpoint for current prices.
 - Maintain one persistent Kraken public WebSocket connection for BTC/USD and ETH/USD rather than opening one socket per ticker.
 - Keep REST fallback behavior on the normal polling cadence if the crypto socket disconnects; do not increase REST frequency because the socket is down.
