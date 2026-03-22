@@ -88,10 +88,15 @@ export default class TickerPriceExtension extends Extension {
     _getEntriesForSide(entries, side) {
         const tickersForSide = getTickersForSide(loadTickerConfigs(this._settings), side);
         const entriesBySymbol = new Map(entries.map(entry => [entry.symbol?.toUpperCase() ?? entry.label, entry]));
-
-        return tickersForSide
+        const sideEntries = tickersForSide
             .map(ticker => entriesBySymbol.get(ticker.symbol.toUpperCase()) ?? entriesBySymbol.get(ticker.label))
-            .filter(entry => entry !== undefined);
+            .filter(entry => entry !== undefined)
+            .map(entry => ({...entry}));
+
+        if (sideEntries.length > 0)
+            sideEntries[0].separatorBefore = '';
+
+        return sideEntries;
     }
 
     _shutdown() {
