@@ -26,6 +26,7 @@ const KRAKEN_SYMBOL_TO_TICKER_SYMBOL = new Map([
 
 export const TICKERS = [
     {label: 'SPX', symbol: '^spx', priceDecimals: 0, marketType: 'us-session'},
+    {label: 'NDX', symbol: '^ndq', priceDecimals: 0, marketType: 'us-session'},
     {label: 'ETH', symbol: 'eth.v', priceDecimals: 0, marketType: 'always-open'},
     {label: 'BTC', symbol: 'btc.v', priceDecimals: 0, marketType: 'always-open'},
 ];
