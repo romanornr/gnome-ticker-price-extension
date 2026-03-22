@@ -10,14 +10,22 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const REFRESH_INTERVAL_SECONDS = 300;
 const HISTORY_LOOKBACK_DAYS = 7;
+const KRAKEN_WEBSOCKET_URL = 'wss://ws.kraken.com/v2';
+const KRAKEN_TICKER_SYMBOLS = ['BTC/USD', 'ETH/USD'];
+const KRAKEN_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
+const CRYPTO_UI_UPDATE_INTERVAL_SECONDS = 4;
 const DEFAULT_TEXT_COLOR = '#ffffff';
 const POSITIVE_COLOR = '#3FB950';
 const NEGATIVE_COLOR = '#F85149';
 const US_MARKET_TIME_ZONE = 'America/New_York';
+const KRAKEN_SYMBOL_TO_TICKER_SYMBOL = new Map([
+    ['BTC/USD', 'BTC.V'],
+    ['ETH/USD', 'ETH.V'],
+]);
 const TICKERS = [
     {label: 'SPX', symbol: '^spx', priceDecimals: 0, marketType: 'us-session'},
-    {label: 'ETH', symbol: 'eth.v', priceDecimals: 0, marketType: 'always-open'},
-    {label: 'BTC', symbol: 'btc.v', priceDecimals: 0, marketType: 'always-open'},
+    {label: 'ETH', symbol: 'eth.v', priceDecimals: 2, marketType: 'always-open'},
+    {label: 'BTC', symbol: 'btc.v', priceDecimals: 1, marketType: 'always-open'},
 ];
 
 const TickerIndicator = GObject.registerClass(
@@ -82,6 +90,13 @@ export default class HelloWorldExtension extends Extension {
         this._latestQuotesBySymbol = new Map();
         this._previousCloseCache = new Map();
         this._refreshTimeoutId = 0;
+        this._indicatorUpdateTimeoutId = 0;
+        this._indicatorUpdateInProgress = false;
+        this._indicatorUpdateQueued = false;
+        this._lastIndicatorUpdateUsec = 0;
+        this._krakenWebsocket = null;
+        this._krakenReconnectTimeoutId = 0;
+        this._krakenReconnectAttempt = 0;
         this._session = new Soup.Session();
     }
 
@@ -93,6 +108,7 @@ export default class HelloWorldExtension extends Extension {
         // from the far-right edge.
         Main.panel.addToStatusArea(this.uuid, this._indicator, 0, 'right');
         this._refreshPrices(true);
+        this._connectKrakenWebsocket();
 
         this._refreshTimeoutId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
@@ -110,10 +126,26 @@ export default class HelloWorldExtension extends Extension {
             this._refreshTimeoutId = 0;
         }
 
+        if (this._indicatorUpdateTimeoutId !== 0) {
+            GLib.Source.remove(this._indicatorUpdateTimeoutId);
+            this._indicatorUpdateTimeoutId = 0;
+        }
+
+        if (this._krakenReconnectTimeoutId !== 0) {
+            GLib.Source.remove(this._krakenReconnectTimeoutId);
+            this._krakenReconnectTimeoutId = 0;
+        }
+
+        const indicator = this._indicator;
+        this._indicator = null;
+        this._indicatorUpdateInProgress = false;
+        this._indicatorUpdateQueued = false;
+        this._lastIndicatorUpdateUsec = 0;
+        this._krakenReconnectAttempt = 0;
+        this._disconnectKrakenWebsocket();
         this._latestQuotesBySymbol.clear();
         this._previousCloseCache.clear();
-        this._indicator?.destroy();
-        this._indicator = null;
+        indicator?.destroy();
     }
 
     async _refreshPrices(forceRefreshAll = false) {
@@ -134,6 +166,59 @@ export default class HelloWorldExtension extends Extension {
             }
         }
 
+        this._requestIndicatorUpdate(true);
+    }
+
+    _requestIndicatorUpdate(immediate = false) {
+        if (!this._indicator)
+            return;
+
+        if (this._indicatorUpdateInProgress) {
+            this._indicatorUpdateQueued = true;
+            return;
+        }
+
+        if (immediate) {
+            if (this._indicatorUpdateTimeoutId !== 0) {
+                GLib.Source.remove(this._indicatorUpdateTimeoutId);
+                this._indicatorUpdateTimeoutId = 0;
+            }
+
+            void this._updateIndicator();
+            return;
+        }
+
+        const elapsedSeconds = (GLib.get_monotonic_time() - this._lastIndicatorUpdateUsec) / 1_000_000;
+        if (this._lastIndicatorUpdateUsec === 0 || elapsedSeconds >= CRYPTO_UI_UPDATE_INTERVAL_SECONDS) {
+            void this._updateIndicator();
+            return;
+        }
+
+        if (this._indicatorUpdateTimeoutId !== 0)
+            return;
+
+        const remainingMs = Math.max(
+            1,
+            Math.round((CRYPTO_UI_UPDATE_INTERVAL_SECONDS - elapsedSeconds) * 1000)
+        );
+
+        this._indicatorUpdateTimeoutId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            remainingMs,
+            () => {
+                this._indicatorUpdateTimeoutId = 0;
+                void this._updateIndicator();
+                return GLib.SOURCE_REMOVE;
+            }
+        );
+    }
+
+    async _updateIndicator() {
+        if (!this._indicator || this._indicatorUpdateInProgress)
+            return;
+
+        this._indicatorUpdateInProgress = true;
+
         const entries = await Promise.all(
             TICKERS.map(async ticker => {
                 try {
@@ -152,10 +237,18 @@ export default class HelloWorldExtension extends Extension {
             })
         );
 
-        if (!this._indicator)
+        if (this._indicator) {
+            this._indicator.setEntries(entries);
+            this._lastIndicatorUpdateUsec = GLib.get_monotonic_time();
+        }
+
+        this._indicatorUpdateInProgress = false;
+
+        if (!this._indicatorUpdateQueued)
             return;
 
-        this._indicator.setEntries(entries);
+        this._indicatorUpdateQueued = false;
+        this._requestIndicatorUpdate(false);
     }
 
     async _fetchTickerEntry(ticker) {
@@ -198,6 +291,161 @@ export default class HelloWorldExtension extends Extension {
         const message = Soup.Message.new('GET', url);
         const bytes = await this._session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null);
         return new TextDecoder().decode(bytes.get_data()).trim();
+    }
+
+    async _connectKrakenWebsocket() {
+        if (!this._indicator || this._krakenWebsocket)
+            return;
+
+        try {
+            const message = Soup.Message.new('GET', KRAKEN_WEBSOCKET_URL);
+            const websocket = await new Promise((resolve, reject) => {
+                this._session.websocket_connect_async(
+                    message,
+                    null,
+                    [],
+                    GLib.PRIORITY_DEFAULT,
+                    null,
+                    (_session, result) => {
+                        try {
+                            resolve(this._session.websocket_connect_finish(result));
+                        } catch (error) {
+                            reject(error);
+                        }
+                    }
+                );
+            });
+
+            if (!this._indicator) {
+                websocket.close(1000, null);
+                return;
+            }
+
+            this._krakenWebsocket = websocket;
+
+            websocket.connect('message', (_connection, type, messageBytes) => {
+                this._handleKrakenMessage(type, messageBytes);
+            });
+
+            websocket.connect('error', (_connection, error) => {
+                logError(error, `${this.uuid}: Kraken websocket error`);
+            });
+
+            websocket.connect('closed', () => {
+                this._handleKrakenDisconnect();
+            });
+
+            websocket.send_text(JSON.stringify({
+                method: 'subscribe',
+                params: {
+                    channel: 'ticker',
+                    event_trigger: 'trades',
+                    symbol: KRAKEN_TICKER_SYMBOLS,
+                    snapshot: true,
+                },
+            }));
+        } catch (error) {
+            logError(error, `${this.uuid}: failed to connect Kraken websocket`);
+            this._scheduleKrakenReconnect();
+        }
+    }
+
+    _disconnectKrakenWebsocket() {
+        const websocket = this._krakenWebsocket;
+        this._krakenWebsocket = null;
+
+        if (!websocket)
+            return;
+
+        const state = websocket.get_state();
+        if (state !== Soup.WebsocketState.CLOSING && state !== Soup.WebsocketState.CLOSED)
+            websocket.close(1000, null);
+    }
+
+    _handleKrakenDisconnect() {
+        this._krakenWebsocket = null;
+
+        if (!this._indicator)
+            return;
+
+        this._scheduleKrakenReconnect();
+    }
+
+    _scheduleKrakenReconnect() {
+        if (!this._indicator || this._krakenReconnectTimeoutId !== 0)
+            return;
+
+        const index = Math.min(
+            this._krakenReconnectAttempt,
+            KRAKEN_RECONNECT_DELAYS_SECONDS.length - 1
+        );
+        const delaySeconds = KRAKEN_RECONNECT_DELAYS_SECONDS[index];
+        this._krakenReconnectAttempt += 1;
+
+        this._krakenReconnectTimeoutId = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            delaySeconds,
+            () => {
+                this._krakenReconnectTimeoutId = 0;
+                void this._connectKrakenWebsocket();
+                return GLib.SOURCE_REMOVE;
+            }
+        );
+    }
+
+    _handleKrakenMessage(type, messageBytes) {
+        if (type !== Soup.WebsocketDataType.TEXT)
+            return;
+
+        let payload;
+
+        try {
+            payload = JSON.parse(new TextDecoder().decode(messageBytes.get_data()));
+        } catch (error) {
+            logError(error, `${this.uuid}: failed to parse Kraken websocket payload`);
+            return;
+        }
+
+        if (payload?.success === false) {
+            logError(
+                new Error(payload.error ?? 'Kraken websocket subscription failed'),
+                `${this.uuid}: Kraken websocket rejected request`
+            );
+            this._disconnectKrakenWebsocket();
+            this._scheduleKrakenReconnect();
+            return;
+        }
+
+        if (
+            payload?.method === 'subscribe' &&
+            payload?.success === true &&
+            payload?.result?.channel === 'ticker'
+        ) {
+            this._krakenReconnectAttempt = 0;
+            return;
+        }
+
+        if (payload?.channel !== 'ticker' || !Array.isArray(payload.data))
+            return;
+
+        let updated = false;
+
+        payload.data.forEach(entry => {
+            const tickerSymbol = KRAKEN_SYMBOL_TO_TICKER_SYMBOL.get(entry?.symbol ?? '');
+            const price = Number.parseFloat(`${entry?.last ?? ''}`);
+            const quoteDate = this._normalizeTimestampDate(entry?.timestamp ?? '');
+
+            if (!tickerSymbol || !Number.isFinite(price) || !quoteDate)
+                return;
+
+            this._latestQuotesBySymbol.set(tickerSymbol, {price, quoteDate});
+            updated = true;
+        });
+
+        if (updated) {
+            this._krakenReconnectAttempt = 0;
+            this._requestIndicatorUpdate(false);
+        }
     }
 
     _buildBatchQuoteUrl(tickers) {
@@ -276,6 +524,10 @@ export default class HelloWorldExtension extends Extension {
     _normalizeQuoteDate(dateText) {
         const normalized = dateText.replaceAll('-', '');
         return /^\d{8}$/.test(normalized) ? normalized : '';
+    }
+
+    _normalizeTimestampDate(timestampText) {
+        return this._normalizeQuoteDate(timestampText.slice(0, 10));
     }
 
     _shouldRefreshTicker(ticker) {
