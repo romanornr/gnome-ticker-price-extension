@@ -11,12 +11,21 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `prefs.js`: GNOME preferences window for ticker configuration, refresh cadence, and display options
 - `ui/indicator.js`: panel indicator rendering
 - `services/quotes.js`: quote fetching, Kraken WebSocket lifecycle, cache management, update scheduling
+- `services/quote-store.js`: in-memory quote cache and refresh-cadence timestamps for normalized symbols
+- `services/entry-model.js`: panel entry/view-model building, including loading/error states and price-flash decoration
+- `services/providers/stooq.js`: batched Stooq quote fetching/parsing plus symbol verification helpers
+- `services/providers/kraken-live.js`: Kraken live quote adapter, subscription management, and reconnect handling
+- `services/providers/hyperliquid-live.js`: Hyperliquid live quote adapter plus REST fallback snapshot normalization
 - `README.md`: user-facing setup notes, ticker add flow, and curated catalog editing guide
 - `utils/format.js`: display-entry formatting and color helpers
 - `utils/asset-categories.js`: shared asset-category metadata, category search terms, and default market-type mapping
+- `utils/display-settings.js`: display preset defaults, separator metadata, and refresh-interval option helpers
 - `utils/hyperliquid.js`: Hyperliquid REST/WebSocket helpers for spot and perp discovery, symbol normalization, and runtime crypto catalog entries
 - `utils/kraken.js`: Kraken WebSocket helpers for instrument discovery, symbol normalization, and runtime crypto catalog entries
+- `utils/market-schedule.js`: shared market-hours and refresh-cadence rules using `America/New_York`
 - `utils/settings.js`: shared settings defaults, validation, and settings-backed ticker/display loading
+- `utils/prefs/ticker-dialog-state.js`: pure ticker-dialog validation, crypto resolution, and form-to-config normalization helpers
+- `utils/prefs/stooq-verifier.js`: prefs-side Stooq verification wrapper
 - `utils/ticker-catalog.js`: curated ticker aggregation and search helpers for guided prefs selection
 - `utils/catalog/*.js`: curated ticker data split by asset category for contributor-friendly maintenance
 - `utils/catalog/us-equity.js`: alphabetized curated U.S. equity catalog; keep symbols Stooq-verified and search keywords sensible

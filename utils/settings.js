@@ -8,6 +8,12 @@ import {
     getDefaultCryptoProvider,
 } from './asset-categories.js';
 import {
+    DEFAULT_DISPLAY_SETTINGS,
+    DEFAULT_REFRESH_INTERVAL_SECONDS,
+    FORMAT_PRESETS,
+    SEPARATOR_STYLES,
+} from './display-settings.js';
+import {
     normalizeHyperliquidLiveSymbol,
     normalizeHyperliquidTickerSymbol,
 } from './hyperliquid.js';
@@ -35,20 +41,6 @@ export {
     getCryptoProviderOptions,
     getDefaultCryptoProvider,
 };
-
-export const FORMAT_PRESETS = {
-    DEFAULT: 'default',
-    CHANGE: 'change-only',
-    PRICE: 'price-only',
-};
-
-export const SEPARATOR_STYLES = {
-    DOT: 'dot',
-    PIPES: 'pipes',
-    SPACE: 'space',
-};
-
-export const DEFAULT_REFRESH_INTERVAL_SECONDS = 300;
 
 export const DEFAULT_TICKERS = [
     {
@@ -122,14 +114,6 @@ export const DEFAULT_TICKERS = [
     },
 ];
 
-export const DEFAULT_DISPLAY_SETTINGS = {
-    formatPreset: FORMAT_PRESETS.DEFAULT,
-    showPrice: true,
-    showArrow: true,
-    showPercent: true,
-    separatorStyle: SEPARATOR_STYLES.DOT,
-};
-
 const SUPPORTED_LIVE_TICKERS = [
     {
         label: 'BTC',
@@ -200,18 +184,6 @@ export function getTickersForSide(tickers, side) {
     return tickers.filter(ticker => (ticker.panelSide ?? RIGHT_PANEL_SIDE) === side);
 }
 
-export function getSeparatorText(separatorStyle) {
-    switch (separatorStyle) {
-    case SEPARATOR_STYLES.PIPES:
-        return ' || ';
-    case SEPARATOR_STYLES.SPACE:
-        return '   ';
-    case SEPARATOR_STYLES.DOT:
-    default:
-        return ' \u00b7 ';
-    }
-}
-
 export function getMarketTypeOptions() {
     return [
         {
@@ -236,33 +208,6 @@ export function getMarketTypeForAssetCategory(assetCategory) {
     return getAssetCategoryDefaultMarketType(assetCategory);
 }
 
-export function getFormatPresetOptions() {
-    return [
-        {value: FORMAT_PRESETS.DEFAULT, title: 'Ticker + price + change'},
-        {value: FORMAT_PRESETS.CHANGE, title: 'Ticker + change'},
-        {value: FORMAT_PRESETS.PRICE, title: 'Ticker + price'},
-    ];
-}
-
-export function getSeparatorOptions() {
-    return [
-        {value: SEPARATOR_STYLES.DOT, title: '\u00b7'},
-        {value: SEPARATOR_STYLES.PIPES, title: '||'},
-        {value: SEPARATOR_STYLES.SPACE, title: 'Spacing'},
-    ];
-}
-
-export function getRefreshIntervalOptions() {
-    return [60, 120, 300, 600, 900, 1800, 3600];
-}
-
-export function formatRefreshIntervalLabel(seconds) {
-    if (seconds < 60)
-        return `${seconds} sec`;
-
-    const minutes = seconds / 60;
-    return `${minutes} min`;
-}
 
 export function cloneTicker(ticker) {
     return JSON.parse(JSON.stringify(ticker));

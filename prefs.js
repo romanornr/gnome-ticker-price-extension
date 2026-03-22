@@ -1,5 +1,4 @@
 import Adw from 'gi://Adw';
-import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 import Soup from 'gi://Soup?version=3.0';
@@ -10,15 +9,11 @@ import {
     getAssetCategoryOptions,
     cloneTicker,
     CRYPTO_PROVIDERS,
-    formatRefreshIntervalLabel,
     getCryptoProviderOptions,
     getDefaultCryptoProvider,
-    getFormatPresetOptions,
     getMarketTypeForAssetCategory,
     getMarketTypeOptions,
-    getRefreshIntervalOptions,
     getTickersForSide,
-    getSeparatorOptions,
     LEFT_PANEL_SIDE,
     loadDisplaySettings,
     loadRefreshIntervalSeconds,
@@ -29,14 +24,31 @@ import {
     SETTINGS_KEYS,
 } from './utils/settings.js';
 import {
+    formatRefreshIntervalLabel,
+    getFormatPresetOptions,
+    getRefreshIntervalOptions,
+    getSeparatorOptions,
+} from './utils/display-settings.js';
+import {
     loadHyperliquidMarkets,
 } from './utils/hyperliquid.js';
-import {
-    findCuratedTicker,
-    matchCuratedTickers,
-    resolveCryptoCatalogTicker,
-} from './utils/ticker-catalog.js';
 import {loadKrakenSpotPairs} from './utils/kraken.js';
+import {
+    buildTickerConfig,
+    getCatalogMatches,
+    getCryptoCatalogLoadingMessage,
+    getCryptoCatalogUnavailableTitle,
+    getCryptoEmptyStateSubtitle,
+    getCryptoSearchPrompt,
+    getCryptoSearchQuery,
+    getCryptoVerificationFailureMessage,
+    getCryptoVerificationSuccessMessage,
+    getSuggestionsDescription,
+    resolveSelectedCryptoTicker,
+    validateTickerDraft,
+    validateTickerSymbol,
+} from './utils/prefs/ticker-dialog-state.js';
+import {verifyTickerSymbol} from './utils/prefs/stooq-verifier.js';
 
 const MAX_CURATED_SUGGESTIONS = 8;
 
@@ -487,36 +499,17 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             cryptoCatalogRequestId += 1;
         };
 
-        const getCatalogOptions = () => ({
-            cryptoCatalog: Array.isArray(cryptoCatalog) ? cryptoCatalog : [],
-            cryptoProvider: activeCryptoProvider,
-        });
         const updateSuggestionsDescription = () => {
-            suggestionsGroup.description = activeAssetCategory === 'crypto'
-                ? activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                    ? 'Search live Hyperliquid spot symbols and perps. Non-crypto assets still use the built-in catalog.'
-                    : 'Search live Kraken WebSocket pairs. Non-crypto assets still use the built-in catalog.'
-                : 'Type a label or symbol above to search the built-in catalog. You can still save any custom Stooq symbol.';
+            suggestionsGroup.description = getSuggestionsDescription(activeAssetCategory, activeCryptoProvider);
         };
 
-        const getCryptoSearchQuery = () => symbolRow.text.trim() || labelRow.text.trim();
-
-        const getResolvedCryptoTicker = () => {
-            if (activeAssetCategory !== 'crypto' || !Array.isArray(cryptoCatalog))
-                return null;
-
-            const query = getCryptoSearchQuery();
-            if (query === '')
-                return null;
-
-            const exactMatch = findCuratedTicker({
-                label: labelRow.text.trim(),
-                symbol: query,
-                assetCategory: activeAssetCategory,
-            }, getCatalogOptions());
-
-            return exactMatch ?? resolveCryptoCatalogTicker(query, cryptoCatalog, activeCryptoProvider);
-        };
+        const getResolvedCryptoTicker = () => resolveSelectedCryptoTicker({
+            assetCategory: activeAssetCategory,
+            cryptoCatalog,
+            cryptoProvider: activeCryptoProvider,
+            labelText: labelRow.text,
+            symbolText: symbolRow.text,
+        });
 
         const ensureCryptoCatalogLoaded = async () => {
             if (activeAssetCategory !== 'crypto' || cryptoCatalogLoading)
@@ -580,16 +573,14 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             clearSuggestionRows();
 
             const query = activeAssetCategory === 'crypto'
-                ? getCryptoSearchQuery()
+                ? getCryptoSearchQuery(labelRow.text, symbolRow.text)
                 : (symbolRow.text.trim() || labelRow.text.trim());
 
             if (activeAssetCategory === 'crypto') {
                 if (cryptoCatalogLoading) {
                     const loadingRow = new Adw.ActionRow({
                         title: 'Loading crypto pairs',
-                        subtitle: activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                            ? 'Fetching live Hyperliquid spot symbols and perps for search and verification.'
-                            : 'Fetching active Kraken WebSocket pairs for search and verification.',
+                        subtitle: getCryptoCatalogLoadingMessage(activeCryptoProvider),
                         sensitive: false,
                     });
                     suggestionsGroup.add(loadingRow);
@@ -599,9 +590,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
                 if (cryptoCatalogError !== '') {
                     const unavailableRow = new Adw.ActionRow({
-                        title: activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                            ? 'Hyperliquid crypto catalog unavailable'
-                            : 'Kraken crypto catalog unavailable',
+                        title: getCryptoCatalogUnavailableTitle(activeCryptoProvider),
                         subtitle: cryptoCatalogError,
                         sensitive: false,
                     });
@@ -615,9 +604,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 const promptRow = new Adw.ActionRow({
                     title: 'Start typing to search',
                     subtitle: activeAssetCategory === 'crypto'
-                        ? activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                            ? 'Type a perp like BTC or a spot pair like PURR/USDC.'
-                            : 'Type a base asset or pair like SOL, SOLUSD, or SOL/USD.'
+                        ? getCryptoSearchPrompt(activeCryptoProvider)
                         : 'Curated matches stay hidden until you enter a label or symbol.',
                     sensitive: false,
                 });
@@ -626,14 +613,17 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                 return;
             }
 
-            const matches = matchCuratedTickers(activeAssetCategory, query, getCatalogOptions());
+            const matches = getCatalogMatches(
+                activeAssetCategory,
+                query,
+                cryptoCatalog,
+                activeCryptoProvider
+            );
             if (matches.length === 0) {
                 const emptyRow = new Adw.ActionRow({
                     title: 'No curated matches',
                     subtitle: activeAssetCategory === 'crypto'
-                        ? activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                            ? 'Type an exact Hyperliquid perp like BTC or a spot pair like PURR/USDC.'
-                            : 'Type an exact Kraken WebSocket pair like SOL/USD, or keep searching.'
+                        ? getCryptoEmptyStateSubtitle(activeCryptoProvider)
                         : 'Keep your manual symbol and use Verify to check whether Stooq returns data for it.',
                     sensitive: false,
                 });
@@ -692,28 +682,22 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
                 const resolvedCryptoTicker = getResolvedCryptoTicker();
                 if (!resolvedCryptoTicker) {
-                    setVerificationMessage(
-                        activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                            ? 'Choose a Hyperliquid-supported spot symbol or perp before saving.'
-                            : 'Choose a Kraken-supported pair before saving.',
-                        true
-                    );
+                    setVerificationMessage(getCryptoVerificationFailureMessage(activeCryptoProvider), true);
                     updateVerifyButtonSensitivity();
                     return;
                 }
 
                 lastVerifiedSymbol = resolvedCryptoTicker.liveSymbol;
-                setVerificationMessage(
-                    activeCryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                        ? `Verified ${resolvedCryptoTicker.liveSymbol}. Hyperliquid supports this market.`
-                        : `Verified ${resolvedCryptoTicker.liveSymbol}. Kraken WebSocket supports this pair.`
-                );
+                setVerificationMessage(getCryptoVerificationSuccessMessage(
+                    activeCryptoProvider,
+                    resolvedCryptoTicker.liveSymbol
+                ));
                 updateVerifyButtonSensitivity();
                 return;
             }
 
             const symbol = symbolRow.text.trim().toLowerCase();
-            const symbolValidationMessage = this._validateTickerSymbol(symbol);
+            const symbolValidationMessage = validateTickerSymbol(symbol);
 
             if (symbolValidationMessage !== '') {
                 setVerificationMessage(symbolValidationMessage, true);
@@ -728,7 +712,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             setVerificationMessage(`Checking ${symbol} on Stooq...`);
 
             try {
-                const result = await this._verifyTickerSymbol(verificationSession, symbol);
+                const result = await verifyTickerSymbol(verificationSession, symbol);
                 if (requestId !== verificationRequestId)
                     return;
 
@@ -752,8 +736,13 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
 
         const updateSaveSensitivity = () => {
             const hasCryptoCatalogMatches = activeAssetCategory === 'crypto' &&
-                matchCuratedTickers(activeAssetCategory, getCryptoSearchQuery(), getCatalogOptions()).length > 0;
-            const validationMessage = this._validateTickerDraft(labelRow.text, symbolRow.text, {
+                getCatalogMatches(
+                    activeAssetCategory,
+                    getCryptoSearchQuery(labelRow.text, symbolRow.text),
+                    cryptoCatalog,
+                    activeCryptoProvider
+                ).length > 0;
+            const validationMessage = validateTickerDraft(labelRow.text, symbolRow.text, {
                 assetCategory: activeAssetCategory,
                 cryptoProvider: activeCryptoProvider,
                 cryptoCatalogLoading,
@@ -845,39 +834,17 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         dialog.connect('response', (_dialog, responseId) => {
             if (responseId === Gtk.ResponseType.OK) {
                 const resolvedCryptoTicker = getResolvedCryptoTicker();
-                const effectiveLabel = activeAssetCategory === 'crypto' && labelRow.text.trim() === ''
-                    ? (resolvedCryptoTicker?.label ?? '')
-                    : labelRow.text.trim();
-                const matchingCuratedTicker = findCuratedTicker({
-                    label: effectiveLabel,
-                    symbol: activeAssetCategory === 'crypto'
-                        ? (resolvedCryptoTicker?.liveSymbol ?? symbolRow.text.trim())
-                        : symbolRow.text.trim().toLowerCase(),
-                    assetCategory: activeAssetCategory,
-                }, getCatalogOptions());
-                const nextTicker = {
-                    ...initialTicker,
-                    label: effectiveLabel,
-                    symbol: activeAssetCategory === 'crypto'
-                        ? (resolvedCryptoTicker?.symbol ?? symbolRow.text.trim().toLowerCase())
-                        : symbolRow.text.trim().toLowerCase(),
+                const nextTicker = buildTickerConfig({
+                    initialTicker,
+                    labelText: labelRow.text,
+                    symbolText: symbolRow.text,
                     priceDecimals: decimalsRow.value,
                     panelSide: sideOptions[sideRow.selected].value,
-                    marketType: getMarketTypeForAssetCategory(activeAssetCategory),
                     assetCategory: activeAssetCategory,
-                };
-
-                if (activeAssetCategory === 'crypto') {
-                    nextTicker.cryptoProvider = activeCryptoProvider || getDefaultCryptoProvider();
-                    nextTicker.liveSymbol = resolvedCryptoTicker?.liveSymbol ?? matchingCuratedTicker?.liveSymbol ?? '';
-                } else {
-                    delete nextTicker.cryptoProvider;
-                    if (matchingCuratedTicker?.liveSymbol)
-                        nextTicker.liveSymbol = matchingCuratedTicker.liveSymbol;
-                    else
-                        delete nextTicker.liveSymbol;
-                }
-
+                    cryptoProvider: activeCryptoProvider,
+                    resolvedCryptoTicker,
+                    cryptoCatalog,
+                });
                 onSave(nextTicker);
             }
 
@@ -885,89 +852,6 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         });
 
         dialog.present();
-    }
-
-    _validateTickerDraft(label, symbol, options = {}) {
-        if (options.assetCategory === 'crypto') {
-            if (symbol.trim() === '')
-                return 'Symbol is required.';
-
-            if (options.cryptoCatalogLoading)
-                return options.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                    ? 'Hyperliquid crypto symbols are still loading.'
-                    : 'Kraken crypto pairs are still loading.';
-
-            if (options.cryptoCatalogError)
-                return options.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                    ? 'Hyperliquid crypto symbols could not be loaded.'
-                    : 'Kraken crypto pairs could not be loaded.';
-
-            if (!options.resolvedCryptoTicker && options.hasCryptoCatalogMatches) {
-                return options.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                    ? 'Keep typing or choose a suggested Hyperliquid spot symbol or perp.'
-                    : 'Keep typing or choose a suggested Kraken pair.';
-            }
-
-            if (!options.resolvedCryptoTicker)
-                return options.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-                    ? 'Choose a Hyperliquid-supported spot symbol or perp.'
-                    : 'Choose a Kraken-supported crypto pair.';
-
-            return '';
-        }
-
-        if (label.trim() === '')
-            return 'Label is required.';
-
-        return this._validateTickerSymbol(symbol);
-    }
-
-    _validateTickerSymbol(symbol) {
-        if (symbol.trim() === '')
-            return 'Symbol is required.';
-
-        if (/\s/.test(symbol))
-            return 'Symbol cannot contain spaces.';
-
-        return '';
-    }
-
-    async _verifyTickerSymbol(session, symbol) {
-        const csv = await this._fetchText(session, this._buildStooqLookupUrl(symbol));
-        const rows = csv
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line !== '');
-        const firstRow = rows[0] ?? '';
-        const fields = firstRow.split(',');
-
-        if (fields.length < 4)
-            throw new Error(`Could not verify ${symbol}. Stooq returned an unexpected response.`);
-
-        const returnedSymbol = `${fields[0] ?? ''}`.trim().toLowerCase();
-        const quoteDate = `${fields[1] ?? ''}`.trim();
-        const price = Number.parseFloat(`${fields[3] ?? ''}`.trim());
-
-        if (returnedSymbol === '' || returnedSymbol === 'symbol')
-            throw new Error(`Could not verify ${symbol}. Stooq returned an unexpected response.`);
-
-        if (quoteDate.toUpperCase() === 'N/D' || !Number.isFinite(price))
-            throw new Error(`Could not verify ${symbol}. No quote data was returned by Stooq.`);
-
-        return {
-            symbol: returnedSymbol,
-            quoteDate,
-        };
-    }
-
-    async _fetchText(session, url) {
-        const message = Soup.Message.new('GET', url);
-        const bytes = await session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null);
-        return new TextDecoder().decode(bytes.get_data()).trim();
-    }
-
-    _buildStooqLookupUrl(symbol) {
-        return `https://stooq.com/q/l/?s=${encodeURIComponent(symbol).replace(/%2B/g, '+')}&f=sd2t2cp&i=d`;
     }
 
     _clearTickerRows() {

@@ -2,7 +2,7 @@ import {
     DEFAULT_DISPLAY_SETTINGS,
     FORMAT_PRESETS,
     getSeparatorText,
-} from './settings.js';
+} from './display-settings.js';
 
 export const DEFAULT_TEXT_COLOR = '#ffffff';
 export const POSITIVE_COLOR = '#3FB950';
