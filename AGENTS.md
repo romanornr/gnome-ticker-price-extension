@@ -3,7 +3,7 @@
 ## Repo Purpose
 
 This repository contains a GNOME Shell extension that shows market tickers in the top bar.
-The current ticker list is defined in `extension.js`.
+The default ticker list is defined in `utils/settings.js`, and the curated suggestion catalog is defined under `utils/catalog/`.
 
 ## Key Files
 
@@ -11,8 +11,15 @@ The current ticker list is defined in `extension.js`.
 - `prefs.js`: GNOME preferences window for ticker configuration, refresh cadence, and display options
 - `ui/indicator.js`: panel indicator rendering
 - `services/quotes.js`: quote fetching, Kraken WebSocket lifecycle, cache management, update scheduling
+- `README.md`: user-facing setup notes, ticker add flow, and curated catalog editing guide
 - `utils/format.js`: display-entry formatting and color helpers
+- `utils/asset-categories.js`: shared asset-category metadata, category search terms, and default market-type mapping
 - `utils/settings.js`: shared settings defaults, validation, and settings-backed ticker/display loading
+- `utils/ticker-catalog.js`: curated ticker aggregation and search helpers for guided prefs selection
+- `utils/catalog/*.js`: curated ticker data split by asset category for contributor-friendly maintenance
+- `utils/catalog/us-equity.js`: alphabetized curated U.S. equity catalog; keep symbols Stooq-verified and search keywords sensible
+- `utils/catalog/us-etf.js`: alphabetized curated U.S. ETF catalog; keep symbols Stooq-verified and search keywords sensible
+- `utils/catalog/commodity.js` and `utils/catalog/fx.js`: keep labels alphabetized and prefer verified Stooq symbols when adding or replacing entries
 - `schemas/org.gnome.shell.extensions.ticker-price-extension.gschema.xml`: extension settings schema
 - `metadata.json`: GNOME Shell extension metadata and compatibility
 - `install.sh`: copy-based local install, including runtime module directories
@@ -28,6 +35,8 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 
 - Market data is fetched from Stooq, with Kraken WebSocket v2 used for live BTC/USD and ETH/USD updates.
 - The current supported non-crypto tickers are SPX, NDX, DXY, EUR/USD, Gold, and USO; verify Stooq symbol availability with `curl` before adding more.
+- Keep `utils/catalog/us-equity.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
+- Keep `utils/catalog/us-etf.js`, `utils/catalog/commodity.js`, and `utils/catalog/fx.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
 - Tickers may be split across GNOME panel sides via per-ticker `panelSide` metadata; when adding indicators to the left panel, append them after existing left-side items so other extensions are not shifted unexpectedly.
 - Prefer the batched quote endpoint for current prices.
 - Maintain one persistent Kraken public WebSocket connection for BTC/USD and ETH/USD rather than opening one socket per ticker.

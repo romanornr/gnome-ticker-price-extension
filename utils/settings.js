@@ -1,3 +1,10 @@
+import {
+    ASSET_CATEGORIES,
+    MARKET_TYPES,
+    getAssetCategoryDefaultMarketType,
+    getAssetCategoryOptions,
+} from './asset-categories.js';
+
 export const SETTINGS_KEYS = {
     TICKERS_JSON: 'tickers-json',
     REFRESH_INTERVAL_SECONDS: 'refresh-interval-seconds',
@@ -11,11 +18,7 @@ export const SETTINGS_KEYS = {
 export const LEFT_PANEL_SIDE = 'left';
 export const RIGHT_PANEL_SIDE = 'right';
 
-export const MARKET_TYPES = {
-    ALWAYS_OPEN: 'always-open',
-    WEEKDAY_SESSION: 'weekday-session',
-    US_SESSION: 'us-session',
-};
+export {ASSET_CATEGORIES, MARKET_TYPES, getAssetCategoryOptions};
 
 export const FORMAT_PRESETS = {
     DEFAULT: 'default',
@@ -32,17 +35,60 @@ export const SEPARATOR_STYLES = {
 export const DEFAULT_REFRESH_INTERVAL_SECONDS = 300;
 
 export const DEFAULT_TICKERS = [
-    {label: 'SPX', symbol: '^spx', priceDecimals: 0, marketType: MARKET_TYPES.US_SESSION, panelSide: RIGHT_PANEL_SIDE},
-    {label: 'NDX', symbol: '^ndq', priceDecimals: 0, marketType: MARKET_TYPES.US_SESSION, panelSide: RIGHT_PANEL_SIDE},
-    {label: 'DXY', symbol: 'dx.f', priceDecimals: 2, marketType: MARKET_TYPES.WEEKDAY_SESSION, panelSide: LEFT_PANEL_SIDE},
-    {label: 'EUR/USD', symbol: 'eurusd', priceDecimals: 4, marketType: MARKET_TYPES.WEEKDAY_SESSION, panelSide: LEFT_PANEL_SIDE},
-    {label: 'Gold', symbol: 'xauusd', priceDecimals: 0, marketType: MARKET_TYPES.WEEKDAY_SESSION, panelSide: RIGHT_PANEL_SIDE},
-    {label: 'USO', symbol: 'uso.us', priceDecimals: 2, marketType: MARKET_TYPES.US_SESSION, panelSide: RIGHT_PANEL_SIDE},
+    {
+        label: 'SPX',
+        symbol: '^spx',
+        priceDecimals: 0,
+        marketType: MARKET_TYPES.US_SESSION,
+        assetCategory: ASSET_CATEGORIES.US_EQUITY,
+        panelSide: RIGHT_PANEL_SIDE,
+    },
+    {
+        label: 'NDX',
+        symbol: '^ndq',
+        priceDecimals: 0,
+        marketType: MARKET_TYPES.US_SESSION,
+        assetCategory: ASSET_CATEGORIES.US_EQUITY,
+        panelSide: RIGHT_PANEL_SIDE,
+    },
+    {
+        label: 'DXY',
+        symbol: 'dx.f',
+        priceDecimals: 2,
+        marketType: MARKET_TYPES.WEEKDAY_SESSION,
+        assetCategory: ASSET_CATEGORIES.FX,
+        panelSide: LEFT_PANEL_SIDE,
+    },
+    {
+        label: 'EUR/USD',
+        symbol: 'eurusd',
+        priceDecimals: 4,
+        marketType: MARKET_TYPES.WEEKDAY_SESSION,
+        assetCategory: ASSET_CATEGORIES.FX,
+        panelSide: LEFT_PANEL_SIDE,
+    },
+    {
+        label: 'Gold',
+        symbol: 'xauusd',
+        priceDecimals: 0,
+        marketType: MARKET_TYPES.WEEKDAY_SESSION,
+        assetCategory: ASSET_CATEGORIES.COMMODITY,
+        panelSide: RIGHT_PANEL_SIDE,
+    },
+    {
+        label: 'USO',
+        symbol: 'uso.us',
+        priceDecimals: 2,
+        marketType: MARKET_TYPES.US_SESSION,
+        assetCategory: ASSET_CATEGORIES.US_ETF,
+        panelSide: RIGHT_PANEL_SIDE,
+    },
     {
         label: 'ETH',
         symbol: 'ethusd',
         priceDecimals: 0,
         marketType: MARKET_TYPES.ALWAYS_OPEN,
+        assetCategory: ASSET_CATEGORIES.CRYPTO,
         panelSide: RIGHT_PANEL_SIDE,
         separatorBefore: ' || ',
         liveSymbol: 'ETH/USD',
@@ -52,6 +98,7 @@ export const DEFAULT_TICKERS = [
         symbol: 'btcusd',
         priceDecimals: 0,
         marketType: MARKET_TYPES.ALWAYS_OPEN,
+        assetCategory: ASSET_CATEGORIES.CRYPTO,
         panelSide: RIGHT_PANEL_SIDE,
         liveSymbol: 'BTC/USD',
     },
@@ -70,12 +117,14 @@ const SUPPORTED_LIVE_TICKERS = [
         label: 'BTC',
         symbol: 'btcusd',
         marketType: MARKET_TYPES.ALWAYS_OPEN,
+        assetCategory: ASSET_CATEGORIES.CRYPTO,
         liveSymbol: 'BTC/USD',
     },
     {
         label: 'ETH',
         symbol: 'ethusd',
         marketType: MARKET_TYPES.ALWAYS_OPEN,
+        assetCategory: ASSET_CATEGORIES.CRYPTO,
         liveSymbol: 'ETH/USD',
     },
 ];
@@ -163,6 +212,10 @@ export function getMarketTypeOptions() {
     ];
 }
 
+export function getMarketTypeForAssetCategory(assetCategory) {
+    return getAssetCategoryDefaultMarketType(assetCategory);
+}
+
 export function getFormatPresetOptions() {
     return [
         {value: FORMAT_PRESETS.DEFAULT, title: 'Ticker + price + change'},
@@ -210,6 +263,12 @@ function normalizeTickerConfig(rawTicker) {
 
     const priceDecimals = clampInteger(rawTicker.priceDecimals, 0, 6, 0);
     const marketType = normalizeMarketType(rawTicker.marketType);
+    const assetCategory = normalizeAssetCategory(rawTicker.assetCategory, {
+        label,
+        symbol,
+        marketType,
+        liveSymbol: rawTicker.liveSymbol,
+    });
     const panelSide = normalizePanelSide(rawTicker.panelSide);
     const separatorBefore = typeof rawTicker.separatorBefore === 'string'
         ? rawTicker.separatorBefore
@@ -219,7 +278,8 @@ function normalizeTickerConfig(rawTicker) {
         label,
         symbol,
         priceDecimals,
-        marketType,
+        marketType: getMarketTypeForAssetCategory(assetCategory),
+        assetCategory,
         panelSide,
     };
 
@@ -234,11 +294,13 @@ function normalizeTickerConfig(rawTicker) {
 }
 
 function serializeTickerConfig(ticker) {
+    const assetCategory = normalizeAssetCategory(ticker.assetCategory, ticker);
     const serialized = {
         label: ticker.label,
         symbol: ticker.symbol,
         priceDecimals: ticker.priceDecimals,
-        marketType: ticker.marketType,
+        marketType: getMarketTypeForAssetCategory(assetCategory),
+        assetCategory,
         panelSide: ticker.panelSide,
     };
 
@@ -274,6 +336,19 @@ function normalizeFormatPreset(formatPreset) {
         return formatPreset;
     default:
         return DEFAULT_DISPLAY_SETTINGS.formatPreset;
+    }
+}
+
+function normalizeAssetCategory(assetCategory, ticker = null) {
+    switch (assetCategory) {
+    case ASSET_CATEGORIES.US_EQUITY:
+    case ASSET_CATEGORIES.US_ETF:
+    case ASSET_CATEGORIES.COMMODITY:
+    case ASSET_CATEGORIES.FX:
+    case ASSET_CATEGORIES.CRYPTO:
+        return assetCategory;
+    default:
+        return inferAssetCategory(ticker);
     }
 }
 
@@ -314,8 +389,39 @@ function getSupportedLiveSymbol(ticker, rawLiveSymbol) {
         candidate.label === ticker.label &&
         candidate.symbol === ticker.symbol &&
         candidate.marketType === ticker.marketType &&
+        candidate.assetCategory === ticker.assetCategory &&
         (explicitLiveSymbol === '' || explicitLiveSymbol === candidate.liveSymbol)
     );
 
     return supportedTicker?.liveSymbol ?? '';
+}
+
+function inferAssetCategory(ticker) {
+    const marketType = normalizeMarketType(ticker?.marketType);
+    const symbol = `${ticker?.symbol ?? ''}`.trim().toLowerCase();
+    const label = `${ticker?.label ?? ''}`.trim().toLowerCase();
+    const liveSymbol = typeof ticker?.liveSymbol === 'string'
+        ? ticker.liveSymbol
+        : '';
+
+    if (marketType === MARKET_TYPES.ALWAYS_OPEN || liveSymbol !== '')
+        return ASSET_CATEGORIES.CRYPTO;
+
+    if (marketType === MARKET_TYPES.WEEKDAY_SESSION) {
+        if (['xauusd', 'xagusd', 'wticrud.f', 'brent.f', 'hg.f', 'ng.f'].includes(symbol))
+            return ASSET_CATEGORIES.COMMODITY;
+
+        if (symbol.endsWith('usd') || symbol === 'dx.f' || label.includes('/'))
+            return ASSET_CATEGORIES.FX;
+
+        return ASSET_CATEGORIES.COMMODITY;
+    }
+
+    if (
+        symbol.endsWith('.us') &&
+        ['spy.us', 'qqq.us', 'dia.us', 'iwm.us', 'vti.us', 'voo.us', 'ivv.us', 'xlf.us', 'xle.us', 'gld.us', 'slv.us', 'tlt.us', 'uso.us'].includes(symbol)
+    )
+        return ASSET_CATEGORIES.US_ETF;
+
+    return ASSET_CATEGORIES.US_EQUITY;
 }

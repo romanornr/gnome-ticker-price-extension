@@ -1,13 +1,17 @@
 import Adw from 'gi://Adw';
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
+import Soup from 'gi://Soup?version=3.0';
 
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 import {
+    getAssetCategoryOptions,
     cloneTicker,
     formatRefreshIntervalLabel,
     getFormatPresetOptions,
+    getMarketTypeForAssetCategory,
     getMarketTypeOptions,
     getRefreshIntervalOptions,
     getTickersForSide,
@@ -21,6 +25,12 @@ import {
     saveTickerConfigs,
     SETTINGS_KEYS,
 } from './utils/settings.js';
+import {
+    findCuratedTicker,
+    matchCuratedTickers,
+} from './utils/ticker-catalog.js';
+
+const MAX_CURATED_SUGGESTIONS = 8;
 
 class TickerPreferencesPage extends Adw.PreferencesPage {
     static {
@@ -40,6 +50,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         this._tickerActionsGroup = null;
         this._tickerRows = [];
         this._refreshOptions = getRefreshIntervalOptions();
+        this._assetCategoryOptions = getAssetCategoryOptions();
         this._marketTypeOptions = getMarketTypeOptions();
 
         this._build();
@@ -206,22 +217,83 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             title: 'Add ticker',
         });
         addRow.add_suffix(this._createTextButton('+ Add ticker', () => {
-            this._presentTickerDialog({
+            this._presentAssetCategoryDialog({
                 title: 'Add ticker',
-                initialTicker: {
-                    label: '',
-                    symbol: '',
-                    priceDecimals: 2,
-                    panelSide: addSide,
-                    marketType: this._marketTypeOptions[1].value,
-                },
-                onSave: newTicker => {
-                    saveTickerConfigs(this._settings, [...tickers, newTicker]);
-                    this._rebuildTickerRows();
+                initialAssetCategory: this._assetCategoryOptions[0].value,
+                onSelected: assetCategory => {
+                    this._presentTickerDialog({
+                        title: 'Add ticker',
+                        initialTicker: {
+                            label: '',
+                            symbol: '',
+                            priceDecimals: 2,
+                            panelSide: addSide,
+                            assetCategory,
+                            marketType: getMarketTypeForAssetCategory(assetCategory),
+                        },
+                        onSave: newTicker => {
+                            saveTickerConfigs(this._settings, [...tickers, newTicker]);
+                            this._rebuildTickerRows();
+                        },
+                    });
                 },
             });
         }));
         this._addTickerRow(group, addRow);
+    }
+
+    _presentAssetCategoryDialog({title, initialAssetCategory, onSelected}) {
+        const dialog = new Gtk.Dialog({
+            transient_for: this._window,
+            modal: true,
+            use_header_bar: true,
+            title,
+        });
+        dialog.add_button('Cancel', Gtk.ResponseType.CANCEL);
+        const continueButton = dialog.add_button('Continue', Gtk.ResponseType.OK);
+        continueButton.add_css_class('suggested-action');
+
+        const contentArea = dialog.get_content_area();
+        contentArea.set_margin_top(12);
+        contentArea.set_margin_bottom(12);
+        contentArea.set_margin_start(12);
+        contentArea.set_margin_end(12);
+
+        const content = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL,
+            spacing: 12,
+        });
+        contentArea.append(content);
+
+        const introLabel = new Gtk.Label({
+            label: 'Choose what kind of ticker you want to add so the right market session and suggestions are ready immediately.',
+            halign: Gtk.Align.START,
+            wrap: true,
+        });
+        content.append(introLabel);
+
+        const group = new Adw.PreferencesGroup();
+        content.append(group);
+
+        const categoryRow = this._createComboRow({
+            title: 'Asset type',
+            options: this._assetCategoryOptions,
+            selectedValue: initialAssetCategory,
+            onSelected: () => {},
+        });
+        group.add(categoryRow);
+
+        dialog.connect('response', (_dialog, responseId) => {
+            if (responseId === Gtk.ResponseType.OK) {
+                const selectedOption = this._assetCategoryOptions[categoryRow.selected];
+                if (selectedOption)
+                    onSelected(selectedOption.value);
+            }
+
+            dialog.destroy();
+        });
+
+        dialog.present();
     }
 
     _presentTickerDialog({title, initialTicker, onSave}) {
@@ -250,6 +322,23 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         const formGroup = new Adw.PreferencesGroup();
         content.append(formGroup);
 
+        let activeAssetCategory = initialTicker.assetCategory ?? this._assetCategoryOptions[0].value;
+        let activeMarketType = getMarketTypeForAssetCategory(activeAssetCategory);
+
+        const assetCategoryRow = this._createComboRow({
+            title: 'Asset type',
+            options: this._assetCategoryOptions,
+            selectedValue: activeAssetCategory,
+            onSelected: () => {},
+        });
+        formGroup.add(assetCategoryRow);
+
+        const marketTypeRow = new Adw.ActionRow({
+            title: 'Market session',
+            subtitle: this._getMarketTypeTitle(activeMarketType),
+        });
+        formGroup.add(marketTypeRow);
+
         const labelRow = new Adw.EntryRow({
             title: 'Label',
             text: initialTicker.label ?? '',
@@ -261,6 +350,11 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             text: initialTicker.symbol ?? '',
         });
         formGroup.add(symbolRow);
+
+        const verifyButton = this._createTextButton('Verify', () => {
+            void runSymbolVerification();
+        });
+        symbolRow.add_suffix(verifyButton);
 
         const decimalsAdjustment = new Gtk.Adjustment({
             lower: 0,
@@ -287,36 +381,11 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         });
         formGroup.add(sideRow);
 
-        const marketGroup = new Adw.PreferencesGroup({
-            title: 'Market type',
+        const suggestionsGroup = new Adw.PreferencesGroup({
+            title: 'Catalog matches',
+            description: 'Type a label or symbol above to search the built-in catalog. You can still save any custom Stooq symbol.',
         });
-        content.append(marketGroup);
-
-        let activeMarketType = initialTicker.marketType ?? this._marketTypeOptions[1].value;
-        let firstButton = null;
-
-        this._marketTypeOptions.forEach(option => {
-            const button = new Gtk.CheckButton({
-                active: option.value === activeMarketType,
-                valign: Gtk.Align.CENTER,
-                group: firstButton,
-            });
-            if (!firstButton)
-                firstButton = button;
-
-            button.connect('toggled', () => {
-                if (button.active)
-                    activeMarketType = option.value;
-            });
-
-            const row = new Adw.ActionRow({
-                title: option.title,
-                subtitle: option.description,
-                activatable_widget: button,
-            });
-            row.add_prefix(button);
-            marketGroup.add(row);
-        });
+        content.append(suggestionsGroup);
 
         const errorLabel = new Gtk.Label({
             halign: Gtk.Align.START,
@@ -326,28 +395,207 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         errorLabel.add_css_class('error');
         content.append(errorLabel);
 
+        const verificationLabel = new Gtk.Label({
+            halign: Gtk.Align.START,
+            wrap: true,
+            visible: false,
+        });
+        verificationLabel.add_css_class('dim-label');
+        content.append(verificationLabel);
+
+        const verificationSession = new Soup.Session();
+        let verifyInProgress = false;
+        let lastVerifiedSymbol = '';
+        let verificationRequestId = 0;
+
+        const suggestionRows = [];
+        const applyCuratedTicker = curatedTicker => {
+            labelRow.text = curatedTicker.label;
+            symbolRow.text = curatedTicker.symbol;
+            decimalsRow.value = curatedTicker.priceDecimals;
+            activeAssetCategory = curatedTicker.assetCategory;
+            activeMarketType = curatedTicker.marketType;
+            assetCategoryRow.selected = this._findOptionIndex(this._assetCategoryOptions, curatedTicker.assetCategory);
+            marketTypeRow.subtitle = this._getMarketTypeTitle(activeMarketType);
+            updateSaveSensitivity();
+        };
+
+        const setVerificationMessage = (message, isError = false) => {
+            verificationLabel.visible = message !== '';
+            verificationLabel.label = message;
+
+            if (isError)
+                verificationLabel.add_css_class('error');
+            else
+                verificationLabel.remove_css_class('error');
+        };
+
+        const clearVerificationState = () => {
+            lastVerifiedSymbol = '';
+            setVerificationMessage('');
+        };
+
+        const clearSuggestionRows = () => {
+            suggestionRows.splice(0).forEach(row => suggestionsGroup.remove(row));
+        };
+
+        const renderCuratedSuggestions = () => {
+            clearSuggestionRows();
+
+            const query = symbolRow.text.trim() || labelRow.text.trim();
+            if (query === '') {
+                const promptRow = new Adw.ActionRow({
+                    title: 'Start typing to search',
+                    subtitle: 'Curated matches stay hidden until you enter a label or symbol.',
+                    sensitive: false,
+                });
+                suggestionsGroup.add(promptRow);
+                suggestionRows.push(promptRow);
+                return;
+            }
+
+            const matches = matchCuratedTickers(activeAssetCategory, query);
+            if (matches.length === 0) {
+                const emptyRow = new Adw.ActionRow({
+                    title: 'No curated matches',
+                    subtitle: 'Keep your manual symbol and use Verify to check whether Stooq returns data for it.',
+                    sensitive: false,
+                });
+                suggestionsGroup.add(emptyRow);
+                suggestionRows.push(emptyRow);
+                return;
+            }
+
+            matches.slice(0, MAX_CURATED_SUGGESTIONS).forEach(curatedTicker => {
+                const keywordText = (curatedTicker.keywords ?? []).slice(0, 3).join(' · ');
+                const subtitle = keywordText === ''
+                    ? `${curatedTicker.symbol} · ${curatedTicker.priceDecimals} decimals`
+                    : `${curatedTicker.symbol} · ${curatedTicker.priceDecimals} decimals · ${keywordText}`;
+                const row = new Adw.ActionRow({
+                    title: curatedTicker.label,
+                    subtitle,
+                });
+                row.add_suffix(this._createTextButton('Use', () => {
+                    applyCuratedTicker(curatedTicker);
+                }));
+                suggestionsGroup.add(row);
+                suggestionRows.push(row);
+            });
+
+            if (matches.length > MAX_CURATED_SUGGESTIONS) {
+                const overflowRow = new Adw.ActionRow({
+                    title: `Showing first ${MAX_CURATED_SUGGESTIONS} matches`,
+                    subtitle: 'Keep typing to narrow the catalog results.',
+                    sensitive: false,
+                });
+                suggestionsGroup.add(overflowRow);
+                suggestionRows.push(overflowRow);
+            }
+        };
+
+        const updateVerifyButtonSensitivity = () => {
+            verifyButton.set_sensitive(symbolRow.text.trim() !== '' && !verifyInProgress);
+        };
+
+        const runSymbolVerification = async () => {
+            const symbol = symbolRow.text.trim().toLowerCase();
+            const symbolValidationMessage = this._validateTickerSymbol(symbol);
+
+            if (symbolValidationMessage !== '') {
+                setVerificationMessage(symbolValidationMessage, true);
+                updateVerifyButtonSensitivity();
+                return;
+            }
+
+            verificationRequestId += 1;
+            const requestId = verificationRequestId;
+            verifyInProgress = true;
+            updateVerifyButtonSensitivity();
+            setVerificationMessage(`Checking ${symbol} on Stooq...`);
+
+            try {
+                const result = await this._verifyTickerSymbol(verificationSession, symbol);
+                if (requestId !== verificationRequestId)
+                    return;
+
+                lastVerifiedSymbol = symbol;
+                setVerificationMessage(
+                    `Verified ${result.symbol}. Stooq returned quote data dated ${result.quoteDate}.`
+                );
+            } catch (error) {
+                if (requestId !== verificationRequestId)
+                    return;
+
+                lastVerifiedSymbol = '';
+                setVerificationMessage(error.message, true);
+            } finally {
+                if (requestId === verificationRequestId) {
+                    verifyInProgress = false;
+                    updateVerifyButtonSensitivity();
+                }
+            }
+        };
+
         const updateSaveSensitivity = () => {
             const validationMessage = this._validateTickerDraft(labelRow.text, symbolRow.text);
             const isValid = validationMessage === '';
             saveButton.set_sensitive(isValid);
             errorLabel.visible = !isValid;
             errorLabel.label = validationMessage;
+            updateVerifyButtonSensitivity();
         };
 
-        labelRow.connect('notify::text', updateSaveSensitivity);
-        symbolRow.connect('notify::text', updateSaveSensitivity);
+        assetCategoryRow.connect('notify::selected', widget => {
+            const option = this._assetCategoryOptions[widget.selected];
+            if (!option)
+                return;
+
+            activeAssetCategory = option.value;
+            activeMarketType = getMarketTypeForAssetCategory(activeAssetCategory);
+            marketTypeRow.subtitle = this._getMarketTypeTitle(activeMarketType);
+            renderCuratedSuggestions();
+            updateSaveSensitivity();
+        });
+        labelRow.connect('notify::text', () => {
+            renderCuratedSuggestions();
+            updateSaveSensitivity();
+        });
+        symbolRow.connect('notify::text', () => {
+            if (lastVerifiedSymbol !== '' && symbolRow.text.trim().toLowerCase() !== lastVerifiedSymbol)
+                clearVerificationState();
+
+            renderCuratedSuggestions();
+            updateSaveSensitivity();
+        });
+        renderCuratedSuggestions();
         updateSaveSensitivity();
+
+        dialog.connect('destroy', () => {
+            verificationRequestId += 1;
+            verificationSession.abort();
+        });
 
         dialog.connect('response', (_dialog, responseId) => {
             if (responseId === Gtk.ResponseType.OK) {
+                const matchingCuratedTicker = findCuratedTicker({
+                    label: labelRow.text.trim(),
+                    symbol: symbolRow.text.trim().toLowerCase(),
+                    assetCategory: activeAssetCategory,
+                });
                 const nextTicker = {
                     ...initialTicker,
                     label: labelRow.text.trim(),
                     symbol: symbolRow.text.trim().toLowerCase(),
                     priceDecimals: decimalsRow.value,
                     panelSide: sideOptions[sideRow.selected].value,
-                    marketType: activeMarketType,
+                    marketType: getMarketTypeForAssetCategory(activeAssetCategory),
+                    assetCategory: activeAssetCategory,
                 };
+
+                if (matchingCuratedTicker?.liveSymbol)
+                    nextTicker.liveSymbol = matchingCuratedTicker.liveSymbol;
+                else
+                    delete nextTicker.liveSymbol;
 
                 onSave(nextTicker);
             }
@@ -362,6 +610,10 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         if (label.trim() === '')
             return 'Label is required.';
 
+        return this._validateTickerSymbol(symbol);
+    }
+
+    _validateTickerSymbol(symbol) {
         if (symbol.trim() === '')
             return 'Symbol is required.';
 
@@ -369,6 +621,44 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             return 'Symbol cannot contain spaces.';
 
         return '';
+    }
+
+    async _verifyTickerSymbol(session, symbol) {
+        const csv = await this._fetchText(session, this._buildStooqLookupUrl(symbol));
+        const rows = csv
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line !== '');
+        const firstRow = rows[0] ?? '';
+        const fields = firstRow.split(',');
+
+        if (fields.length < 4)
+            throw new Error(`Could not verify ${symbol}. Stooq returned an unexpected response.`);
+
+        const returnedSymbol = `${fields[0] ?? ''}`.trim().toLowerCase();
+        const quoteDate = `${fields[1] ?? ''}`.trim();
+        const price = Number.parseFloat(`${fields[3] ?? ''}`.trim());
+
+        if (returnedSymbol === '' || returnedSymbol === 'symbol')
+            throw new Error(`Could not verify ${symbol}. Stooq returned an unexpected response.`);
+
+        if (quoteDate.toUpperCase() === 'N/D' || !Number.isFinite(price))
+            throw new Error(`Could not verify ${symbol}. No quote data was returned by Stooq.`);
+
+        return {
+            symbol: returnedSymbol,
+            quoteDate,
+        };
+    }
+
+    async _fetchText(session, url) {
+        const message = Soup.Message.new('GET', url);
+        const bytes = await session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null);
+        return new TextDecoder().decode(bytes.get_data()).trim();
+    }
+
+    _buildStooqLookupUrl(symbol) {
+        return `https://stooq.com/q/l/?s=${encodeURIComponent(symbol).replace(/%2B/g, '+')}&f=sd2t2cp&i=d`;
     }
 
     _clearTickerRows() {
@@ -409,6 +699,15 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         });
 
         return row;
+    }
+
+    _findOptionIndex(options, value) {
+        return Math.max(0, options.findIndex(option => option.value === value));
+    }
+
+    _getMarketTypeTitle(marketType) {
+        const option = this._marketTypeOptions.find(candidate => candidate.value === marketType);
+        return option?.title ?? 'Unknown market session';
     }
 
     _createIconButton(iconName, tooltipText, onClicked, disabled = false) {
