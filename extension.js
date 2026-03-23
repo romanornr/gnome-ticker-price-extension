@@ -109,9 +109,9 @@ export default class TickerPriceExtension extends Extension {
     /* Side filtering preserves saved ticker order per panel side before the indicator renders. */
     _getEntriesForSide(entries, side) {
         const tickersForSide = getTickersForSide(loadTickerConfigs(this._settings), side);
-        const entriesBySymbol = new Map(entries.map(entry => [entry.symbol?.toUpperCase() ?? entry.label, entry]));
+        const entriesBySymbol = new Map(entries.map(entry => [entry.symbol.toUpperCase(), entry]));
         const sideEntries = tickersForSide
-            .map(ticker => entriesBySymbol.get(ticker.symbol.toUpperCase()) ?? entriesBySymbol.get(ticker.label))
+            .map(ticker => entriesBySymbol.get(ticker.symbol.toUpperCase()))
             .filter(entry => entry !== undefined)
             .map(entry => ({...entry}));
 

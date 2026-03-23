@@ -250,16 +250,6 @@ function normalizeTickerSymbolForProvider(symbol, rawLiveSymbol, cryptoProvider)
     if (liveSymbol !== '')
         return adapter.normalizeTickerSymbol(liveSymbol);
 
-    /*
-     * This preserves older saved Kraken ticker ids from before the extension
-     * stored normalized websocket pair symbols directly in settings.
-     */
-    if (symbol === 'btc.v' && liveSymbol === 'BTC/USD')
-        return 'btcusd';
-
-    if (symbol === 'eth.v' && liveSymbol === 'ETH/USD')
-        return 'ethusd';
-
     return symbol;
 }
 

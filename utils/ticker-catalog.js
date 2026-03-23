@@ -41,7 +41,6 @@ export function getCuratedTickerCategories() {
     return Array.from(new Set(CATALOG.map(entry => entry.assetCategory)));
 }
 
-/* Exact lookup is used when turning chosen dialog text back into a concrete ticker config. */
 /* Exact catalog resolution converts dialog text back into a known ticker definition when possible. */
 export function findCuratedTicker({label = '', symbol = '', assetCategory = ''}, options = {}) {
     const normalizedLabel = label.trim().toLowerCase();
@@ -80,7 +79,7 @@ export function matchCuratedTickers(assetCategory, query, options = {}) {
 }
 
 /* Crypto resolution chooses a single confident match when the query is precise enough. */
-export function resolveCryptoCatalogTicker(query, cryptoCatalog = [], cryptoProvider = CRYPTO_PROVIDERS.KRAKEN) {
+export function resolveCryptoCatalogTicker(query, cryptoCatalog = null, cryptoProvider = CRYPTO_PROVIDERS.KRAKEN) {
     const matches = matchCuratedTickers(ASSET_CATEGORIES.CRYPTO, query, {cryptoCatalog, cryptoProvider});
     if (matches.length === 0)
         return null;
@@ -136,7 +135,7 @@ function scoreCryptoCatalogEntry(entry, query, cryptoProvider) {
 
 /* prefs can swap between static curated lists and runtime crypto catalogs through this single catalog selector. */
 function getCatalogForCategory(assetCategory, options = {}) {
-    const cryptoCatalog = Array.isArray(options.cryptoCatalog)
+    const cryptoCatalog = Array.isArray(options.cryptoCatalog) && options.cryptoCatalog.length > 0
         ? options.cryptoCatalog
         : null;
 

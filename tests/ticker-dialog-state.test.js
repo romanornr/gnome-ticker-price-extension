@@ -45,6 +45,15 @@ export function runTests() {
     );
     assertEqual(matches.length, 1, 'Catalog matching should use the provided crypto catalog');
 
+    const curatedFallbackMatches = getCatalogMatches(
+        ASSET_CATEGORIES.CRYPTO,
+        'BTC',
+        null,
+        CRYPTO_PROVIDERS.KRAKEN
+    );
+    assertEqual(curatedFallbackMatches.length, 1,
+        'Missing runtime crypto catalogs should fall back to curated seed entries');
+
     assertEqual(validateTickerDraft('Label', 'btc/usd', {
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
