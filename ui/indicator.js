@@ -21,9 +21,7 @@ class TickerIndicator extends PanelMenu.Button {
         super._init(0.0, 'Ticker Indicator', false);
 
         this._openPreferences = openPreferences;
-        this._content = new St.BoxLayout({
-            y_align: Clutter.ActorAlign.CENTER,
-        });
+        this._content = new St.BoxLayout({y_align: Clutter.ActorAlign.CENTER});
 
         this.add_child(this._content);
 
@@ -44,41 +42,21 @@ class TickerIndicator extends PanelMenu.Button {
 
         entries.forEach(entry => {
             if (entry.separatorBefore) {
-                this._content.add_child(new St.Label({
-                    text: entry.separatorBefore,
-                    y_align: Clutter.ActorAlign.CENTER,
-                    style: `color: ${DEFAULT_TEXT_COLOR};`,
-                }));
+                this._content.add_child(new St.Label({text: entry.separatorBefore, y_align: Clutter.ActorAlign.CENTER, style: `color: ${DEFAULT_TEXT_COLOR};`}));
             }
 
-            this._content.add_child(new St.Label({
-                text: entry.label,
-                y_align: Clutter.ActorAlign.CENTER,
-                style: `color: ${DEFAULT_TEXT_COLOR};`,
-            }));
+            this._content.add_child(new St.Label({text: entry.label, y_align: Clutter.ActorAlign.CENTER, style: `color: ${DEFAULT_TEXT_COLOR};`}));
 
             if (entry.showPrice) {
-                this._content.add_child(new St.Label({
-                    text: ` ${entry.priceText}`,
-                    y_align: Clutter.ActorAlign.CENTER,
-                    style: `color: ${entry.priceColor ?? DEFAULT_TEXT_COLOR};`,
-                }));
+                this._content.add_child(new St.Label({text: ` ${entry.priceText}`, y_align: Clutter.ActorAlign.CENTER, style: `color: ${entry.priceColor ?? DEFAULT_TEXT_COLOR};`}));
             }
 
             if (entry.showArrow) {
-                this._content.add_child(new St.Label({
-                    text: ` ${entry.arrow}`,
-                    y_align: Clutter.ActorAlign.CENTER,
-                    style: `color: ${entry.changeColor ?? DEFAULT_TEXT_COLOR};`,
-                }));
+                this._content.add_child(new St.Label({text: ` ${entry.arrow}`, y_align: Clutter.ActorAlign.CENTER, style: `color: ${entry.changeColor ?? DEFAULT_TEXT_COLOR};`}));
             }
 
             if (entry.showPercent) {
-                this._content.add_child(new St.Label({
-                    text: ` ${entry.percentText}`,
-                    y_align: Clutter.ActorAlign.CENTER,
-                    style: `color: ${entry.changeColor ?? DEFAULT_TEXT_COLOR};`,
-                }));
+                this._content.add_child(new St.Label({text: ` ${entry.percentText}`, y_align: Clutter.ActorAlign.CENTER, style: `color: ${entry.changeColor ?? DEFAULT_TEXT_COLOR};`}));
             }
         });
     }

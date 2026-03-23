@@ -131,11 +131,7 @@ function resolveVisibility(displaySettings) {
         break;
     }
 
-    return {
-        showPrice: presetVisibility.showPrice && settings.showPrice,
-        showArrow: presetVisibility.showArrow && settings.showArrow,
-        showPercent: presetVisibility.showPercent && settings.showPercent,
-    };
+    return {showPrice: presetVisibility.showPrice && settings.showPrice, showArrow: presetVisibility.showArrow && settings.showArrow, showPercent: presetVisibility.showPercent && settings.showPercent};
 }
 
 /* Price text formatting is centralized so all success states display numeric precision consistently. */

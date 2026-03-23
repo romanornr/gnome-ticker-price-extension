@@ -77,10 +77,7 @@ export class QuotesCoordinator {
         if (this._entriesUpdateTimeoutId !== 0)
             return;
 
-        const remainingMs = Math.max(
-            1,
-            Math.round((CRYPTO_UI_UPDATE_INTERVAL_SECONDS - elapsedSeconds) * 1000)
-        );
+        const remainingMs = Math.max(1, Math.round((CRYPTO_UI_UPDATE_INTERVAL_SECONDS - elapsedSeconds) * 1000));
 
         this._entriesUpdateTimeoutId = GLib.timeout_add(
             GLib.PRIORITY_DEFAULT,

@@ -20,8 +20,7 @@ export function isHyperliquidSpotSymbol(value) {
 /* Search scoring encodes Hyperliquid-specific matching priorities for the prefs dialog. */
 export function scoreHyperliquidCatalogEntry(entry, query) {
     const normalizedQuery = normalizeHyperliquidSearchQuery(query);
-    if (normalizedQuery === '')
-        return Number.NEGATIVE_INFINITY;
+    if (normalizedQuery === '') return Number.NEGATIVE_INFINITY;
 
     const normalizedLabel = normalizeHyperliquidSearchQuery(entry.label);
     const normalizedSymbol = normalizeHyperliquidSearchQuery(entry.symbol);

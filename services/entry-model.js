@@ -42,10 +42,7 @@ export function buildEntries(tickers, quoteStore, displaySettings, previousEntri
 
 /* After the temporary flash window expires, entries return to the neutral text color. */
 export function clearPriceFlash(entries) {
-    return entries.map(entry => ({
-        ...entry,
-        priceColor: DEFAULT_TEXT_COLOR,
-    }));
+    return entries.map(entry => ({...entry, priceColor: DEFAULT_TEXT_COLOR}));
 }
 
 /* Price flash compares the new view-model to the previous render, not to raw quotes. */
@@ -67,10 +64,7 @@ function decorateEntriesWithPriceFlash(entries, previousEntries) {
             return entry;
         }
 
-        return {
-            ...entry,
-            priceColor: entry.displayPrice > previousPrice ? POSITIVE_COLOR : NEGATIVE_COLOR,
-        };
+        return {...entry, priceColor: entry.displayPrice > previousPrice ? POSITIVE_COLOR : NEGATIVE_COLOR};
     });
 }
 

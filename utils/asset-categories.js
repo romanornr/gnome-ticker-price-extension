@@ -88,22 +88,14 @@ export function getAssetCategoryMetadata(assetCategory) {
     if (!metadata)
         return null;
 
-    return {
-        value: assetCategory,
-        ...metadata,
-        searchKeywords: [...metadata.searchKeywords],
-    };
+    return {value: assetCategory, ...metadata, searchKeywords: [...metadata.searchKeywords]};
 }
 
 /* prefs uses these options to keep UI labels and descriptions in sync with the shared metadata tables. */
 export function getAssetCategoryOptions() {
     return CATEGORY_ORDER.map(assetCategory => {
         const metadata = ASSET_CATEGORY_METADATA[assetCategory];
-        return {
-            value: assetCategory,
-            title: metadata.title,
-            description: metadata.description,
-        };
+        return {value: assetCategory, title: metadata.title, description: metadata.description};
     });
 }
 
@@ -123,22 +115,14 @@ export function getCryptoProviderMetadata(provider) {
     if (!metadata)
         return null;
 
-    return {
-        value: provider,
-        ...metadata,
-    };
+    return {value: provider, ...metadata};
 }
 
 /* prefs uses provider options from here so the UI and runtime provider vocabulary never drift apart. */
 export function getCryptoProviderOptions() {
     return CRYPTO_PROVIDER_ORDER.map(provider => {
         const metadata = CRYPTO_PROVIDER_METADATA[provider];
-        return {
-            value: provider,
-            title: metadata.title,
-            description: metadata.description,
-            sensitive: metadata.available,
-        };
+        return {value: provider, title: metadata.title, description: metadata.description, sensitive: metadata.available};
     });
 }
 

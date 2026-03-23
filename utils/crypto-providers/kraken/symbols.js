@@ -15,8 +15,7 @@ export function normalizeKrakenTickerSymbol(value) {
 /* Search scoring prefers strong Kraken pair matches while still supporting fuzzy asset/pair queries. */
 export function scoreKrakenCatalogEntry(entry, query) {
     const normalizedQuery = normalizeKrakenSearchQuery(query);
-    if (normalizedQuery === '')
-        return Number.NEGATIVE_INFINITY;
+    if (normalizedQuery === '') return Number.NEGATIVE_INFINITY;
 
     const normalizedLiveSymbol = normalizeKrakenSearchQuery(entry.liveSymbol);
     const normalizedCompactSymbol = normalizeKrakenSearchQuery(entry.symbol);

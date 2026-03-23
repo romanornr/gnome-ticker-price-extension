@@ -16,8 +16,7 @@ import {
  * Hyperliquid as one provider regardless of where the latest quote came from.
  */
 export async function refresh(tickers, {session, quoteStore}) {
-    if (!session || tickers.length === 0)
-        return new Map();
+    if (!session || tickers.length === 0) return new Map();
 
     const snapshots = await hyperliquidAdapter.fetchMarketSnapshots(session);
     const perpsBySymbol = new Map(snapshots.perps.map(entry => [entry.liveSymbol, entry]));
@@ -74,30 +73,20 @@ export class HyperliquidLiveProvider extends LiveWebsocketProvider {
 
     /* Hyperliquid live payloads are normalized through createHyperliquidQuote before leaving the provider layer. */
     _handlePayload(payload) {
-        if (payload?.channel === 'subscriptionResponse' && payload?.data?.type === 'activeAssetCtx')
-            return {resetReconnect: true};
+        if (payload?.channel === 'subscriptionResponse' && payload?.data?.type === 'activeAssetCtx') return {resetReconnect: true};
 
-        if (payload?.channel !== 'activeAssetCtx' || !payload?.data?.coin || !payload?.data?.ctx)
-            return null;
+        if (payload?.channel !== 'activeAssetCtx' || !payload?.data?.coin || !payload?.data?.ctx) return null;
 
         const liveSymbol = hyperliquidAdapter.normalizeLiveSymbol(payload.data.coin);
         const tickerSymbol = this._getSymbolToTickerSymbolMap().get(liveSymbol);
-        if (!tickerSymbol)
-            return null;
+        if (!tickerSymbol) return null;
 
         const existingQuote = this._quoteStore?.getQuote(tickerSymbol);
-        const quote = hyperliquidAdapter.createQuote({
-            liveSymbol,
-            ctx: payload.data.ctx,
-        }, existingQuote?.previousClose);
+        const quote = hyperliquidAdapter.createQuote({liveSymbol, ctx: payload.data.ctx}, existingQuote?.previousClose);
 
-        if (!quote)
-            return null;
+        if (!quote) return null;
 
-        return {
-            resetReconnect: true,
-            quotesBySymbol: new Map([[tickerSymbol, quote]]),
-        };
+        return {resetReconnect: true, quotesBySymbol: new Map([[tickerSymbol, quote]])};
     }
 }
 

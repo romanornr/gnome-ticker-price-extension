@@ -57,12 +57,7 @@ export function presentTickerDialog({
     findOptionIndex,
     getMarketTypeTitle,
 }) {
-    const dialog = new Gtk.Dialog({
-        transient_for: window,
-        modal: true,
-        use_header_bar: true,
-        title,
-    });
+    const dialog = new Gtk.Dialog({transient_for: window, modal: true, use_header_bar: true, title});
     dialog.add_button('Cancel', Gtk.ResponseType.CANCEL);
     const saveButton = dialog.add_button('Save', Gtk.ResponseType.OK);
     saveButton.add_css_class('suggested-action');
@@ -73,10 +68,7 @@ export function presentTickerDialog({
     contentArea.set_margin_start(12);
     contentArea.set_margin_end(12);
 
-    const content = new Gtk.Box({
-        orientation: Gtk.Orientation.VERTICAL,
-        spacing: 12,
-    });
+    const content = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 12});
     contentArea.append(content);
 
     const formGroup = new Adw.PreferencesGroup();
@@ -98,18 +90,10 @@ export function presentTickerDialog({
     let lastVerifiedSymbol = '';
     let verificationRequestId = 0;
 
-    const assetCategoryRow = createComboRow({
-        title: 'Asset type',
-        options: assetCategoryOptions,
-        selectedValue: activeAssetCategory,
-        onSelected: () => {},
-    });
+    const assetCategoryRow = createComboRow({title: 'Asset type', options: assetCategoryOptions, selectedValue: activeAssetCategory, onSelected: () => {}});
     formGroup.add(assetCategoryRow);
 
-    const marketTypeRow = new Adw.ActionRow({
-        title: 'Market session',
-        subtitle: getMarketTypeTitle(activeMarketType),
-    });
+    const marketTypeRow = new Adw.ActionRow({title: 'Market session', subtitle: getMarketTypeTitle(activeMarketType)});
     formGroup.add(marketTypeRow);
 
     const cryptoProviderRow = createComboRow({
@@ -122,10 +106,7 @@ export function presentTickerDialog({
     cryptoProviderRow.visible = activeAssetCategory === 'crypto';
     formGroup.add(cryptoProviderRow);
 
-    const labelRow = new Adw.EntryRow({
-        title: 'Label',
-        text: initialTicker.label ?? '',
-    });
+    const labelRow = new Adw.EntryRow({title: 'Label', text: initialTicker.label ?? ''});
     formGroup.add(labelRow);
 
     const symbolRow = new Adw.EntryRow({
@@ -148,43 +129,24 @@ export function presentTickerDialog({
         page_increment: 1,
         value: initialTicker.priceDecimals ?? 2,
     });
-    const decimalsRow = new Adw.SpinRow({
-        title: 'Decimals',
-        adjustment: decimalsAdjustment,
-    });
+    const decimalsRow = new Adw.SpinRow({title: 'Decimals', adjustment: decimalsAdjustment});
     formGroup.add(decimalsRow);
 
     const sideOptions = [
         {value: LEFT_PANEL_SIDE, title: 'Left'},
         {value: RIGHT_PANEL_SIDE, title: 'Right'},
     ];
-    const sideRow = createComboRow({
-        title: 'Panel side',
-        options: sideOptions,
-        selectedValue: initialTicker.panelSide ?? RIGHT_PANEL_SIDE,
-        onSelected: () => {},
-    });
+    const sideRow = createComboRow({title: 'Panel side', options: sideOptions, selectedValue: initialTicker.panelSide ?? RIGHT_PANEL_SIDE, onSelected: () => {}});
     formGroup.add(sideRow);
 
-    const suggestionsGroup = new Adw.PreferencesGroup({
-        title: 'Catalog matches',
-        description: 'Type a label or symbol above to search the built-in catalog. You can still save any custom Stooq symbol.',
-    });
+    const suggestionsGroup = new Adw.PreferencesGroup({title: 'Catalog matches', description: 'Type a label or symbol above to search the built-in catalog. You can still save any custom Stooq symbol.'});
     content.append(suggestionsGroup);
 
-    const errorLabel = new Gtk.Label({
-        halign: Gtk.Align.START,
-        wrap: true,
-        visible: false,
-    });
+    const errorLabel = new Gtk.Label({halign: Gtk.Align.START, wrap: true, visible: false});
     errorLabel.add_css_class('error');
     content.append(errorLabel);
 
-    const verificationLabel = new Gtk.Label({
-        halign: Gtk.Align.START,
-        wrap: true,
-        visible: false,
-    });
+    const verificationLabel = new Gtk.Label({halign: Gtk.Align.START, wrap: true, visible: false});
     verificationLabel.add_css_class('dim-label');
     content.append(verificationLabel);
 
@@ -338,11 +300,7 @@ export function presentTickerDialog({
             symbolText: symbolRow.text,
             maxSuggestions: MAX_CURATED_SUGGESTIONS,
         }).forEach(rowModel => {
-            const row = new Adw.ActionRow({
-                title: rowModel.title,
-                subtitle: rowModel.subtitle,
-                sensitive: rowModel.kind === 'match',
-            });
+            const row = new Adw.ActionRow({title: rowModel.title, subtitle: rowModel.subtitle, sensitive: rowModel.kind === 'match'});
 
             if (rowModel.kind === 'match') {
                 row.add_suffix(createTextButton('Use', () => {

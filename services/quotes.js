@@ -82,13 +82,7 @@ export const QuotesService = GObject.registerClass({
                 this.emit('entries-changed');
             },
         });
-        this._runtimeProviders = createRuntimeProviderRegistry({
-            uuid,
-            onQuotes: quotesBySymbol => {
-                this._handleLiveQuotes(quotesBySymbol);
-            },
-            quoteStore: this._quoteStore,
-        });
+        this._runtimeProviders = createRuntimeProviderRegistry({uuid, onQuotes: quotesBySymbol => this._handleLiveQuotes(quotesBySymbol), quoteStore: this._quoteStore});
     }
 
     /* start() boots the full quote pipeline: settings, providers, initial loading state, and timers. */

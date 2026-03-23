@@ -49,18 +49,13 @@ export async function postHyperliquidInfo(session, body) {
     );
 
     const bytes = await new Promise((resolve, reject) => {
-        requestSession.send_and_read_async(
-            message,
-            GLib.PRIORITY_DEFAULT,
-            null,
-            (_session, result) => {
+        requestSession.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (_session, result) => {
                 try {
                     resolve(requestSession.send_and_read_finish(result));
                 } catch (error) {
                     reject(error);
                 }
-            }
-        );
+            });
     });
     return JSON.parse(new TextDecoder().decode(bytes.get_data()));
 }
@@ -113,8 +108,7 @@ function buildHyperliquidSpotEntries(response) {
 /* Perp catalog entries add provider metadata and search keywords around one Hyperliquid market. */
 function createHyperliquidPerpCatalogEntry(market, ctx) {
     const liveSymbol = normalizeHyperliquidLiveSymbol(market?.name);
-    if (liveSymbol === '' || market?.isDelisted === true)
-        return null;
+    if (liveSymbol === '' || market?.isDelisted === true) return null;
 
     return {
         assetCategory: ASSET_CATEGORIES.CRYPTO,
@@ -135,13 +129,7 @@ function createHyperliquidPerpCatalogEntry(market, ctx) {
 /* Spot catalog entries follow the same normalized shape as perps so prefs search can treat them uniformly. */
 function createHyperliquidSpotCatalogEntry(market, ctx) {
     const liveSymbol = normalizeHyperliquidLiveSymbol(market?.name);
-    if (
-        liveSymbol === '' ||
-        market?.isCanonical !== true ||
-        !isHyperliquidSpotSymbol(liveSymbol)
-    ) {
-        return null;
-    }
+    if (liveSymbol === '' || market?.isCanonical !== true || !isHyperliquidSpotSymbol(liveSymbol)) return null;
 
     const [base, quote] = liveSymbol.split('/');
     return {
@@ -163,8 +151,7 @@ function createHyperliquidSpotCatalogEntry(market, ctx) {
 /* Price precision is derived from provider text because Hyperliquid does not ship one fixed decimal field. */
 function deriveHyperliquidPriceDecimals(ctx) {
     const priceText = `${ctx?.midPx ?? ctx?.markPx ?? ctx?.prevDayPx ?? ''}`.trim();
-    if (priceText === '')
-        return 2;
+    if (priceText === '') return 2;
 
     const [, decimals = ''] = priceText.split('.');
     return Math.min(6, Math.max(0, decimals.length));

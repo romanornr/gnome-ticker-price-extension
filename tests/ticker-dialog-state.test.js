@@ -31,13 +31,7 @@ export function runTests() {
         'Search live Kraken WebSocket pairs. Non-crypto assets still use the built-in catalog.',
         'Crypto suggestion copy should reflect provider');
 
-    const resolvedCryptoTicker = resolveSelectedCryptoTicker({
-        assetCategory: ASSET_CATEGORIES.CRYPTO,
-        cryptoCatalog,
-        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
-        labelText: '',
-        symbolText: 'BTC/USD',
-    });
+    const resolvedCryptoTicker = resolveSelectedCryptoTicker({assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoCatalog, cryptoProvider: CRYPTO_PROVIDERS.KRAKEN, labelText: '', symbolText: 'BTC/USD'});
     assertTruthy(resolvedCryptoTicker, 'Exact crypto symbol matches should resolve');
     assertEqual(resolvedCryptoTicker.liveSymbol, 'BTC/USD',
         'Resolved crypto ticker should preserve live symbol');

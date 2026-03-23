@@ -8,27 +8,10 @@ import {assertDeepEqual, assertEqual} from './support/assert.js';
 export function runTests() {
     testCreateRuntimeProviderRegistry();
     testRefreshPlanSkipsProvidersWithoutRefreshFallback();
-    const krakenTicker = {
-        assetCategory: ASSET_CATEGORIES.CRYPTO,
-        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
-        liveSymbol: 'BTC/USD',
-        symbol: 'btcusd',
-    };
-    const defaultKrakenTicker = {
-        assetCategory: ASSET_CATEGORIES.CRYPTO,
-        liveSymbol: 'ETH/USD',
-        symbol: 'ethusd',
-    };
-    const hyperliquidTicker = {
-        assetCategory: ASSET_CATEGORIES.CRYPTO,
-        cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID,
-        liveSymbol: 'PURR/USDC',
-        symbol: 'purrusdc',
-    };
-    const stooqTicker = {
-        assetCategory: ASSET_CATEGORIES.US_EQUITY,
-        symbol: 'aapl.us',
-    };
+    const krakenTicker = {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.KRAKEN, liveSymbol: 'BTC/USD', symbol: 'btcusd'};
+    const defaultKrakenTicker = {assetCategory: ASSET_CATEGORIES.CRYPTO, liveSymbol: 'ETH/USD', symbol: 'ethusd'};
+    const hyperliquidTicker = {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID, liveSymbol: 'PURR/USDC', symbol: 'purrusdc'};
+    const stooqTicker = {assetCategory: ASSET_CATEGORIES.US_EQUITY, symbol: 'aapl.us'};
 
     const providerEntries = [
         {
@@ -92,13 +75,10 @@ export function runTests() {
 function testCreateRuntimeProviderRegistry() {
     const registry = createRuntimeProviderRegistry({
         uuid: 'test-uuid',
-        quoteStore: {
-            getQuote() {
-                return null;
-            },
-        },
-        onQuotes() {
-        },
+        quoteStore: {getQuote() {
+            return null;
+        }},
+        onQuotes() {},
     });
 
     assertDeepEqual(registry.map(entry => entry.id), [

@@ -81,21 +81,11 @@ export function buildCatalogSuggestionRows({
             ? `${curatedTicker.liveSymbol ?? curatedTicker.symbol} · ${curatedTicker.priceDecimals} decimals`
             : `${curatedTicker.liveSymbol ?? curatedTicker.symbol} · ${curatedTicker.priceDecimals} decimals · ${keywordText}`;
 
-        return {
-            kind: 'match',
-            title: curatedTicker.label,
-            subtitle,
-            curatedTicker,
-        };
+        return {kind: 'match', title: curatedTicker.label, subtitle, curatedTicker};
     });
 
-    if (matches.length > maxSuggestions) {
-        rows.push({
-            kind: 'info',
-            title: `Showing first ${maxSuggestions} matches`,
-            subtitle: 'Keep typing to narrow the catalog results.',
-        });
-    }
+    if (matches.length > maxSuggestions)
+        rows.push({kind: 'info', title: `Showing first ${maxSuggestions} matches`, subtitle: 'Keep typing to narrow the catalog results.'});
 
     return rows;
 }

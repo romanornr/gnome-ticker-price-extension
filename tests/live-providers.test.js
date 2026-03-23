@@ -10,15 +10,8 @@ export function runTests() {
 }
 
 function testKrakenPayloadHandling() {
-    const provider = new KrakenLiveProvider({
-        uuid: 'test',
-        onQuotes() {
-        },
-    });
-    provider._tickers = [{
-        liveSymbol: 'BTC/USD',
-        symbol: 'btcusd',
-    }];
+    const provider = new KrakenLiveProvider({uuid: 'test', onQuotes() {}});
+    provider._tickers = [{liveSymbol: 'BTC/USD', symbol: 'btcusd'}];
 
     assertDeepEqual(provider._handlePayload({
         method: 'subscribe',
@@ -46,21 +39,11 @@ function testKrakenPayloadHandling() {
 }
 
 function testHyperliquidPayloadHandling() {
-    const quoteStore = {
-        getQuote() {
-            return {previousClose: 0.4};
-        },
-    };
-    const provider = new HyperliquidLiveProvider({
-        uuid: 'test',
-        quoteStore,
-        onQuotes() {
-        },
-    });
-    provider._tickers = [{
-        liveSymbol: 'PURR/USDC',
-        symbol: 'purrusdc',
-    }];
+    const quoteStore = {getQuote() {
+        return {previousClose: 0.4};
+    }};
+    const provider = new HyperliquidLiveProvider({uuid: 'test', quoteStore, onQuotes() {}});
+    provider._tickers = [{liveSymbol: 'PURR/USDC', symbol: 'purrusdc'}];
 
     assertDeepEqual(provider._handlePayload({
         channel: 'subscriptionResponse',
@@ -87,11 +70,7 @@ function testHyperliquidPayloadHandling() {
 }
 
 function testKrakenReconnectPayloadHandling() {
-    const provider = new KrakenLiveProvider({
-        uuid: 'test',
-        onQuotes() {
-        },
-    });
+    const provider = new KrakenLiveProvider({uuid: 'test', onQuotes() {}});
     const originalLogError = globalThis.logError;
     globalThis.logError = () => {};
 
@@ -109,18 +88,12 @@ function testKrakenReconnectPayloadHandling() {
 function testHyperliquidIgnoresUnmappedPayloads() {
     const provider = new HyperliquidLiveProvider({
         uuid: 'test',
-        quoteStore: {
-            getQuote() {
-                return null;
-            },
-        },
-        onQuotes() {
-        },
+        quoteStore: {getQuote() {
+            return null;
+        }},
+        onQuotes() {},
     });
-    provider._tickers = [{
-        liveSymbol: 'BTC',
-        symbol: 'btc',
-    }];
+    provider._tickers = [{liveSymbol: 'BTC', symbol: 'btc'}];
 
     assertEqual(provider._handlePayload({
         channel: 'activeAssetCtx',

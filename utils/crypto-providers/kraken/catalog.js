@@ -68,20 +68,13 @@ async function _fetchKrakenSpotPairs() {
     try {
         const message = Soup.Message.new('GET', KRAKEN_WEBSOCKET_URL);
         websocket = await new Promise((resolve, reject) => {
-            session.websocket_connect_async(
-                message,
-                null,
-                [],
-                GLib.PRIORITY_DEFAULT,
-                null,
-                (_session, result) => {
+            session.websocket_connect_async(message, null, [], GLib.PRIORITY_DEFAULT, null, (_session, result) => {
                     try {
                         resolve(session.websocket_connect_finish(result));
                     } catch (error) {
                         reject(error);
                     }
-                }
-            );
+                });
         });
         websocket.set_max_incoming_payload_size(KRAKEN_INSTRUMENT_MAX_INCOMING_PAYLOAD_SIZE);
 
@@ -176,8 +169,7 @@ async function _fetchKrakenSpotPairs() {
 /* Price precision is normalized into the extension's bounded decimals range here. */
 function clampDecimals(value) {
     const parsed = Number.parseInt(`${value ?? ''}`, 10);
-    if (!Number.isInteger(parsed))
-        return 2;
+    if (!Number.isInteger(parsed)) return 2;
 
     return Math.min(6, Math.max(0, parsed));
 }
@@ -185,8 +177,7 @@ function clampDecimals(value) {
 /* Sorting keeps similar bases grouped while preferring similar quote currencies first. */
 function compareKrakenCatalogEntries(left, right) {
     const priorityDifference = getKrakenQuotePriority(left.quote) - getKrakenQuotePriority(right.quote);
-    if (left.base === right.base && priorityDifference !== 0)
-        return priorityDifference;
+    if (left.base === right.base && priorityDifference !== 0) return priorityDifference;
 
     return left.label.localeCompare(right.label);
 }

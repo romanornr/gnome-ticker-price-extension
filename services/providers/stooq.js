@@ -10,8 +10,7 @@ import Soup from 'gi://Soup?version=3.0';
  * a symbol resolves, without either caller caring about raw CSV details.
  */
 export async function refresh(tickers, {session}) {
-    if (!session || tickers.length === 0)
-        return new Map();
+    if (!session || tickers.length === 0) return new Map();
 
     const csv = await fetchText(session, buildBatchQuoteUrl(tickers));
     return parseBatchQuotes(csv, tickers.length);
@@ -40,10 +39,7 @@ export async function verifySymbol(session, symbol) {
     if (quoteDate.toUpperCase() === 'N/D' || !Number.isFinite(price))
         throw new Error(`Could not verify ${symbol}. No quote data was returned by Stooq.`);
 
-    return {
-        symbol: returnedSymbol,
-        quoteDate,
-    };
+    return {symbol: returnedSymbol, quoteDate};
 }
 
 /* Runtime quote polling batches symbols into Stooq's multi-symbol lookup endpoint here. */

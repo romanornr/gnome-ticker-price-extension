@@ -51,19 +51,16 @@ export function isLiveCryptoTicker(ticker) {
 
 /* Provider-specific ownership resolves through one helper so runtime/provider filters stay parallel. */
 export function isLiveCryptoTickerForProvider(ticker, cryptoProvider) {
-    if (!isLiveCryptoTicker(ticker))
-        return false;
+    if (!isLiveCryptoTicker(ticker)) return false;
 
-    if (cryptoProvider === CRYPTO_PROVIDERS.KRAKEN)
-        return (ticker.cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN) === CRYPTO_PROVIDERS.KRAKEN;
+    if (cryptoProvider === CRYPTO_PROVIDERS.KRAKEN) return (ticker.cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN) === CRYPTO_PROVIDERS.KRAKEN;
 
     return ticker.cryptoProvider === cryptoProvider;
 }
 
 /* Shared timeout cleanup keeps provider lifecycle helpers using one consistent convention. */
 export function removeTimeout(sourceId) {
-    if (sourceId === 0)
-        return 0;
+    if (sourceId === 0) return 0;
 
     GLib.Source.remove(sourceId);
     return 0;

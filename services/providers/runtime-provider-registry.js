@@ -20,15 +20,8 @@ import {refresh as refreshStooqQuotes} from './stooq.js';
 
 /* QuotesService builds the runtime provider set once so orchestration logic can iterate one registry. */
 export function createRuntimeProviderRegistry({uuid, quoteStore, onQuotes}) {
-    const krakenLiveProvider = new KrakenLiveProvider({
-        uuid,
-        onQuotes,
-    });
-    const hyperliquidLiveProvider = new HyperliquidLiveProvider({
-        uuid,
-        quoteStore,
-        onQuotes,
-    });
+    const krakenLiveProvider = new KrakenLiveProvider({uuid, onQuotes});
+    const hyperliquidLiveProvider = new HyperliquidLiveProvider({uuid, quoteStore, onQuotes});
 
     return [
         {
@@ -60,11 +53,9 @@ export function getProviderRefreshPlan(tickers, providerEntries) {
         }))
         .filter(plan => plan.tickers.length > 0)
         .filter(plan => {
-            if (!plan.providerEntry.refreshFallback)
-                return false;
+            if (!plan.providerEntry.refreshFallback) return false;
 
-            if (!plan.providerEntry.hasPollingFallback)
-                return true;
+            if (!plan.providerEntry.hasPollingFallback) return true;
 
             return plan.providerEntry.hasPollingFallback(plan.providerEntry);
         });

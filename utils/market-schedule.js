@@ -27,15 +27,12 @@ export function shouldRefreshTicker(
     lastRefreshUsec = 0,
     baseIntervalSeconds = DEFAULT_REFRESH_INTERVAL_SECONDS
 ) {
-    if (ticker.marketType === MARKET_TYPES.ALWAYS_OPEN)
-        return true;
+    if (ticker.marketType === MARKET_TYPES.ALWAYS_OPEN) return true;
 
-    if (ticker.marketType === MARKET_TYPES.WEEKDAY_SESSION)
-        return !isUsMarketWeekend(now.date);
+    if (ticker.marketType === MARKET_TYPES.WEEKDAY_SESSION) return !isUsMarketWeekend(now.date);
 
     if (ticker.marketType === MARKET_TYPES.US_SESSION) {
-        if (isUsMarketWeekend(now.date))
-            return false;
+        if (isUsMarketWeekend(now.date)) return false;
 
         return hasReachedCadence(
             lastRefreshUsec,
@@ -54,8 +51,7 @@ export function getRefreshIntervalSecondsForTicker(
     baseIntervalSeconds = DEFAULT_REFRESH_INTERVAL_SECONDS
 ) {
     const intervalSeconds = baseIntervalSeconds || DEFAULT_REFRESH_INTERVAL_SECONDS;
-    if (ticker.marketType !== MARKET_TYPES.US_SESSION)
-        return intervalSeconds;
+    if (ticker.marketType !== MARKET_TYPES.US_SESSION) return intervalSeconds;
 
     return isUsMarketExtendedHoursActive(now.date)
         ? intervalSeconds
@@ -64,8 +60,7 @@ export function getRefreshIntervalSecondsForTicker(
 
 /* Refresh cadence is evaluated against monotonic time so local clock changes do not distort polling behavior. */
 function hasReachedCadence(lastRefreshUsec, refreshIntervalSeconds, nowUsec) {
-    if (!lastRefreshUsec)
-        return true;
+    if (!lastRefreshUsec) return true;
 
     const elapsedSeconds = (nowUsec - lastRefreshUsec) / 1_000_000;
     return elapsedSeconds >= refreshIntervalSeconds;
@@ -90,17 +85,10 @@ function isUsMarketExtendedHoursActive(date) {
         minute: 'numeric',
     }).formatToParts(date);
 
-    const hour = Number.parseInt(
-        parts.find(part => part.type === 'hour')?.value ?? '',
-        10
-    );
-    const minute = Number.parseInt(
-        parts.find(part => part.type === 'minute')?.value ?? '',
-        10
-    );
+    const hour = Number.parseInt(parts.find(part => part.type === 'hour')?.value ?? '', 10);
+    const minute = Number.parseInt(parts.find(part => part.type === 'minute')?.value ?? '', 10);
 
-    if (!Number.isInteger(hour) || !Number.isInteger(minute))
-        return true;
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return true;
 
     const minutesSinceMidnight = (hour * 60) + minute;
     return minutesSinceMidnight >= US_MARKET_PREMARKET_START_HOUR * 60 &&

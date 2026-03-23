@@ -3,22 +3,16 @@ export function createHyperliquidQuote(entry, fallbackPreviousClose = null) {
     const price = firstFiniteNumber(entry?.ctx?.midPx, entry?.ctx?.markPx);
     const previousClose = firstFinitePositiveNumber(entry?.ctx?.prevDayPx, fallbackPreviousClose);
 
-    if (!Number.isFinite(price))
-        return null;
+    if (!Number.isFinite(price)) return null;
 
-    return {
-        price,
-        quoteDate: getCurrentUtcDate(),
-        previousClose: Number.isFinite(previousClose) ? previousClose : null,
-    };
+    return {price, quoteDate: getCurrentUtcDate(), previousClose: Number.isFinite(previousClose) ? previousClose : null};
 }
 
 /* Quote normalization picks the first usable numeric field from Hyperliquid's multiple price representations. */
 function firstFiniteNumber(...values) {
     for (const value of values) {
         const parsed = Number.parseFloat(`${value ?? ''}`);
-        if (Number.isFinite(parsed))
-            return parsed;
+        if (Number.isFinite(parsed)) return parsed;
     }
 
     return null;
@@ -28,8 +22,7 @@ function firstFiniteNumber(...values) {
 function firstFinitePositiveNumber(...values) {
     for (const value of values) {
         const parsed = Number.parseFloat(`${value ?? ''}`);
-        if (Number.isFinite(parsed) && parsed > 0)
-            return parsed;
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
     }
 
     return null;

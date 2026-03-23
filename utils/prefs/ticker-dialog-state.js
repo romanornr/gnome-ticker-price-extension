@@ -30,20 +30,11 @@ export function getSuggestionsDescription(assetCategory, cryptoProvider) {
 
 /* Catalog options bundle the runtime crypto catalog and provider choice into one reusable lookup input. */
 export function getCatalogOptions(cryptoCatalog, cryptoProvider) {
-    return {
-        cryptoCatalog: Array.isArray(cryptoCatalog) ? cryptoCatalog : [],
-        cryptoProvider,
-    };
+    return {cryptoCatalog: Array.isArray(cryptoCatalog) ? cryptoCatalog : [], cryptoProvider};
 }
 
 /* Exact-or-confident crypto resolution happens here before the controller attempts verification or save. */
-export function resolveSelectedCryptoTicker({
-    assetCategory,
-    cryptoCatalog,
-    cryptoProvider,
-    labelText,
-    symbolText,
-}) {
+export function resolveSelectedCryptoTicker({assetCategory, cryptoCatalog, cryptoProvider, labelText, symbolText}) {
     if (assetCategory !== ASSET_CATEGORIES.CRYPTO || !Array.isArray(cryptoCatalog))
         return null;
 

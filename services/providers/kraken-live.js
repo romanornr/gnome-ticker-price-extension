@@ -63,8 +63,7 @@ export class KrakenLiveProvider extends LiveWebsocketProvider {
             return {resetReconnect: true};
         }
 
-        if (payload?.channel !== 'ticker' || !Array.isArray(payload.data))
-            return null;
+        if (payload?.channel !== 'ticker' || !Array.isArray(payload.data)) return null;
 
         const updatedQuotes = new Map();
         const liveSymbolMap = this._getSymbolToTickerSymbolMap();
@@ -79,10 +78,7 @@ export class KrakenLiveProvider extends LiveWebsocketProvider {
             updatedQuotes.set(tickerSymbol, quote);
         });
 
-        return {
-            resetReconnect: updatedQuotes.size > 0,
-            quotesBySymbol: updatedQuotes,
-        };
+        return {resetReconnect: updatedQuotes.size > 0, quotesBySymbol: updatedQuotes};
     }
 }
 

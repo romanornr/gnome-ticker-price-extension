@@ -60,6 +60,68 @@ Avoid comments like:
 
 These make the code noisier without improving understanding.
 
+## Formatting Short Object Literals
+
+Short object literals may be written on one line when the whole expression is
+still easy to scan.
+
+Prefer compact one-line objects for:
+
+- constructor and function call arguments
+- short `return {}` values
+- short standalone assignments
+
+Keep object literals multiline when they contain nested objects or arrays,
+multiline callbacks, ternaries that become hard to scan, or otherwise feel
+visually dense in context.
+
+Examples:
+
+```js
+const provider = new KrakenLiveProvider({uuid, onQuotes});
+return {price, quoteDate, previousClose};
+
+return {
+    channel: 'ticker',
+    data: [{
+        symbol: 'BTC/USD',
+        last: '104321.50',
+    }],
+};
+```
+
+## Formatting Short Guard Clauses
+
+Short guard clauses may be written on one line when the condition and return
+value are still easy to scan.
+
+Prefer compact one-line guards for simple early returns such as:
+
+- `if (!lastRefreshUsec) return true;`
+- `if (symbol.trim() === '') return 'Symbol is required.';`
+- `if (!quote) return null;`
+- `if (left.base === right.base && priorityDifference !== 0) return priorityDifference;`
+- `if (liveSymbol === '' || market?.isCanonical !== true || !isHyperliquidSpotSymbol(liveSymbol)) return null;`
+
+Keep guard clauses multiline when the condition is long enough to feel crowded,
+when the returned expression is visually dense, or when stacking multiple
+one-line guards would make the flow harder to read.
+
+## Formatting Short Function Calls
+
+Short function or method calls may be written on one line when the full call is
+still easy to scan, even if they take several simple arguments.
+
+Prefer compact one-line calls for simple argument lists such as:
+
+- `const hour = Number.parseInt(value ?? '', 10);`
+- `session.abort();`
+- `session.websocket_connect_async(message, null, [], GLib.PRIORITY_DEFAULT, null, callback);`
+
+Keep calls multiline when any argument is structurally dense, when a callback
+body is large enough to hide the call shape, or when the compact form makes the
+call harder to skim than the expanded version.
+
 ## Recommended Comment Shapes
 
 ### File-level module comment

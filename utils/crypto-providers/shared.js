@@ -13,8 +13,7 @@ export function normalizeCompactProviderSymbol(value, pattern) {
         .toUpperCase()
         .replace(/\s+/g, '');
 
-    if (!pattern.test(compact))
-        return '';
+    if (!pattern.test(compact)) return '';
 
     return compact;
 }

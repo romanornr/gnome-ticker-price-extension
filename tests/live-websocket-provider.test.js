@@ -14,9 +14,7 @@ export function runTests() {
 
 function testHandleSocketMessageEmitsQuotesAndResetsReconnect() {
     const emittedQuotes = [];
-    const provider = new TestLiveWebsocketProvider({
-        onQuotes: quotesBySymbol => emittedQuotes.push(Array.from(quotesBySymbol.entries())),
-    });
+    const provider = new TestLiveWebsocketProvider({onQuotes: quotesBySymbol => emittedQuotes.push(Array.from(quotesBySymbol.entries()))});
     provider._reconnectAttempt = 3;
 
     provider.setHandlePayloadResult({
@@ -76,9 +74,7 @@ function testHandleSocketMessageIgnoresNonTextFrames() {
 
 function testHandleSocketMessageCanResetReconnectWithoutEmittingQuotes() {
     const emittedQuotes = [];
-    const provider = new TestLiveWebsocketProvider({
-        onQuotes: quotesBySymbol => emittedQuotes.push(quotesBySymbol),
-    });
+    const provider = new TestLiveWebsocketProvider({onQuotes: quotesBySymbol => emittedQuotes.push(quotesBySymbol)});
     provider._reconnectAttempt = 2;
     provider.setHandlePayloadResult({resetReconnect: true});
 
@@ -109,11 +105,7 @@ function testSharedMappingHelpersRemainAvailableThroughTheBaseClass() {
 
 class TestLiveWebsocketProvider extends LiveWebsocketProvider {
     constructor({onQuotes = null} = {}) {
-        super({
-            uuid: 'test',
-            onQuotes,
-            filterTicker: ticker => Boolean(ticker?.liveSymbol),
-        });
+        super({uuid: 'test', onQuotes, filterTicker: ticker => Boolean(ticker?.liveSymbol)});
         this._nextHandlePayloadResult = null;
         this.handlePayloadCalls = [];
         this.disconnectCalls = 0;
