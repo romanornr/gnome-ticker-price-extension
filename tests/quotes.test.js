@@ -24,7 +24,7 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
     service._running = true;
     service._session = {};
     service._tickers = [
-        {assetCategory: ASSET_CATEGORIES.US_EQUITY, symbol: 'aapl.us'},
+        {assetCategory: ASSET_CATEGORIES.EQUITY, symbol: 'aapl.us'},
         {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID, liveSymbol: 'PURR/USDC', symbol: 'purrusdc'},
         {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.KRAKEN, liveSymbol: 'BTC/USD', symbol: 'btcusd'},
     ];
@@ -120,7 +120,7 @@ async function testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh() {
 
     service._running = true;
     service._session = {};
-    service._tickers = [{assetCategory: ASSET_CATEGORIES.US_EQUITY, symbol: 'aapl.us'}];
+    service._tickers = [{assetCategory: ASSET_CATEGORIES.EQUITY, symbol: 'aapl.us'}];
     service._coordinator = {
         requestEntriesUpdate() {
             entryUpdateRequests += 1;

@@ -1,3 +1,8 @@
+import {
+    MARKET_SESSION_IDS,
+    getLegacyMarketTypeForSessionId,
+} from './market-sessions.js';
+
 /*
  * Asset/category metadata is the shared taxonomy for the entire extension.
  *
@@ -11,11 +16,13 @@ export const MARKET_TYPES = {
 };
 
 export const ASSET_CATEGORIES = {
-    US_EQUITY: 'us-equity',
-    US_ETF: 'us-etf',
+    EQUITY: 'equity',
+    ETF: 'etf',
     COMMODITY: 'commodity',
     FX: 'fx',
     CRYPTO: 'crypto',
+    US_EQUITY: 'equity',
+    US_ETF: 'etf',
 };
 
 export const CRYPTO_PROVIDERS = {
@@ -24,42 +31,42 @@ export const CRYPTO_PROVIDERS = {
 };
 
 const CATEGORY_ORDER = [
-    ASSET_CATEGORIES.US_EQUITY,
-    ASSET_CATEGORIES.US_ETF,
+    ASSET_CATEGORIES.EQUITY,
+    ASSET_CATEGORIES.ETF,
     ASSET_CATEGORIES.COMMODITY,
     ASSET_CATEGORIES.FX,
     ASSET_CATEGORIES.CRYPTO,
 ];
 
 const ASSET_CATEGORY_METADATA = {
-    [ASSET_CATEGORIES.US_EQUITY]: {
-        title: 'U.S. equity',
-        description: 'Stocks and major U.S. equity indexes.',
-        defaultMarketType: MARKET_TYPES.US_SESSION,
+    [ASSET_CATEGORIES.EQUITY]: {
+        title: 'Equity',
+        description: 'Individual stocks and major equity indexes.',
+        defaultMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         searchKeywords: ['equity', 'stock', 'stocks', 'index', 'indexes'],
     },
-    [ASSET_CATEGORIES.US_ETF]: {
-        title: 'U.S. ETFs',
-        description: 'Exchange-traded funds that follow the U.S. equity session.',
-        defaultMarketType: MARKET_TYPES.US_SESSION,
+    [ASSET_CATEGORIES.ETF]: {
+        title: 'ETF',
+        description: 'Exchange-traded funds that follow an equity market session.',
+        defaultMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         searchKeywords: ['etf', 'etfs', 'fund', 'funds'],
     },
     [ASSET_CATEGORIES.COMMODITY]: {
         title: 'Commodity',
         description: 'Metals and energy markets that refresh on weekdays.',
-        defaultMarketType: MARKET_TYPES.WEEKDAY_SESSION,
+        defaultMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         searchKeywords: ['commodity', 'commodities', 'metals', 'energy'],
     },
     [ASSET_CATEGORIES.FX]: {
         title: 'FX',
         description: 'Forex pairs and DXY-style currency products.',
-        defaultMarketType: MARKET_TYPES.WEEKDAY_SESSION,
+        defaultMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         searchKeywords: ['forex', 'currency', 'currencies'],
     },
     [ASSET_CATEGORIES.CRYPTO]: {
         title: 'Crypto',
         description: 'Always-open crypto markets. Kraken is available now, with more providers planned.',
-        defaultMarketType: MARKET_TYPES.ALWAYS_OPEN,
+        defaultMarketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         searchKeywords: ['crypto', 'cryptocurrency', 'cryptocurrencies'],
     },
 };
@@ -99,9 +106,14 @@ export function getAssetCategoryOptions() {
     });
 }
 
-/* Market defaults come from the taxonomy so ticker creation and normalization agree on session policy. */
+/* Market-session defaults come from the taxonomy so ticker creation and normalization agree on session policy. */
+export function getAssetCategoryDefaultMarketSessionId(assetCategory) {
+    return ASSET_CATEGORY_METADATA[assetCategory]?.defaultMarketSessionId ?? MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
+}
+
+/* Legacy callers can still derive marketType while the rest of the codebase migrates to marketSessionId. */
 export function getAssetCategoryDefaultMarketType(assetCategory) {
-    return ASSET_CATEGORY_METADATA[assetCategory]?.defaultMarketType ?? MARKET_TYPES.US_SESSION;
+    return getLegacyMarketTypeForSessionId(getAssetCategoryDefaultMarketSessionId(assetCategory));
 }
 
 /* A single default crypto provider keeps new ticker flows deterministic when the user has not chosen one yet. */

@@ -8,7 +8,8 @@ import {
     validateTickerDraft,
     validateTickerSymbol,
 } from '../utils/prefs/ticker-dialog-state.js';
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../utils/asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
+import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
 import {assertEqual, assertTruthy} from './support/assert.js';
 
 export function runTests() {
@@ -19,7 +20,7 @@ export function runTests() {
             liveSymbol: 'BTC/USD',
             priceDecimals: 0,
             assetCategory: ASSET_CATEGORIES.CRYPTO,
-            marketType: MARKET_TYPES.ALWAYS_OPEN,
+            marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
             cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
             keywords: ['btc', 'usd'],
         },
@@ -60,6 +61,7 @@ export function runTests() {
         priceDecimals: 0,
         panelSide: 'right',
         assetCategory: ASSET_CATEGORIES.CRYPTO,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         resolvedCryptoTicker,
         cryptoCatalog,
@@ -67,6 +69,8 @@ export function runTests() {
     assertEqual(nextTicker.symbol, 'btcusd', 'Built crypto configs should use normalized symbol');
     assertEqual(nextTicker.liveSymbol, 'BTC/USD', 'Built crypto configs should preserve live symbol');
     assertEqual(nextTicker.label, 'BTC/USD', 'Empty crypto labels should autofill from resolved ticker');
+    assertEqual(nextTicker.marketSessionId, MARKET_SESSION_IDS.ALWAYS_OPEN,
+        'Built crypto configs should persist the selected market session id');
 
     assertEqual(getCryptoVerificationFailureMessage(CRYPTO_PROVIDERS.KRAKEN),
         'Choose a Kraken-supported pair before saving.',

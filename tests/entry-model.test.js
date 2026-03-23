@@ -13,7 +13,7 @@ export function runTests() {
         symbol: '^spx',
         priceDecimals: 0,
         marketType: MARKET_TYPES.US_SESSION,
-        assetCategory: ASSET_CATEGORIES.US_EQUITY,
+        assetCategory: ASSET_CATEGORIES.EQUITY,
     };
     const liveCryptoTicker = {
         label: 'BTC',

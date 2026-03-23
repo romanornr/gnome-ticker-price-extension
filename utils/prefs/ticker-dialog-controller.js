@@ -20,7 +20,8 @@ import {
 import {verifyTickerSymbol} from './stooq-verifier.js';
 import {
     getDefaultCryptoProvider,
-    getMarketTypeForAssetCategory,
+    getMarketSessionForAssetCategory,
+    getMarketSessionOptionsForAssetCategory,
     LEFT_PANEL_SIDE,
     RIGHT_PANEL_SIDE,
 } from '../settings.js';
@@ -55,7 +56,7 @@ export function presentTickerDialog({
     createComboRow,
     createTextButton,
     findOptionIndex,
-    getMarketTypeTitle,
+    getMarketSessionTitle,
 }) {
     const dialog = new Gtk.Dialog({transient_for: window, modal: true, use_header_bar: true, title});
     dialog.add_button('Cancel', Gtk.ResponseType.CANCEL);
@@ -75,10 +76,11 @@ export function presentTickerDialog({
     content.append(formGroup);
 
     let activeAssetCategory = initialTicker.assetCategory ?? assetCategoryOptions[0].value;
-    let activeMarketType = getMarketTypeForAssetCategory(activeAssetCategory);
+    let activeMarketSessionId = initialTicker.marketSessionId ?? getMarketSessionForAssetCategory(activeAssetCategory);
     let activeCryptoProvider = activeAssetCategory === 'crypto'
         ? (initialTicker.cryptoProvider ?? getDefaultCryptoProvider())
         : '';
+    let marketSessionOptions = getMarketSessionOptionsForAssetCategory(activeAssetCategory);
     let cryptoCatalog = null;
     let cryptoCatalogProvider = '';
     let cryptoCatalogError = '';
@@ -93,8 +95,10 @@ export function presentTickerDialog({
     const assetCategoryRow = createComboRow({title: 'Asset type', options: assetCategoryOptions, selectedValue: activeAssetCategory, onSelected: () => {}});
     formGroup.add(assetCategoryRow);
 
-    const marketTypeRow = new Adw.ActionRow({title: 'Market session', subtitle: getMarketTypeTitle(activeMarketType)});
-    formGroup.add(marketTypeRow);
+    const marketSessionModel = Gtk.StringList.new(marketSessionOptions.map(option => option.title));
+    const marketSessionRow = new Adw.ComboRow({title: 'Market session', model: marketSessionModel});
+    marketSessionRow.selected = Math.max(0, marketSessionOptions.findIndex(option => option.value === activeMarketSessionId));
+    formGroup.add(marketSessionRow);
 
     const cryptoProviderRow = createComboRow({
         title: 'Crypto API',
@@ -165,17 +169,25 @@ export function presentTickerDialog({
             : curatedTicker.symbol;
         decimalsRow.value = curatedTicker.priceDecimals;
         activeAssetCategory = curatedTicker.assetCategory;
-        activeMarketType = curatedTicker.marketType;
+        activeMarketSessionId = curatedTicker.marketSessionId ?? getMarketSessionForAssetCategory(curatedTicker.assetCategory);
+        marketSessionOptions = getMarketSessionOptionsForAssetCategory(activeAssetCategory);
         activeCryptoProvider = curatedTicker.assetCategory === 'crypto'
             ? (curatedTicker.cryptoProvider ?? getDefaultCryptoProvider())
             : '';
         assetCategoryRow.selected = findOptionIndex(assetCategoryOptions, curatedTicker.assetCategory);
         cryptoProviderRow.selected = findOptionIndex(cryptoProviderOptions, activeCryptoProvider);
-        marketTypeRow.subtitle = getMarketTypeTitle(activeMarketType);
+        syncMarketSessionRow();
         cryptoProviderRow.visible = activeAssetCategory === 'crypto';
         if (activeAssetCategory === 'crypto')
             autoFilledCryptoLabel = curatedTicker.label;
         updateSaveSensitivity();
+    };
+
+    /* Market-session selection stays editable for manual non-crypto tickers and follows the current asset type. */
+    const syncMarketSessionRow = () => {
+        marketSessionOptions = getMarketSessionOptionsForAssetCategory(activeAssetCategory);
+        marketSessionModel.splice(0, marketSessionModel.get_n_items(), marketSessionOptions.map(option => option.title));
+        marketSessionRow.selected = Math.max(0, marketSessionOptions.findIndex(option => option.value === activeMarketSessionId));
     };
 
     /* Verification status is funneled through one label helper so async branches update the UI consistently. */
@@ -424,13 +436,13 @@ export function presentTickerDialog({
             return;
 
         activeAssetCategory = option.value;
-        activeMarketType = getMarketTypeForAssetCategory(activeAssetCategory);
+        activeMarketSessionId = getMarketSessionForAssetCategory(activeAssetCategory);
         activeCryptoProvider = activeAssetCategory === 'crypto'
             ? (activeCryptoProvider || getDefaultCryptoProvider())
             : '';
         resetCryptoCatalogState();
         clearVerificationState();
-        marketTypeRow.subtitle = getMarketTypeTitle(activeMarketType);
+        syncMarketSessionRow();
         cryptoProviderRow.visible = activeAssetCategory === 'crypto';
         if (activeAssetCategory === 'crypto')
             cryptoProviderRow.selected = findOptionIndex(cryptoProviderOptions, activeCryptoProvider);
@@ -439,6 +451,14 @@ export function presentTickerDialog({
             void ensureCryptoCatalogLoaded();
         renderCuratedSuggestions();
         updateSaveSensitivity();
+    });
+
+    marketSessionRow.connect('notify::selected', widget => {
+        const option = marketSessionOptions[widget.selected];
+        if (!option)
+            return;
+
+        activeMarketSessionId = option.value;
     });
 
     cryptoProviderRow.connect('notify::selected', widget => {
@@ -485,6 +505,7 @@ export function presentTickerDialog({
     });
 
     updateSuggestionsDescription();
+    syncMarketSessionRow();
     if (activeAssetCategory === 'crypto')
         void ensureCryptoCatalogLoaded();
     renderCuratedSuggestions();
@@ -506,6 +527,7 @@ export function presentTickerDialog({
                 priceDecimals: decimalsRow.value,
                 panelSide: sideOptions[sideRow.selected].value,
                 assetCategory: activeAssetCategory,
+                marketSessionId: activeMarketSessionId,
                 cryptoProvider: activeCryptoProvider,
                 resolvedCryptoTicker,
                 cryptoCatalog,

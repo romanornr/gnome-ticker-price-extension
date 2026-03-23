@@ -1,7 +1,7 @@
 import {
     ASSET_CATEGORIES,
     CRYPTO_PROVIDERS,
-    getAssetCategoryDefaultMarketType,
+    getAssetCategoryDefaultMarketSessionId,
     getDefaultCryptoProvider,
 } from '../asset-categories.js';
 import {findCuratedTicker, matchCuratedTickers, resolveCryptoCatalogTicker} from '../ticker-catalog.js';
@@ -109,6 +109,7 @@ export function buildTickerConfig({
     priceDecimals,
     panelSide,
     assetCategory,
+    marketSessionId,
     cryptoProvider,
     resolvedCryptoTicker,
     cryptoCatalog,
@@ -133,7 +134,7 @@ export function buildTickerConfig({
             : symbolText.trim().toLowerCase(),
         priceDecimals,
         panelSide,
-        marketType: getAssetCategoryDefaultMarketType(assetCategory),
+        marketSessionId: marketSessionId || getAssetCategoryDefaultMarketSessionId(assetCategory),
         assetCategory,
     };
 

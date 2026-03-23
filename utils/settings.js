@@ -1,12 +1,15 @@
 import {
     ASSET_CATEGORIES,
     CRYPTO_PROVIDERS,
-    MARKET_TYPES,
-    getAssetCategoryDefaultMarketType,
+    getAssetCategoryDefaultMarketSessionId,
     getAssetCategoryOptions,
     getCryptoProviderOptions,
     getDefaultCryptoProvider,
 } from './asset-categories.js';
+import {
+    MARKET_SESSION_IDS,
+    getMarketSessionOptions,
+} from './market-sessions.js';
 import {
     DEFAULT_DISPLAY_SETTINGS,
     DEFAULT_REFRESH_INTERVAL_SECONDS,
@@ -30,12 +33,13 @@ export const SETTINGS_KEYS = {
     SEPARATOR_STYLE: 'separator-style',
 };
 
-export {ASSET_CATEGORIES, MARKET_TYPES, getAssetCategoryOptions};
+export {ASSET_CATEGORIES, getAssetCategoryOptions};
 export {
     CRYPTO_PROVIDERS,
     getCryptoProviderOptions,
     getDefaultCryptoProvider,
 };
+export {MARKET_SESSION_IDS, getMarketSessionOptions};
 export {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE};
 
 export const DEFAULT_TICKERS = [
@@ -43,23 +47,23 @@ export const DEFAULT_TICKERS = [
         label: 'SPX',
         symbol: '^spx',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.US_SESSION,
-        assetCategory: ASSET_CATEGORIES.US_EQUITY,
+        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        assetCategory: ASSET_CATEGORIES.EQUITY,
         panelSide: RIGHT_PANEL_SIDE,
     },
     {
         label: 'NDX',
         symbol: '^ndq',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.US_SESSION,
-        assetCategory: ASSET_CATEGORIES.US_EQUITY,
+        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        assetCategory: ASSET_CATEGORIES.EQUITY,
         panelSide: RIGHT_PANEL_SIDE,
     },
     {
         label: 'DXY',
         symbol: 'dx.f',
         priceDecimals: 2,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
+        marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         assetCategory: ASSET_CATEGORIES.FX,
         panelSide: LEFT_PANEL_SIDE,
     },
@@ -67,7 +71,7 @@ export const DEFAULT_TICKERS = [
         label: 'EUR/USD',
         symbol: 'eurusd',
         priceDecimals: 4,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
+        marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         assetCategory: ASSET_CATEGORIES.FX,
         panelSide: LEFT_PANEL_SIDE,
     },
@@ -75,7 +79,7 @@ export const DEFAULT_TICKERS = [
         label: 'Gold',
         symbol: 'xauusd',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
+        marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         assetCategory: ASSET_CATEGORIES.COMMODITY,
         panelSide: RIGHT_PANEL_SIDE,
     },
@@ -83,15 +87,15 @@ export const DEFAULT_TICKERS = [
         label: 'USO',
         symbol: 'uso.us',
         priceDecimals: 2,
-        marketType: MARKET_TYPES.US_SESSION,
-        assetCategory: ASSET_CATEGORIES.US_ETF,
+        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        assetCategory: ASSET_CATEGORIES.ETF,
         panelSide: RIGHT_PANEL_SIDE,
     },
     {
         label: 'ETH',
         symbol: 'ethusd',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         panelSide: RIGHT_PANEL_SIDE,
@@ -102,7 +106,7 @@ export const DEFAULT_TICKERS = [
         label: 'BTC',
         symbol: 'btcusd',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         panelSide: RIGHT_PANEL_SIDE,
@@ -161,30 +165,32 @@ export function getTickersForSide(tickers, side) {
     return tickers.filter(ticker => (ticker.panelSide ?? RIGHT_PANEL_SIDE) === side);
 }
 
-export function getMarketTypeOptions() {
-    return [
-        {
-            value: MARKET_TYPES.ALWAYS_OPEN,
-            title: 'Always open',
-            description: 'Crypto and other 24/7 markets. Refreshes every day.',
-        },
-        {
-            value: MARKET_TYPES.WEEKDAY_SESSION,
-            title: 'Weekday global market',
-            description: 'Forex and commodities. Refreshes on weekdays and skips weekends.',
-        },
-        {
-            value: MARKET_TYPES.US_SESSION,
-            title: 'U.S. equity session',
-            description: 'U.S. stocks and ETFs. Uses U.S. market hours and slower overnight refreshes.',
-        },
-    ];
+export function getMarketSessionForAssetCategory(assetCategory) {
+    return getAssetCategoryDefaultMarketSessionId(assetCategory);
 }
 
-export function getMarketTypeForAssetCategory(assetCategory) {
-    return getAssetCategoryDefaultMarketType(assetCategory);
-}
+export function getMarketSessionOptionsForAssetCategory(assetCategory) {
+    const equitySessionValues = new Set([
+        MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
+        MARKET_SESSION_IDS.UK_EQUITY_CASH,
+        MARKET_SESSION_IDS.JAPAN_EQUITY_CASH,
+        MARKET_SESSION_IDS.CHINA_EQUITY_CASH,
+        MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH,
+        MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH,
+        MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH,
+        MARKET_SESSION_IDS.INDIA_EQUITY_CASH,
+        MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH,
+    ]);
 
+    if (assetCategory === ASSET_CATEGORIES.CRYPTO)
+        return getMarketSessionOptions().filter(option => option.value === MARKET_SESSION_IDS.ALWAYS_OPEN);
+
+    if (assetCategory === ASSET_CATEGORIES.COMMODITY || assetCategory === ASSET_CATEGORIES.FX)
+        return getMarketSessionOptions().filter(option => option.value === MARKET_SESSION_IDS.WEEKDAY_24H);
+
+    return getMarketSessionOptions().filter(option => equitySessionValues.has(option.value));
+}
 
 export function cloneTicker(ticker) {
     return cloneTickerConfig(ticker);

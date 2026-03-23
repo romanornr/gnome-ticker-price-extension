@@ -22,10 +22,10 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `services/providers/runtime-provider-registry.js`: QuotesService-facing runtime provider registry for ownership, lifecycle wiring, and fallback-refresh capabilities
 - `README.md`: user-facing setup notes, ticker add flow, and curated catalog editing guide
 - `PROVIDER_ADAPTER_REFACTOR_PLAN.md`: historical note marking the completed adapter migration and redirecting to the current long-term architecture doc
-- `PROVIDER_ARCHITECTURE_LONG_TERM_PLAN.md`: long-term architecture plan covering adapter/runtime boundaries, migration order, and Option C cleanup for crypto providers
 - `CODE_STYLE_GUIDE.md`: repo-local coding and commenting contract intended to be understandable by human contributors and coding agents
 - `utils/format.js`: display-entry formatting and color helpers
 - `utils/asset-categories.js`: shared asset-category metadata, category search terms, and default market-type mapping
+- `utils/market-sessions.js`: shared market-session profile registry, including behavior-based session ids, legacy market-type migration helpers, and prefs session option metadata
 - `utils/crypto-providers/index.js`: crypto provider switchboard that exposes the shared adapter seam to prefs and ticker normalization layers
 - `utils/crypto-providers/kraken-adapter.js`: Kraken provider adapter implementation for catalog loading, symbol normalization, scoring, and websocket metadata
 - `utils/crypto-providers/kraken/catalog.js`: Kraken catalog discovery, cached instrument snapshot loading, and runtime catalog entry normalization
@@ -47,6 +47,7 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/prefs/stooq-verifier.js`: prefs-side Stooq verification wrapper
 - `utils/ticker-catalog.js`: curated ticker aggregation and search helpers for guided prefs selection
 - `utils/catalog/*.js`: curated ticker data split by asset category for contributor-friendly maintenance
+- `utils/catalog/germany-equity.js`, `utils/catalog/netherlands-equity.js`, and `utils/catalog/uk-equity.js`: alphabetized curated country-level equity catalogs using Stooq-verified symbols and region-appropriate market-session ids
 - `utils/catalog/us-equity.js`: alphabetized curated U.S. equity catalog; keep symbols Stooq-verified and search keywords sensible
 - `utils/catalog/us-etf.js`: alphabetized curated U.S. ETF catalog; keep symbols Stooq-verified and search keywords sensible
 - `utils/catalog/commodity.js` and `utils/catalog/fx.js`: keep labels alphabetized and prefer verified Stooq symbols when adding or replacing entries
@@ -66,7 +67,7 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 
 - Market data is fetched from Stooq, with Kraken WebSocket v2 and Hyperliquid REST/WebSocket APIs used for crypto market discovery and live crypto updates.
 - The current supported non-crypto tickers are SPX, NDX, DXY, EUR/USD, Gold, and USO; verify Stooq symbol availability with `curl` before adding more.
-- Keep `utils/catalog/us-equity.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
+- Keep `utils/catalog/us-equity.js`, `utils/catalog/germany-equity.js`, `utils/catalog/netherlands-equity.js`, and `utils/catalog/uk-equity.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
 - Keep `utils/catalog/us-etf.js`, `utils/catalog/commodity.js`, and `utils/catalog/fx.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
 - Tickers may be split across GNOME panel sides via per-ticker `panelSide` metadata; when adding indicators to the left panel, append them after existing left-side items so other extensions are not shifted unexpectedly.
 - Prefer the batched quote endpoint for current prices.

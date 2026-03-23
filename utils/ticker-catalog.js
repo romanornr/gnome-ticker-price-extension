@@ -2,10 +2,14 @@ import {getAssetCategorySearchTerms} from './asset-categories.js';
 import {COMMODITY_TICKERS} from './catalog/commodity.js';
 import {CRYPTO_TICKERS} from './catalog/crypto.js';
 import {FX_TICKERS} from './catalog/fx.js';
+import {GERMANY_EQUITY_TICKERS} from './catalog/germany-equity.js';
+import {NETHERLANDS_EQUITY_TICKERS} from './catalog/netherlands-equity.js';
+import {UK_EQUITY_TICKERS} from './catalog/uk-equity.js';
 import {US_ETF_TICKERS} from './catalog/us-etf.js';
 import {US_EQUITY_TICKERS} from './catalog/us-equity.js';
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from './asset-categories.js';
 import {getCryptoProviderAdapter} from './crypto-providers/index.js';
+import {getMarketSessionIdFromLegacyMarketType} from './market-sessions.js';
 
 /*
  * The ticker catalog is the search/lookup layer used by prefs.
@@ -15,6 +19,9 @@ import {getCryptoProviderAdapter} from './crypto-providers/index.js';
  * need to know where each candidate came from.
  */
 const CATALOG = [
+    ...GERMANY_EQUITY_TICKERS,
+    ...NETHERLANDS_EQUITY_TICKERS,
+    ...UK_EQUITY_TICKERS,
     ...US_EQUITY_TICKERS,
     ...US_ETF_TICKERS,
     ...COMMODITY_TICKERS,
@@ -143,6 +150,7 @@ function getCatalogForCategory(assetCategory, options = {}) {
 function cloneCatalogEntry(entry) {
     return {
         ...entry,
+        marketSessionId: entry.marketSessionId ?? getMarketSessionIdFromLegacyMarketType(entry.marketType),
         keywords: [...(entry.keywords ?? [])],
     };
 }

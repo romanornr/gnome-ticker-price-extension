@@ -11,7 +11,7 @@ export function runTests() {
     const krakenTicker = {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.KRAKEN, liveSymbol: 'BTC/USD', symbol: 'btcusd'};
     const defaultKrakenTicker = {assetCategory: ASSET_CATEGORIES.CRYPTO, liveSymbol: 'ETH/USD', symbol: 'ethusd'};
     const hyperliquidTicker = {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID, liveSymbol: 'PURR/USDC', symbol: 'purrusdc'};
-    const nonLiveTicker = {assetCategory: ASSET_CATEGORIES.US_EQUITY, symbol: 'aapl.us'};
+    const nonLiveTicker = {assetCategory: ASSET_CATEGORIES.EQUITY, symbol: 'aapl.us'};
 
     assertDeepEqual(getDesiredLiveSymbols([
         krakenTicker,

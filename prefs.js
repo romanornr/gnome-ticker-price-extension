@@ -8,8 +8,8 @@ import {
     getAssetCategoryOptions,
     cloneTicker,
     getCryptoProviderOptions,
-    getMarketTypeForAssetCategory,
-    getMarketTypeOptions,
+    getMarketSessionForAssetCategory,
+    getMarketSessionOptions,
     getTickersForSide,
     LEFT_PANEL_SIDE,
     loadDisplaySettings,
@@ -57,7 +57,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         this._refreshOptions = getRefreshIntervalOptions();
         this._assetCategoryOptions = getAssetCategoryOptions();
         this._cryptoProviderOptions = getCryptoProviderOptions();
-        this._marketTypeOptions = getMarketTypeOptions();
+        this._marketSessionOptions = getMarketSessionOptions();
 
         this._build();
         this._rebuildTickerRows();
@@ -184,7 +184,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                     createComboRow: options => this._createComboRow(options),
                     createTextButton: (label, onClicked) => this._createTextButton(label, onClicked),
                     findOptionIndex: (options, value) => this._findOptionIndex(options, value),
-                    getMarketTypeTitle: marketType => this._getMarketTypeTitle(marketType),
+                    getMarketSessionTitle: marketSessionId => this._getMarketSessionTitle(marketSessionId),
                     onSave: updatedTicker => {
                         const nextTickers = [...tickers];
                         nextTickers[index] = updatedTicker;
@@ -218,14 +218,14 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                                 priceDecimals: 2,
                                 panelSide: addSide,
                                 assetCategory,
-                                marketType: getMarketTypeForAssetCategory(assetCategory),
+                                marketSessionId: getMarketSessionForAssetCategory(assetCategory),
                             },
                             assetCategoryOptions: this._assetCategoryOptions,
                             cryptoProviderOptions: this._cryptoProviderOptions,
                             createComboRow: options => this._createComboRow(options),
                             createTextButton: (label, onClicked) => this._createTextButton(label, onClicked),
                             findOptionIndex: (options, value) => this._findOptionIndex(options, value),
-                            getMarketTypeTitle: marketType => this._getMarketTypeTitle(marketType),
+                            getMarketSessionTitle: marketSessionId => this._getMarketSessionTitle(marketSessionId),
                             onSave: newTicker => {
                                 saveTickerConfigs(this._settings, [...tickers, newTicker]);
                                 this._rebuildTickerRows();
@@ -329,8 +329,8 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
     }
 
     /* Market-session titles are resolved here so page and dialog surfaces share the same wording. */
-    _getMarketTypeTitle(marketType) {
-        const option = this._marketTypeOptions.find(candidate => candidate.value === marketType);
+    _getMarketSessionTitle(marketSessionId) {
+        const option = this._marketSessionOptions.find(candidate => candidate.value === marketSessionId);
         return option?.title ?? 'Unknown market session';
     }
 

@@ -3,13 +3,18 @@ import {
     getRefreshIntervalSecondsForTicker,
     shouldRefreshTicker,
 } from '../utils/market-schedule.js';
-import {MARKET_TYPES} from '../utils/asset-categories.js';
+import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
 import {assertEqual} from './support/assert.js';
 
 export function runTests() {
-    const alwaysOpenTicker = {marketType: MARKET_TYPES.ALWAYS_OPEN};
-    const weekdayTicker = {marketType: MARKET_TYPES.WEEKDAY_SESSION};
-    const usTicker = {marketType: MARKET_TYPES.US_SESSION};
+    const alwaysOpenTicker = {marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN};
+    const weekdayTicker = {marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H};
+    const usTicker = {marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED};
+    const europeTicker = {marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH};
+    const ukTicker = {marketSessionId: MARKET_SESSION_IDS.UK_EQUITY_CASH};
+    const japanTicker = {marketSessionId: MARKET_SESSION_IDS.JAPAN_EQUITY_CASH};
+    const chinaTicker = {marketSessionId: MARKET_SESSION_IDS.CHINA_EQUITY_CASH};
+    const australiaTicker = {marketSessionId: MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH};
 
     const saturdayMorningNy = createMarketScheduleNow(new Date('2026-03-21T14:00:00Z'), 10_000_000);
     const mondayRegularHoursNy = createMarketScheduleNow(new Date('2026-03-23T15:00:00Z'), 10_000_000);
@@ -33,4 +38,14 @@ export function runTests() {
         'U.S. session tickers should respect cadence when recently refreshed');
     assertEqual(shouldRefreshTicker(usTicker, mondayRegularHoursNy, 0, 300), true,
         'U.S. session tickers should refresh when no prior refresh exists');
+    assertEqual(getRefreshIntervalSecondsForTicker(europeTicker, mondayOvernightNy, 300), 1800,
+        'European equity profiles should be able to slow down outside their cash session');
+    assertEqual(getRefreshIntervalSecondsForTicker(ukTicker, mondayOvernightNy, 300), 1800,
+        'U.K. equity profiles should be able to slow down outside their cash session');
+    assertEqual(getRefreshIntervalSecondsForTicker(japanTicker, mondayOvernightNy, 300), 300,
+        'Japan equity profiles should use base cadence during Tokyo daytime trading');
+    assertEqual(getRefreshIntervalSecondsForTicker(chinaTicker, mondayRegularHoursNy, 300), 1800,
+        'China equity profiles should slow down when the Shanghai session is closed');
+    assertEqual(getRefreshIntervalSecondsForTicker(australiaTicker, mondayRegularHoursNy, 300), 1800,
+        'Australia equity profiles should slow down when the Sydney session is closed');
 }

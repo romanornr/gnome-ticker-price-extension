@@ -1,4 +1,5 @@
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../utils/asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
+import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
 import {
     cloneTicker,
     inferAssetCategory,
@@ -11,21 +12,21 @@ export function runTests() {
     assertEqual(normalizeTickerConfig(null), null,
         'Invalid ticker configs should be rejected');
 
-    assertEqual(inferAssetCategory({marketType: MARKET_TYPES.ALWAYS_OPEN, symbol: 'btcusd'}), ASSET_CATEGORIES.CRYPTO,
+    assertEqual(inferAssetCategory({marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN, symbol: 'btcusd'}), ASSET_CATEGORIES.CRYPTO,
     'Always-open tickers should infer as crypto');
 
-    assertEqual(inferAssetCategory({marketType: MARKET_TYPES.WEEKDAY_SESSION, symbol: 'eurusd', label: 'EUR/USD'}), ASSET_CATEGORIES.FX,
+    assertEqual(inferAssetCategory({marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H, symbol: 'eurusd', label: 'EUR/USD'}), ASSET_CATEGORIES.FX,
     'Weekday currency pairs should infer as FX');
 
-    assertEqual(inferAssetCategory({marketType: MARKET_TYPES.US_SESSION, symbol: 'uso.us'}), ASSET_CATEGORIES.US_ETF,
-    'Known ETF symbols should infer as U.S. ETFs');
+    assertEqual(inferAssetCategory({marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED, symbol: 'uso.us'}), ASSET_CATEGORIES.ETF,
+    'Known ETF symbols should infer as ETFs');
 
-    const legacyKrakenTicker = normalizeTickerConfig({label: 'BTC', symbol: 'btc.v', marketType: MARKET_TYPES.ALWAYS_OPEN, liveSymbol: 'BTC/USD'});
+    const legacyKrakenTicker = normalizeTickerConfig({label: 'BTC', symbol: 'btc.v', marketType: 'always-open', liveSymbol: 'BTC/USD'});
     assertDeepEqual(legacyKrakenTicker, {
         label: 'BTC',
         symbol: 'btcusd',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         panelSide: 'right',
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
@@ -37,7 +38,7 @@ export function runTests() {
         symbol: '',
         liveSymbol: ' purr / usdc ',
         priceDecimals: 3,
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID,
         panelSide: 'left',
@@ -46,7 +47,7 @@ export function runTests() {
         label: 'PURR',
         symbol: 'purrusdc',
         priceDecimals: 3,
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         panelSide: 'left',
         cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID,
@@ -57,7 +58,7 @@ export function runTests() {
         label: 'ETH',
         symbol: 'ethusd',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.US_SESSION,
+        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         panelSide: 'right',
         cryptoProvider: 'unknown-provider',
@@ -67,7 +68,7 @@ export function runTests() {
         label: 'ETH',
         symbol: 'ethusd',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         panelSide: 'right',
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
