@@ -1,93 +1,72 @@
 import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
 
-/* Curated FX suggestions give prefs a searchable baseline for common weekday currency markets. */
-export const FX_TICKERS = [
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'AUD/USD',
-        symbol: 'audusd',
-        priceDecimals: 4,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['aussie'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
+/* Curated FX suggestions give prefs a searchable baseline for weekday currency markets backed by Stooq spot pairs. */
+const FX_CURRENCY_DEFINITIONS = [
+    {code: 'AUD', name: 'Australian dollar'},
+    {code: 'BRL', name: 'Brazilian real'},
+    {code: 'CAD', name: 'Canadian dollar'},
+    {code: 'CHF', name: 'Swiss franc'},
+    {code: 'CZK', name: 'Czech koruna'},
+    {code: 'DKK', name: 'Danish krone'},
+    {code: 'EUR', name: 'Euro'},
+    {code: 'GBP', name: 'British pound'},
+    {code: 'HUF', name: 'Hungarian forint'},
+    {code: 'INR', name: 'Indian rupee'},
+    {code: 'JPY', name: 'Japanese yen'},
+    {code: 'MXN', name: 'Mexican peso'},
+    {code: 'NOK', name: 'Norwegian krone'},
+    {code: 'NZD', name: 'New Zealand dollar'},
+    {code: 'PLN', name: 'Polish zloty'},
+    {code: 'RUB', name: 'Russian ruble'},
+    {code: 'SEK', name: 'Swedish krona'},
+    {code: 'SGD', name: 'Singapore dollar'},
+    {code: 'TRY', name: 'Turkish lira'},
+    {code: 'USD', name: 'U.S. dollar'},
+    {code: 'ZAR', name: 'South African rand'},
+];
+
+/* This turns the verified Stooq currency matrix into searchable prefs entries without hand-maintaining hundreds of pairs. */
+function buildFxTickerDefinition(baseCurrency, quoteCurrency) {
+    const label = `${baseCurrency.code}/${quoteCurrency.code}`;
+    const symbol = `${baseCurrency.code}${quoteCurrency.code}`.toLowerCase();
+    const priceDecimals = quoteCurrency.code === 'JPY' ? 2 : 4;
+
+    if (label === 'AUD/USD') {
+        return {
+            label,
+            symbol,
+            priceDecimals,
+            keywords: ['aussie', 'audusd', 'australian dollar u.s. dollar'],
+        };
+    }
+
+    return {
+        label,
+        symbol,
+        priceDecimals,
+        keywords: [
+            symbol,
+            `${baseCurrency.name.toLowerCase()} ${quoteCurrency.name.toLowerCase()}`,
+        ],
+    };
+}
+
+const FX_TICKER_DEFINITIONS = FX_CURRENCY_DEFINITIONS.flatMap(baseCurrency => FX_CURRENCY_DEFINITIONS
+    .filter(quoteCurrency => quoteCurrency.code !== baseCurrency.code)
+    .map(quoteCurrency => buildFxTickerDefinition(baseCurrency, quoteCurrency)))
+    .concat([{
         label: 'DXY',
         symbol: 'dx.f',
         priceDecimals: 2,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
         keywords: ['dollar index', 'usd index'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'EUR/GBP',
-        symbol: 'eurgbp',
-        priceDecimals: 4,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['euro sterling'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'EUR/JPY',
-        symbol: 'eurjpy',
-        priceDecimals: 2,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['euro yen'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'EUR/USD',
-        symbol: 'eurusd',
-        priceDecimals: 4,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['euro dollar', 'eurusd'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'GBP/USD',
-        symbol: 'gbpusd',
-        priceDecimals: 4,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['cable', 'sterling'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'NZD/USD',
-        symbol: 'nzdusd',
-        priceDecimals: 4,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['kiwi'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'USD/CAD',
-        symbol: 'usdcad',
-        priceDecimals: 4,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['canadian dollar', 'loonie'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'USD/CHF',
-        symbol: 'usdchf',
-        priceDecimals: 4,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['swiss franc'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'USD/JPY',
-        symbol: 'usdjpy',
-        priceDecimals: 2,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['yen'],
-    },
-    {
-        assetCategory: ASSET_CATEGORIES.FX,
-        label: 'USD/SEK',
-        symbol: 'usdsek',
-        priceDecimals: 4,
-        marketType: MARKET_TYPES.WEEKDAY_SESSION,
-        keywords: ['swedish krona'],
-    },
-];
+    }])
+    .sort((left, right) => left.label.localeCompare(right.label));
+
+export const FX_TICKERS = FX_TICKER_DEFINITIONS.map(entry => ({
+    assetCategory: ASSET_CATEGORIES.FX,
+    label: entry.label,
+    symbol: entry.symbol,
+    priceDecimals: entry.priceDecimals,
+    marketType: MARKET_TYPES.WEEKDAY_SESSION,
+    keywords: [...entry.keywords],
+}));
