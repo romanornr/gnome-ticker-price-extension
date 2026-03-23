@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.ticker-price-extension" path="/org/gnome/shell/extensions/ticker-price-extension/">
+    <key name="tickers-json" type="s">
+      <default>''</default>
+      <summary>Serialized ticker configuration</summary>
+      <description>JSON-encoded ticker list. An empty value falls back to the built-in defaults.</description>
+    </key>
+    <key name="refresh-interval-seconds" type="u">
+      <default>300</default>
+      <summary>Base refresh interval</summary>
+      <description>Default polling cadence in seconds before market-aware throttling is applied.</description>
+    </key>
+    <key name="format-preset" type="s">
+      <default>'default'</default>
+      <summary>Display format preset</summary>
+      <description>Controls which parts of each ticker entry are shown by default.</description>
+    </key>
+    <key name="show-price" type="b">
+      <default>true</default>
+      <summary>Show price text</summary>
+      <description>Whether to include the quote price in the panel.</description>
+    </key>
+    <key name="show-arrow" type="b">
+      <default>true</default>
+      <summary>Show change arrow</summary>
+      <description>Whether to include the directional arrow for percent change.</description>
+    </key>
+    <key name="show-percent" type="b">
+      <default>true</default>
+      <summary>Show percent change</summary>
+      <description>Whether to include the percent change text in the panel.</description>
+    </key>
+    <key name="separator-style" type="s">
+      <default>'dot'</default>
+      <summary>Separator style</summary>
+      <description>Default separator shown between ticker entries when no ticker-specific separator override exists.</description>
+    </key>
+  </schema>
+</schemalist>

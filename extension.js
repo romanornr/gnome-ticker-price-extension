@@ -1,69 +1,145 @@
-import Clutter from 'gi://Clutter';
-import GLib from 'gi://GLib';
-import GObject from 'gi://GObject';
-import Soup from 'gi://Soup?version=3.0';
-import St from 'gi://St';
-
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const API_URL = 'https://stooq.com/q/l/?s=btc.v&i=d';
+import {QuotesService} from './services/quotes.js';
+import {TickerIndicator} from './ui/indicator.js';
+import {createLoadingEntries} from './utils/format.js';
+import {
+    getTickersForSide,
+    LEFT_PANEL_SIDE,
+    loadDisplaySettings,
+    loadTickerConfigs,
+    RIGHT_PANEL_SIDE,
+    SETTINGS_KEYS,
+} from './utils/settings.js';
 
-const TickerIndicator = GObject.registerClass(
-class TickerIndicator extends PanelMenu.Button {
-    _init() {
-        super._init(0.0, 'Ticker Indicator', false);
+const LEFT_PANEL_POSITION = 999;
 
-        this._label = new St.Label({
-            text: 'BTC ...',
-            y_align: Clutter.ActorAlign.CENTER,
-            style: 'color: white;',
-        });
-
-        this.add_child(this._label);
-    }
-
-    setText(text) {
-        this._label.set_text(text);
-    }
-});
-
-export default class HelloWorldExtension extends Extension {
+/*
+ * This file is the GNOME Shell entrypoint for the extension as a whole.
+ *
+ * It does not fetch or format quotes itself. Its system role is to:
+ * - own extension lifecycle hooks from GNOME Shell
+ * - create and stop the QuotesService runtime
+ * - mirror the current entry set into left and right panel indicators
+ *
+ * In other words, this is the bridge between GNOME Shell lifecycle/events and
+ * the rest of the internal market-data system.
+ */
+export default class TickerPriceExtension extends Extension {
+    /* The extension object owns the shell-visible instances that survive between enable and disable. */
     constructor(metadata) {
         super(metadata);
-        this._indicator = null;
-        this._session = new Soup.Session();
+        this._leftIndicator = null;
+        this._rightIndicator = null;
+        this._quotesService = null;
+        this._quotesChangedId = 0;
+        this._settings = null;
+        this._settingsSignalIds = [];
     }
+
+    /* enable() is the shell entry hook that boots the extension's runtime graph. */
     enable() {
-        this._indicator = new TickerIndicator();
-
-        // Keep the center clock and right-side indicators untouched
-        Main.panel.addToStatusArea(this.uuid, this._indicator, 1, 'left');
-        this._refreshPrice();
+        this._startup();
     }
 
+    /* disable() mirrors enable() and tears the runtime down from the shell boundary inward. */
     disable() {
-        this._indicator?.destroy();
-        this._indicator = null;
+        this._shutdown();
     }
 
-    async _refreshPrice() {
-        try {
-            const message = Soup.Message.new('GET', API_URL);
-            const bytes = await this._session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null);
+    /* Startup creates the runtime service, subscribes to entry changes, and seeds the panel with placeholders. */
+    _startup() {
+        this._shutdown();
 
-            const csv = new TextDecoder().decode(bytes.get_data()).trim();
-            const fields = csv.split(',');
-            const price = fields[6]?.trim();
+        this._settings = this.getSettings();
 
-            if (!price)
-                throw new Error(`Unexpected response: ${csv}`);
+        this._quotesService = new QuotesService(this.uuid, this._settings);
+        this._quotesChangedId = this._quotesService.connect('entries-changed', () => {
+            this._syncIndicators(this._quotesService.getEntries());
+        });
 
-            this._indicator?.setText(`BTC ${price}`);
-        } catch (error) {
-            logError(error, `${this.uuid}: failed to refresh BTC price`);
-            this._indicator?.setText('BTC --');
+        this._settingsSignalIds = [
+            this._settings.connect(`changed::${SETTINGS_KEYS.TICKERS_JSON}`, () => {
+                this._syncIndicators(this._quotesService?.getEntries() ?? this._getLoadingEntries());
+            }),
+        ];
+
+        this._syncIndicators(this._getLoadingEntries());
+        this._quotesService.start();
+    }
+
+    /* Before live data arrives, the shell still needs placeholder entries to render. */
+    _getLoadingEntries() {
+        const tickers = loadTickerConfigs(this._settings);
+        const displaySettings = loadDisplaySettings(this._settings);
+        return createLoadingEntries(tickers, displaySettings);
+    }
+
+    /* Entry changes from QuotesService are fanned back out to both panel-side indicators here. */
+    _syncIndicators(entries) {
+        this._ensureIndicatorForSide(LEFT_PANEL_SIDE, entries);
+        this._ensureIndicatorForSide(RIGHT_PANEL_SIDE, entries);
+    }
+
+    /*
+     * The extension keeps separate indicator instances per panel side so ticker
+     * placement remains stable even as the saved list changes.
+     */
+    _ensureIndicatorForSide(side, entries) {
+        const sideEntries = this._getEntriesForSide(entries, side);
+        const propertyName = side === LEFT_PANEL_SIDE ? '_leftIndicator' : '_rightIndicator';
+        const areaName = side === LEFT_PANEL_SIDE ? `${this.uuid}-left` : `${this.uuid}-right`;
+        const position = side === LEFT_PANEL_SIDE ? LEFT_PANEL_POSITION : 0;
+
+        if (sideEntries.length === 0) {
+            this[propertyName]?.destroy();
+            this[propertyName] = null;
+            return;
         }
+
+        if (!this[propertyName]) {
+            this[propertyName] = new TickerIndicator(() => this.openPreferences());
+            Main.panel.addToStatusArea(areaName, this[propertyName], position, side);
+        }
+
+        this[propertyName].setEntries(sideEntries);
+    }
+
+    /* Side filtering preserves saved ticker order per panel side before the indicator renders. */
+    _getEntriesForSide(entries, side) {
+        const tickersForSide = getTickersForSide(loadTickerConfigs(this._settings), side);
+        const entriesBySymbol = new Map(entries.map(entry => [entry.symbol.toUpperCase(), entry]));
+        const sideEntries = tickersForSide
+            .map(ticker => entriesBySymbol.get(ticker.symbol.toUpperCase()))
+            .filter(entry => entry !== undefined)
+            .map(entry => ({...entry}));
+
+        if (sideEntries.length > 0)
+            sideEntries[0].separatorBefore = '';
+
+        return sideEntries;
+    }
+
+    /* Shutdown tears the shell-facing boundary down cleanly so a later enable starts from a blank slate. */
+    _shutdown() {
+        this._settingsSignalIds.forEach(signalId => this._settings?.disconnect(signalId));
+        this._settingsSignalIds = [];
+
+        if (this._quotesService && this._quotesChangedId !== 0) {
+            this._quotesService.disconnect(this._quotesChangedId);
+            this._quotesChangedId = 0;
+        }
+
+        this._quotesService?.stop();
+        this._quotesService = null;
+
+        this._leftIndicator?.destroy();
+        this._leftIndicator = null;
+
+        this._rightIndicator?.destroy();
+        this._rightIndicator = null;
+
+        this._settings = null;
     }
 }
