@@ -47,7 +47,7 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/prefs/stooq-verifier.js`: prefs-side Stooq verification wrapper
 - `utils/ticker-catalog.js`: curated ticker aggregation and search helpers for guided prefs selection
 - `utils/catalog/*.js`: curated ticker data split by asset category for contributor-friendly maintenance
-- `utils/catalog/germany-equity.js`, `utils/catalog/netherlands-equity.js`, and `utils/catalog/uk-equity.js`: alphabetized curated country-level equity catalogs using Stooq-verified symbols and region-appropriate market-session ids
+- `utils/catalog/mainland-china-equity.js`, `utils/catalog/germany-equity.js`, `utils/catalog/hong-kong-equity.js`, `utils/catalog/japan-equity.js`, `utils/catalog/netherlands-equity.js`, and `utils/catalog/uk-equity.js`: alphabetized curated country-level equity catalogs using Stooq-verified symbols and region-appropriate market-session ids; mainland China and Hong Kong stay separate
 - `utils/catalog/us-equity.js`: alphabetized curated U.S. equity catalog; keep symbols Stooq-verified and search keywords sensible
 - `utils/catalog/us-etf.js`: alphabetized curated U.S. ETF catalog; keep symbols Stooq-verified and search keywords sensible
 - `utils/catalog/commodity.js` and `utils/catalog/fx.js`: keep labels alphabetized and prefer verified Stooq symbols when adding or replacing entries
@@ -67,7 +67,7 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 
 - Market data is fetched from Stooq, with Kraken WebSocket v2 and Hyperliquid REST/WebSocket APIs used for crypto market discovery and live crypto updates.
 - The current supported non-crypto tickers are SPX, NDX, DXY, EUR/USD, Gold, and USO; verify Stooq symbol availability with `curl` before adding more.
-- Keep `utils/catalog/us-equity.js`, `utils/catalog/germany-equity.js`, `utils/catalog/netherlands-equity.js`, and `utils/catalog/uk-equity.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
+- Keep `utils/catalog/us-equity.js`, `utils/catalog/mainland-china-equity.js`, `utils/catalog/germany-equity.js`, `utils/catalog/hong-kong-equity.js`, `utils/catalog/japan-equity.js`, `utils/catalog/netherlands-equity.js`, and `utils/catalog/uk-equity.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
 - Keep `utils/catalog/us-etf.js`, `utils/catalog/commodity.js`, and `utils/catalog/fx.js` in alphabetical order by `label`, and verify new or changed Stooq symbols with a REST lookup before committing them.
 - Tickers may be split across GNOME panel sides via per-ticker `panelSide` metadata; when adding indicators to the left panel, append them after existing left-side items so other extensions are not shifted unexpectedly.
 - Prefer the batched quote endpoint for current prices.
