@@ -11,6 +11,7 @@ import {
     getMarketSessionForAssetCategory,
     getMarketSessionOptions,
     getTickersForSide,
+    hasSettingsKey,
     LEFT_PANEL_SIDE,
     loadDisplaySettings,
     loadRefreshIntervalSeconds,
@@ -22,6 +23,7 @@ import {
 } from './utils/settings.js';
 import {
     formatRefreshIntervalLabel,
+    getFontPresetOptions,
     getFormatPresetOptions,
     getRefreshIntervalOptions,
     getSeparatorOptions,
@@ -120,6 +122,16 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
             selectedValue: displaySettings.separatorStyle,
             onSelected: value => this._settings.set_string(SETTINGS_KEYS.SEPARATOR_STYLE, value),
         }));
+
+        if (hasSettingsKey(this._settings, SETTINGS_KEYS.FONT_PRESET)) {
+            displayGroup.add(this._createComboRow({
+                title: 'Panel font',
+                subtitle: 'Preset fonts fall back through the system if they are not installed.',
+                options: getFontPresetOptions(),
+                selectedValue: displaySettings.fontPreset,
+                onSelected: value => this._settings.set_string(SETTINGS_KEYS.FONT_PRESET, value),
+            }));
+        }
     }
 
     /* Saved ticker changes always rerender the visible row list through this one rebuild path. */

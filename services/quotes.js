@@ -9,11 +9,12 @@ import {
     getProviderRefreshPlan,
 } from './providers/runtime-provider-registry.js';
 import {createLoadingEntries} from '../utils/format.js';
-import {SETTINGS_KEYS} from '../utils/settings.js';
 import {
+    hasSettingsKey,
     loadDisplaySettings,
     loadRefreshIntervalSeconds,
     loadTickerConfigs,
+    SETTINGS_KEYS,
 } from '../utils/settings.js';
 import {createMarketScheduleNow, shouldRefreshTicker} from '../utils/market-schedule.js';
 
@@ -178,6 +179,12 @@ export const QuotesService = GObject.registerClass({
             this._settings.connect(`changed::${SETTINGS_KEYS.SHOW_PERCENT}`, () => this._handleDisplaySettingsChanged()),
             this._settings.connect(`changed::${SETTINGS_KEYS.SEPARATOR_STYLE}`, () => this._handleDisplaySettingsChanged()),
         ];
+
+        if (hasSettingsKey(this._settings, SETTINGS_KEYS.FONT_PRESET)) {
+            this._settingsSignalIds.push(
+                this._settings.connect(`changed::${SETTINGS_KEYS.FONT_PRESET}`, () => this._handleDisplaySettingsChanged())
+            );
+        }
     }
 
     /* Signal teardown is centralized so startup/shutdown and hot reconfiguration use the same cleanup path. */

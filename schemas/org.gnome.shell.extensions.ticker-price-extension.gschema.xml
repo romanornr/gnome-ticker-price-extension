@@ -36,5 +36,10 @@
       <summary>Separator style</summary>
       <description>Default separator shown between ticker entries when no ticker-specific separator override exists.</description>
     </key>
+    <key name="font-preset" type="s">
+      <default>'system'</default>
+      <summary>Panel font preset</summary>
+      <description>Curated font preset used for ticker text in the panel. Preset font families fall back through the system if unavailable.</description>
+    </key>
   </schema>
 </schemalist>

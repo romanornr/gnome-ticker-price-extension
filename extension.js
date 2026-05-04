@@ -78,15 +78,16 @@ export default class TickerPriceExtension extends Extension {
 
     /* Entry changes from QuotesService are fanned back out to both panel-side indicators here. */
     _syncIndicators(entries) {
-        this._ensureIndicatorForSide(LEFT_PANEL_SIDE, entries);
-        this._ensureIndicatorForSide(RIGHT_PANEL_SIDE, entries);
+        const displaySettings = loadDisplaySettings(this._settings);
+        this._ensureIndicatorForSide(LEFT_PANEL_SIDE, entries, displaySettings);
+        this._ensureIndicatorForSide(RIGHT_PANEL_SIDE, entries, displaySettings);
     }
 
     /*
      * The extension keeps separate indicator instances per panel side so ticker
      * placement remains stable even as the saved list changes.
      */
-    _ensureIndicatorForSide(side, entries) {
+    _ensureIndicatorForSide(side, entries, displaySettings) {
         const sideEntries = this._getEntriesForSide(entries, side);
         const propertyName = side === LEFT_PANEL_SIDE ? '_leftIndicator' : '_rightIndicator';
         const areaName = side === LEFT_PANEL_SIDE ? `${this.uuid}-left` : `${this.uuid}-right`;
@@ -103,7 +104,7 @@ export default class TickerPriceExtension extends Extension {
             Main.panel.addToStatusArea(areaName, this[propertyName], position, side);
         }
 
-        this[propertyName].setEntries(sideEntries);
+        this[propertyName].setEntries(sideEntries, displaySettings);
     }
 
     /* Side filtering preserves saved ticker order per panel side before the indicator renders. */

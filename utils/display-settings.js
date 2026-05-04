@@ -17,6 +17,14 @@ export const SEPARATOR_STYLES = {
     SPACE: 'space',
 };
 
+export const FONT_PRESETS = {
+    SYSTEM: 'system',
+    SYSTEM_TABULAR: 'system-tabular',
+    IBM_PLEX_MONO: 'ibm-plex-mono',
+    JETBRAINS_MONO: 'jetbrains-mono',
+    INTER: 'inter',
+};
+
 export const DEFAULT_REFRESH_INTERVAL_SECONDS = 300;
 
 export const DEFAULT_DISPLAY_SETTINGS = {
@@ -25,6 +33,7 @@ export const DEFAULT_DISPLAY_SETTINGS = {
     showArrow: true,
     showPercent: true,
     separatorStyle: SEPARATOR_STYLES.DOT,
+    fontPreset: FONT_PRESETS.SYSTEM,
 };
 
 /* Formatters call this helper to turn the saved separator style into the actual panel text fragment. */
@@ -56,6 +65,45 @@ export function getSeparatorOptions() {
         {value: SEPARATOR_STYLES.PIPES, title: '||'},
         {value: SEPARATOR_STYLES.SPACE, title: 'Spacing'},
     ];
+}
+
+/* Font presets stay intentionally curated so panel rendering remains predictable across systems. */
+export function getFontPresetOptions() {
+    return [
+        {value: FONT_PRESETS.SYSTEM, title: 'System / GNOME default'},
+        {value: FONT_PRESETS.SYSTEM_TABULAR, title: 'System with tabular numbers'},
+        {value: FONT_PRESETS.IBM_PLEX_MONO, title: 'IBM Plex Mono'},
+        {value: FONT_PRESETS.JETBRAINS_MONO, title: 'JetBrains Mono'},
+        {value: FONT_PRESETS.INTER, title: 'Inter'},
+    ];
+}
+
+/* Indicator rendering asks this helper for CSS fragments instead of knowing preset details. */
+export function getFontPresetStyle(fontPreset) {
+    switch (fontPreset) {
+    case FONT_PRESETS.SYSTEM_TABULAR:
+        return {
+            fontFeatureSettings: '"tnum"',
+        };
+    case FONT_PRESETS.IBM_PLEX_MONO:
+        return {
+            fontFamily: '"IBM Plex Mono", monospace',
+            fontFeatureSettings: '"tnum"',
+        };
+    case FONT_PRESETS.JETBRAINS_MONO:
+        return {
+            fontFamily: '"JetBrains Mono", monospace',
+            fontFeatureSettings: '"tnum"',
+        };
+    case FONT_PRESETS.INTER:
+        return {
+            fontFamily: '"Inter Tight", "Inter", sans-serif',
+            fontFeatureSettings: '"tnum"',
+        };
+    case FONT_PRESETS.SYSTEM:
+    default:
+        return {};
+    }
 }
 
 /* Refresh interval options live here because they are UI-facing choices, not runtime scheduling policy itself. */

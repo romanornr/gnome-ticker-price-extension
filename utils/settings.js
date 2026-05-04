@@ -13,6 +13,7 @@ import {
 import {
     DEFAULT_DISPLAY_SETTINGS,
     DEFAULT_REFRESH_INTERVAL_SECONDS,
+    FONT_PRESETS,
     FORMAT_PRESETS,
     SEPARATOR_STYLES,
 } from './display-settings.js';
@@ -31,6 +32,7 @@ export const SETTINGS_KEYS = {
     SHOW_ARROW: 'show-arrow',
     SHOW_PERCENT: 'show-percent',
     SEPARATOR_STYLE: 'separator-style',
+    FONT_PRESET: 'font-preset',
 };
 
 export {ASSET_CATEGORIES, getAssetCategoryOptions};
@@ -99,7 +101,6 @@ export const DEFAULT_TICKERS = [
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         panelSide: RIGHT_PANEL_SIDE,
-        separatorBefore: ' || ',
         liveSymbol: 'ETH/USD',
     },
     {
@@ -146,6 +147,7 @@ export function resetTickerConfigs(settings) {
 export function loadDisplaySettings(settings) {
     const formatPreset = normalizeFormatPreset(settings?.get_string(SETTINGS_KEYS.FORMAT_PRESET));
     const separatorStyle = normalizeSeparatorStyle(settings?.get_string(SETTINGS_KEYS.SEPARATOR_STYLE));
+    const fontPreset = normalizeFontPreset(getOptionalStringSetting(settings, SETTINGS_KEYS.FONT_PRESET));
 
     return {
         formatPreset,
@@ -153,7 +155,16 @@ export function loadDisplaySettings(settings) {
         showArrow: settings?.get_boolean(SETTINGS_KEYS.SHOW_ARROW) ?? DEFAULT_DISPLAY_SETTINGS.showArrow,
         showPercent: settings?.get_boolean(SETTINGS_KEYS.SHOW_PERCENT) ?? DEFAULT_DISPLAY_SETTINGS.showPercent,
         separatorStyle,
+        fontPreset,
     };
+}
+
+export function hasSettingsKey(settings, key) {
+    try {
+        return settings?.settings_schema?.has_key(key) ?? false;
+    } catch (_error) {
+        return false;
+    }
 }
 
 export function loadRefreshIntervalSeconds(settings) {
@@ -220,4 +231,24 @@ function normalizeSeparatorStyle(separatorStyle) {
     default:
         return DEFAULT_DISPLAY_SETTINGS.separatorStyle;
     }
+}
+
+function normalizeFontPreset(fontPreset) {
+    switch (fontPreset) {
+    case FONT_PRESETS.SYSTEM_TABULAR:
+    case FONT_PRESETS.IBM_PLEX_MONO:
+    case FONT_PRESETS.JETBRAINS_MONO:
+    case FONT_PRESETS.INTER:
+    case FONT_PRESETS.SYSTEM:
+        return fontPreset;
+    default:
+        return DEFAULT_DISPLAY_SETTINGS.fontPreset;
+    }
+}
+
+function getOptionalStringSetting(settings, key) {
+    if (!hasSettingsKey(settings, key))
+        return null;
+
+    return settings.get_string(key);
 }
