@@ -6,6 +6,15 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 cd "${ROOT_DIR}"
 
+if command -v gnome-shell >/dev/null 2>&1; then
+    GNOME_SHELL_MAJOR="$(gnome-shell --version | sed -nE 's/^GNOME Shell ([0-9]+).*/\1/p')"
+
+    if [[ -n "${GNOME_SHELL_MAJOR}" ]] && ! grep -Eq "\"${GNOME_SHELL_MAJOR}\"" metadata.json; then
+        printf 'metadata.json does not list installed GNOME Shell major version: %s\n' "${GNOME_SHELL_MAJOR}" >&2
+        exit 1
+    fi
+fi
+
 printf 'Running focused GJS test suites...\n'
 gjs -m tests/run.js
 

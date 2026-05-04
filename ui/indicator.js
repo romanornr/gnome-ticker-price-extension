@@ -5,7 +5,11 @@ import St from 'gi://St';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
-import {DEFAULT_TEXT_COLOR} from '../utils/format.js';
+import {
+    DEFAULT_TEXT_COLOR,
+    PRIMARY_TEXT_COLOR,
+    SECONDARY_TEXT_COLOR,
+} from '../utils/format.js';
 
 /*
  * TickerIndicator is the last step of the pipeline: it turns prebuilt entry
@@ -42,22 +46,64 @@ class TickerIndicator extends PanelMenu.Button {
 
         entries.forEach(entry => {
             if (entry.separatorBefore) {
-                this._content.add_child(new St.Label({text: entry.separatorBefore, y_align: Clutter.ActorAlign.CENTER, style: `color: ${DEFAULT_TEXT_COLOR};`}));
+                this._content.add_child(new St.Label({
+                    text: entry.separatorBefore,
+                    y_align: Clutter.ActorAlign.CENTER,
+                    style: buildLabelStyle({color: SECONDARY_TEXT_COLOR}),
+                }));
             }
 
-            this._content.add_child(new St.Label({text: entry.label, y_align: Clutter.ActorAlign.CENTER, style: `color: ${DEFAULT_TEXT_COLOR};`}));
+            this._content.add_child(new St.Label({
+                text: entry.label,
+                y_align: Clutter.ActorAlign.CENTER,
+                style: buildLabelStyle({color: PRIMARY_TEXT_COLOR, weight: 500}),
+            }));
 
             if (entry.showPrice) {
-                this._content.add_child(new St.Label({text: ` ${entry.priceText}`, y_align: Clutter.ActorAlign.CENTER, style: `color: ${entry.priceColor ?? DEFAULT_TEXT_COLOR};`}));
+                this._content.add_child(new St.Label({
+                    text: ` ${entry.priceText}`,
+                    y_align: Clutter.ActorAlign.CENTER,
+                    style: buildLabelStyle({
+                        color: entry.priceColor ?? DEFAULT_TEXT_COLOR,
+                    }),
+                }));
             }
 
             if (entry.showArrow) {
-                this._content.add_child(new St.Label({text: ` ${entry.arrow}`, y_align: Clutter.ActorAlign.CENTER, style: `color: ${entry.changeColor ?? DEFAULT_TEXT_COLOR};`}));
+                this._content.add_child(new St.Label({
+                    text: ` ${entry.arrow}`,
+                    y_align: Clutter.ActorAlign.CENTER,
+                    style: buildLabelStyle({
+                        color: entry.changeColor ?? DEFAULT_TEXT_COLOR,
+                        weight: 500,
+                        fontSize: '0.92em',
+                    }),
+                }));
             }
 
             if (entry.showPercent) {
-                this._content.add_child(new St.Label({text: ` ${entry.percentText}`, y_align: Clutter.ActorAlign.CENTER, style: `color: ${entry.changeColor ?? DEFAULT_TEXT_COLOR};`}));
+                this._content.add_child(new St.Label({
+                    text: ` ${entry.percentText}`,
+                    y_align: Clutter.ActorAlign.CENTER,
+                    style: buildLabelStyle({
+                        color: entry.changeColor ?? DEFAULT_TEXT_COLOR,
+                        weight: 500,
+                    }),
+                }));
             }
         });
     }
 });
+
+/* Inline style construction keeps the panel fragment hierarchy consistent without adding stylesheet plumbing. */
+function buildLabelStyle({color, weight = null, fontSize = null}) {
+    const parts = [`color: ${color};`];
+
+    if (weight !== null)
+        parts.push(`font-weight: ${weight};`);
+
+    if (fontSize !== null)
+        parts.push(`font-size: ${fontSize};`);
+
+    return parts.join(' ');
+}

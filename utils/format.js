@@ -9,7 +9,9 @@ import {
  * visibility flags. It is intentionally dumb about where data came from and is
  * reused by both loading/error states and the normal render path.
  */
-export const DEFAULT_TEXT_COLOR = '#ffffff';
+export const PRIMARY_TEXT_COLOR = '#e8e8e8';
+export const SECONDARY_TEXT_COLOR = '#a7adb4';
+export const DEFAULT_TEXT_COLOR = SECONDARY_TEXT_COLOR;
 export const POSITIVE_COLOR = '#3FB950';
 export const NEGATIVE_COLOR = '#F85149';
 

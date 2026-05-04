@@ -5,7 +5,8 @@
   "settings-schema": "org.gnome.shell.extensions.ticker-price-extension",
   "shell-version": [
     "49",
-    "49.5"
+    "49.5",
+    "50"
   ],
   "version": 1,
   "url": "https://github.com/romano/gnome-ticker-price-extension"
