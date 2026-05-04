@@ -1,5 +1,8 @@
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
+
+const STOOQ_REQUEST_TIMEOUT_SECONDS = 12;
 
 /*
  * Stooq is the REST provider for non-live symbols and the manual prefs
@@ -12,8 +15,17 @@ import Soup from 'gi://Soup?version=3.0';
 export async function refresh(tickers, {session}) {
     if (!session || tickers.length === 0) return new Map();
 
-    const csv = await fetchText(session, buildBatchQuoteUrl(tickers));
-    return parseBatchQuotes(csv, tickers.length);
+    try {
+        const csv = await fetchText(session, buildBatchQuoteUrl(tickers));
+        const expectedSymbols = getExpectedSymbols(tickers);
+        const parseResult = parseBatchQuoteResponse(csv, expectedSymbols);
+        logBatchParseResult(parseResult, expectedSymbols.size);
+
+        return parseResult.quotesBySymbol;
+    } catch (error) {
+        logStooqWarning(`Stooq batch request failed for ${tickers.length} symbol(s): ${error.message}`);
+        throw error;
+    }
 }
 
 /* prefs and runtime both use the same verification path so symbol validation stays consistent. */
@@ -59,17 +71,52 @@ export function buildLookupUrl(symbol) {
 /* All Stooq interaction ultimately passes through this transport helper. */
 async function fetchText(session, url) {
     const message = Soup.Message.new('GET', url);
-    const bytes = await session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null);
-    return new TextDecoder().decode(bytes.get_data()).trim();
+    const cancellable = new Gio.Cancellable();
+    let timeoutId = GLib.timeout_add_seconds(
+        GLib.PRIORITY_DEFAULT,
+        STOOQ_REQUEST_TIMEOUT_SECONDS,
+        () => {
+            timeoutId = 0;
+            cancellable.cancel();
+            return GLib.SOURCE_REMOVE;
+        }
+    );
+
+    try {
+        const bytes = await session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, cancellable);
+        return new TextDecoder().decode(bytes.get_data()).trim();
+    } catch (error) {
+        if (cancellable.is_cancelled())
+            throw new Error(`Timed out after ${STOOQ_REQUEST_TIMEOUT_SECONDS}s while loading Stooq quotes.`);
+
+        throw error;
+    } finally {
+        if (timeoutId !== 0)
+            GLib.Source.remove(timeoutId);
+    }
 }
 
 /* Raw Stooq CSV rows are converted here into the normalized quote shape used by the rest of the system. */
-export function parseBatchQuotes(csv, expectedCount) {
+export function parseBatchQuotes(csv, tickersOrExpectedCount = 0) {
+    const expectedSymbols = getExpectedSymbols(tickersOrExpectedCount);
+    const expectedCount = expectedSymbols.size > 0 ? expectedSymbols.size : Number(tickersOrExpectedCount);
+    const parseResult = parseBatchQuoteResponse(csv, expectedSymbols);
+
+    logBatchParseResult(parseResult, expectedSymbols.size > 0 ? expectedSymbols.size : expectedCount);
+    return parseResult.quotesBySymbol;
+}
+
+/*
+ * Runtime batch parsing is intentionally tolerant: one bad Stooq row should not
+ * prevent every other symbol in the startup seed from reaching QuoteStore.
+ */
+function parseBatchQuoteResponse(csv, expectedSymbols = new Set()) {
     const quotesBySymbol = new Map();
     const rows = csv
         .split('\n')
         .map(line => line.trim())
         .filter(line => line !== '');
+    const skippedRows = [];
 
     rows.forEach(row => {
         const fields = row.split(',');
@@ -78,8 +125,10 @@ export function parseBatchQuotes(csv, expectedCount) {
         const price = Number.parseFloat(fields[3]?.trim() ?? '');
         const previousClose = Number.parseFloat(fields[4]?.trim() ?? '');
 
-        if (!symbol || !quoteDate || !Number.isFinite(price))
-            throw new Error(`Unexpected batched quote row: ${row}`);
+        if (!symbol || !quoteDate || !Number.isFinite(price)) {
+            skippedRows.push(row);
+            return;
+        }
 
         quotesBySymbol.set(symbol, {
             price,
@@ -88,14 +137,57 @@ export function parseBatchQuotes(csv, expectedCount) {
         });
     });
 
-    if (quotesBySymbol.size !== expectedCount)
-        throw new Error(`Unexpected batched quote response: ${csv}`);
-
-    return quotesBySymbol;
+    return {
+        csv,
+        rows,
+        quotesBySymbol,
+        skippedRows,
+        missingSymbols: [...expectedSymbols].filter(symbol => !quotesBySymbol.has(symbol)),
+    };
 }
 
 /* Stooq dates are normalized once here so callers never reason about provider-specific date formatting. */
 export function normalizeQuoteDate(dateText) {
     const normalized = dateText.replaceAll('-', '');
     return /^\d{8}$/.test(normalized) ? normalized : '';
+}
+
+/* Diagnostics compare parsed rows against requested ticker symbols using Stooq's uppercase response shape. */
+function getExpectedSymbols(tickersOrExpectedCount) {
+    if (!Array.isArray(tickersOrExpectedCount))
+        return new Set();
+
+    return new Set(
+        tickersOrExpectedCount
+            .map(ticker => `${ticker?.symbol ?? ''}`.trim().toUpperCase())
+            .filter(symbol => symbol !== '')
+    );
+}
+
+/* Provider diagnostics are centralized so tolerant parsing still leaves useful GNOME Shell logs. */
+function logBatchParseResult(parseResult, expectedCount) {
+    const {csv, rows, quotesBySymbol, skippedRows, missingSymbols} = parseResult;
+
+    if (rows.length === 0) {
+        logStooqWarning('Stooq batch returned an empty response.');
+        return;
+    }
+
+    if (skippedRows.length > 0)
+        logStooqWarning(`Skipped ${skippedRows.length} unusable Stooq row(s): ${skippedRows.join(' | ')}`);
+
+    if (missingSymbols.length > 0)
+        logStooqWarning(`Stooq batch missed ${missingSymbols.length} symbol(s): ${missingSymbols.join(', ')}`);
+
+    if (Number.isFinite(expectedCount) && quotesBySymbol.size !== expectedCount)
+        logStooqWarning(`Stooq batch returned ${quotesBySymbol.size}/${expectedCount} usable quotes.`);
+
+    if (quotesBySymbol.size === 0)
+        logStooqWarning(`Stooq batch had no usable quote rows: ${csv}`);
+}
+
+/* Tests run outside GNOME Shell's logging globals, so logging stays optional at the provider boundary. */
+function logStooqWarning(message) {
+    if (typeof log === 'function')
+        log(`Ticker Price Extension: ${message}`);
 }

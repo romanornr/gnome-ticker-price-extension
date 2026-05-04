@@ -7,6 +7,7 @@ export async function runTests() {
     await testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh();
     await testRefreshProviderFallbackPreservesPreviousClose();
     await testRefreshProviderFallbackSwallowsProviderErrors();
+    await testRefreshQuotesContinuesAfterProviderError();
     testHandleLiveQuotesMergesQuotesAndRequestsThrottledUpdate();
     await testStartBootsProvidersAndSchedulesRefresh();
     await testStartSkipsRegistryEntriesWithoutLiveProviders();
@@ -157,6 +158,55 @@ async function testRefreshProviderFallbackSwallowsProviderErrors() {
     } finally {
         globalThis.logError = originalLogError;
     }
+}
+
+async function testRefreshQuotesContinuesAfterProviderError() {
+    const service = createQuotesService();
+    const originalLogError = globalThis.logError;
+    let entryUpdateRequests = 0;
+    globalThis.logError = () => {};
+
+    service._running = true;
+    service._session = {};
+    service._tickers = [
+        {assetCategory: ASSET_CATEGORIES.EQUITY, symbol: 'bad.us'},
+        {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID, liveSymbol: 'PURR/USDC', symbol: 'purrusdc'},
+    ];
+    service._coordinator = {
+        requestEntriesUpdate(immediate) {
+            if (immediate)
+                entryUpdateRequests += 1;
+        },
+    };
+    service._runtimeProviders = [
+        {
+            id: 'stooq',
+            ownsTicker: ticker => ticker.assetCategory === ASSET_CATEGORIES.EQUITY,
+            refreshFallback: async () => {
+                throw new Error('broken stooq');
+            },
+        },
+        {
+            id: CRYPTO_PROVIDERS.HYPERLIQUID,
+            ownsTicker: ticker => ticker.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID,
+            refreshFallback: async () => new Map([['PURRUSDC', {
+                price: 0.42,
+                quoteDate: '20260322',
+                previousClose: 0.4,
+            }]]),
+        },
+    ];
+
+    try {
+        await service._refreshQuotes(true);
+    } finally {
+        globalThis.logError = originalLogError;
+    }
+
+    assertEqual(service._quoteStore.getQuote('purrusdc').price, 0.42,
+        'QuotesService should continue refreshing later providers after one provider fails');
+    assertEqual(entryUpdateRequests, 1,
+        'QuotesService should still request an entry rebuild when a later provider succeeds');
 }
 
 function testHandleLiveQuotesMergesQuotesAndRequestsThrottledUpdate() {
