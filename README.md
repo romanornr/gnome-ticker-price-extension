@@ -44,13 +44,14 @@ Examples: `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD`, `USO`.
 
 ## Supported Markets
 
-| Category | Description | Data Coverage | Trading Session |
-|---|---|---|---|
-| **U.S. Equities** | Stocks and major U.S. equity indexes | Delayed quotes | U.S. session |
-| **U.S. ETFs** | Exchange-traded funds | Delayed quotes | U.S. session |
-| **Commodities** | Metals and energy markets | Delayed quotes | Weekday session |
-| **FX** | Forex pairs and currency products like DXY | Delayed quotes | Weekday session |
-| **Crypto** | Spot and perpetual crypto markets | Kraken / Hyperliquid | Always open |
+| Category | Description | Trading Session |
+|---|---|---|
+| **U.S. Equities** | Stocks and major U.S. equity indexes | U.S. session |
+| **International Equities** | Mainland China, Germany, Hong Kong, Japan, Netherlands, and UK stocks | Local market session |
+| **U.S. ETFs** | Exchange-traded funds | U.S. session |
+| **Commodities** | Metals and energy markets | Weekday session |
+| **FX** | Forex pairs and currency products like DXY | Weekday session |
+| **Crypto** | Spot and perpetual crypto markets | Always open |
 
 Non-crypto tickers are polled on a configurable refresh interval with market-aware throttling. Crypto tickers use live WebSocket connections for real-time updates (see below).
 
