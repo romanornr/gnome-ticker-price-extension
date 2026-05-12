@@ -19,7 +19,7 @@ export const SEPARATOR_STYLES = {
 
 export const FONT_PRESETS = {
     SYSTEM: 'system',
-    SYSTEM_TABULAR: 'system-tabular',
+    MONOSPACE: 'monospace',
     IBM_PLEX_MONO: 'ibm-plex-mono',
     JETBRAINS_MONO: 'jetbrains-mono',
     INTER: 'inter',
@@ -71,7 +71,7 @@ export function getSeparatorOptions() {
 export function getFontPresetOptions() {
     return [
         {value: FONT_PRESETS.SYSTEM, title: 'System / GNOME default'},
-        {value: FONT_PRESETS.SYSTEM_TABULAR, title: 'System with tabular numbers'},
+        {value: FONT_PRESETS.MONOSPACE, title: 'System monospace'},
         {value: FONT_PRESETS.IBM_PLEX_MONO, title: 'IBM Plex Mono'},
         {value: FONT_PRESETS.JETBRAINS_MONO, title: 'JetBrains Mono'},
         {value: FONT_PRESETS.INTER, title: 'Inter'},
@@ -81,8 +81,9 @@ export function getFontPresetOptions() {
 /* Indicator rendering asks this helper for CSS fragments instead of knowing preset details. */
 export function getFontPresetStyle(fontPreset) {
     switch (fontPreset) {
-    case FONT_PRESETS.SYSTEM_TABULAR:
+    case FONT_PRESETS.MONOSPACE:
         return {
+            fontFamily: 'monospace',
             fontFeatureSettings: '"tnum"',
         };
     case FONT_PRESETS.IBM_PLEX_MONO:

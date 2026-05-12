@@ -235,7 +235,7 @@ function normalizeSeparatorStyle(separatorStyle) {
 
 function normalizeFontPreset(fontPreset) {
     switch (fontPreset) {
-    case FONT_PRESETS.SYSTEM_TABULAR:
+    case FONT_PRESETS.MONOSPACE:
     case FONT_PRESETS.IBM_PLEX_MONO:
     case FONT_PRESETS.JETBRAINS_MONO:
     case FONT_PRESETS.INTER:

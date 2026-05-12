@@ -434,6 +434,11 @@ async function testTickerSettingsChangeReloadsConfigurationAndRefreshes() {
 
 function testDisplaySettingsChangeRequestsImmediateRebuild() {
     const settings = createObservableFakeSettings();
+    settings.settings_schema = {
+        has_key(key) {
+            return key === SETTINGS_KEYS.FONT_PRESET;
+        },
+    };
     const service = new QuotesService('test-uuid', settings);
     let immediateRebuildRequests = 0;
 
@@ -447,9 +452,11 @@ function testDisplaySettingsChangeRequestsImmediateRebuild() {
     service._connectSettingsSignals();
     settings.values[SETTINGS_KEYS.SHOW_PRICE] = true;
     settings.trigger(`changed::${SETTINGS_KEYS.SHOW_PRICE}`);
+    settings.values[SETTINGS_KEYS.FONT_PRESET] = 'monospace';
+    settings.trigger(`changed::${SETTINGS_KEYS.FONT_PRESET}`);
 
-    assertEqual(immediateRebuildRequests, 1,
-        'Display-only setting changes should request an immediate entry rebuild');
+    assertEqual(immediateRebuildRequests, 2,
+        'Display-only setting changes including font preset should request an immediate entry rebuild');
 }
 
 function testRefreshIntervalSettingChangeReschedulesCoordinator() {
