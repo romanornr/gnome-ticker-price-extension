@@ -28,6 +28,7 @@ gjs -m services/providers/stooq.js
 gjs -m services/entry-model.js
 gjs -m services/quote-store.js
 gjs -m utils/display-settings.js
+gjs -m utils/display-density.js
 gjs -m utils/market-schedule.js
 gjs -m utils/settings.js
 gjs -m utils/ticker-config.js

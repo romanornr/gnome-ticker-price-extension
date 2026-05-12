@@ -1,6 +1,7 @@
 import {runTests as runEntryModelTests} from './entry-model.test.js';
 import {runTests as runDisplaySettingsTests} from './display-settings.test.js';
 import {runTests as runHyperliquidAdapterTests} from './hyperliquid-adapter.test.js';
+import {runTests as runIndicatorDensityTests} from './indicator-density.test.js';
 import {runTests as runKrakenAdapterTests} from './kraken-adapter.test.js';
 import {runTests as runLiveQuoteProviderTests} from './live-quote-provider.test.js';
 import {runTests as runLiveWebsocketProviderTests} from './live-websocket-provider.test.js';
@@ -16,6 +17,7 @@ import {runTests as runTickerDialogStateTests} from './ticker-dialog-state.test.
 const suites = [
     ['market-schedule', runMarketScheduleTests],
     ['display-settings', runDisplaySettingsTests],
+    ['indicator-density', runIndicatorDensityTests],
     ['entry-model', runEntryModelTests],
     ['live-quote-provider', runLiveQuoteProviderTests],
     ['live-websocket-provider', runLiveWebsocketProviderTests],
