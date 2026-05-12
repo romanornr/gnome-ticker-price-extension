@@ -4,8 +4,8 @@ GNOME Shell extension that shows market tickers in the top bar, with curated sug
 
 ## Compatibility
 
-- Requires **GNOME Shell 49** or **49.5**
-- UUID: `ticker-price-extension@romano`
+- Requires **GNOME Shell 49**, **49.5**, or **50**
+- UUID: `ticker-price-extension@romanornr`
 
 ## Local Install
 
@@ -38,18 +38,18 @@ Open the extension preferences and use `+ Add ticker`. You can search the built-
 - Kraken suggestions are loaded dynamically from Kraken WebSocket instrument metadata, so you can search pairs like `SOL`, `SOLUSD`, or `SOL/USD`.
 - Hyperliquid suggestions are loaded dynamically from the official spot/perp metadata endpoints, so you can search perps like `BTC`.
 
-If your non-crypto symbol is not in the catalog, enter any Stooq symbol manually and use `Verify` before saving. Crypto verification checks whether the selected provider currently supports the market.
+If your non-crypto symbol is not in the catalog, enter the provider symbol manually and use `Verify` before saving. Crypto verification checks whether the selected provider currently supports the market.
 
 Examples: `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD`, `USO`.
 
 ## Supported Markets
 
-| Category | Description | Data Source | Trading Session |
+| Category | Description | Data Coverage | Trading Session |
 |---|---|---|---|
-| **U.S. Equities** | Stocks and major U.S. equity indexes | Stooq | U.S. session |
-| **U.S. ETFs** | Exchange-traded funds | Stooq | U.S. session |
-| **Commodities** | Metals and energy markets | Stooq | Weekday session |
-| **FX** | Forex pairs and currency products like DXY | Stooq | Weekday session |
+| **U.S. Equities** | Stocks and major U.S. equity indexes | Delayed quotes | U.S. session |
+| **U.S. ETFs** | Exchange-traded funds | Delayed quotes | U.S. session |
+| **Commodities** | Metals and energy markets | Delayed quotes | Weekday session |
+| **FX** | Forex pairs and currency products like DXY | Delayed quotes | Weekday session |
 | **Crypto** | Spot and perpetual crypto markets | Kraken / Hyperliquid | Always open |
 
 Non-crypto tickers are polled on a configurable refresh interval with market-aware throttling. Crypto tickers use live WebSocket connections for real-time updates (see below).
@@ -136,7 +136,7 @@ When adding a curated ticker:
 - put it in the file for its asset category
 - keep `assetCategory`, `marketType`, and `priceDecimals` aligned with similar entries
 - add a few helpful `keywords` so catalog search is forgiving
-- verify the Stooq symbol first for non-crypto instruments
+- verify the provider symbol first for non-crypto instruments
 - crypto suggestions come from the selected live provider at runtime rather than a manually maintained static catalog
 
 ## Local Checks
@@ -158,7 +158,7 @@ The current test suite covers:
 - entry-model rendering
 - shared live-provider and live-websocket helpers
 - provider adapters and runtime provider registry
-- Stooq parsing and live-provider payload handling
+- non-crypto quote parsing and live-provider payload handling
 - QuotesService orchestration, coordinator scheduling, and lifecycle
 - ticker config and prefs dialog state
 
@@ -195,7 +195,7 @@ journalctl --user -f /usr/bin/gnome-shell
    confirm price changes still flash briefly and then settle back to the default text color.
 6. If a runtime issue appears, add targeted `log()` or `logError()` statements near the relevant provider, orchestrator, or prefs path before doing more refactoring.
 
-If `gnome-extensions info ticker-price-extension@romano` or `gnome-extensions show ticker-price-extension@romano` returns no data, the extension is not currently installed or not visible to the active session. In that case, install it first and repeat the checklist in the real GNOME session.
+If `gnome-extensions info ticker-price-extension@romanornr` or `gnome-extensions show ticker-price-extension@romanornr` returns no data, the extension is not currently installed or not visible to the active session. In that case, install it first and repeat the checklist in the real GNOME session.
 
 ## Developer Guides
 
