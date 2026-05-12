@@ -1,5 +1,4 @@
 import Clutter from 'gi://Clutter';
-import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
@@ -31,8 +30,7 @@ class TickerIndicator extends PanelMenu.Button {
         this._openPreferences = openPreferences;
         this._content = new St.BoxLayout({y_align: Clutter.ActorAlign.CENTER});
         this._contentScale = 1;
-        this._shouldFitToAllocation = false;
-        this._fitTimeoutId = 0;
+        this._useFittedLabels = false;
 
         this.add_child(this._content);
 
@@ -50,11 +48,13 @@ class TickerIndicator extends PanelMenu.Button {
      */
     setEntries(entries, displaySettings = DEFAULT_DISPLAY_SETTINGS) {
         this._content.destroy_all_children();
-        this._shouldFitToAllocation = shouldFitFontPreset(displaySettings.fontPreset);
-        this._contentScale = getDensityFontScale(entries, displaySettings.fontPreset);
+        this._useFittedLabels = shouldFitFontPreset(displaySettings.fontPreset);
+        this._contentScale = Number.isFinite(displaySettings.fontScaleOverride)
+            ? displaySettings.fontScaleOverride
+            : getDensityFontScale(entries, displaySettings.fontPreset);
         this._applyContentScale();
         const fontStyle = getFontPresetStyle(displaySettings.fontPreset);
-        const createLabel = this._shouldFitToAllocation ? createFittedTickerLabel : createTickerLabel;
+        const createLabel = this._useFittedLabels ? createFittedTickerLabel : createTickerLabel;
 
         entries.forEach(entry => {
             if (entry.separatorBefore) {
@@ -103,52 +103,10 @@ class TickerIndicator extends PanelMenu.Button {
             }
         });
 
-        if (this._shouldFitToAllocation)
-            this._scheduleFitToAllocation();
-    }
-
-    /* The density estimate is followed by a real allocation check once GNOME has laid out the panel. */
-    _scheduleFitToAllocation() {
-        this._fitTimeoutId = removeTimeout(this._fitTimeoutId);
-        this._fitTimeoutId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
-            this._fitTimeoutId = 0;
-            this._fitToAllocation();
-            return GLib.SOURCE_REMOVE;
-        });
-    }
-
-    /*
-     * If GNOME gives this panel item less width than its natural content wants,
-     * scale the whole indicator down based on measured widths rather than a
-     * font-name guess.
-     */
-    _fitToAllocation() {
-        if (!this._shouldFitToAllocation)
-            return;
-
-        const allocatedWidth = this.get_width();
-        if (!Number.isFinite(allocatedWidth) || allocatedWidth <= 0)
-            return;
-
-        const [, naturalWidth] = this._content.get_preferred_width(-1);
-        if (!Number.isFinite(naturalWidth) || naturalWidth <= allocatedWidth)
-            return;
-
-        const measuredScale = Math.max(0.58, Math.min(this._contentScale, (allocatedWidth / naturalWidth) * this._contentScale * 0.96));
-        const roundedScale = Math.round(measuredScale * 100) / 100;
-        if (roundedScale < this._contentScale) {
-            this._contentScale = roundedScale;
-            this._applyContentScale();
-        }
     }
 
     _applyContentScale() {
         this._content.style = this._contentScale < 1 ? `font-size: ${this._contentScale}em;` : '';
-    }
-
-    destroy() {
-        this._fitTimeoutId = removeTimeout(this._fitTimeoutId);
-        super.destroy();
     }
 });
 
@@ -201,12 +159,4 @@ function buildLabelStyle({color, weight = null, fontSize = null, fontStyle = {}}
         parts.push(`font-feature-settings: ${fontStyle.fontFeatureSettings};`);
 
     return parts.join(' ');
-}
-
-function removeTimeout(sourceId) {
-    if (sourceId === 0)
-        return 0;
-
-    GLib.Source.remove(sourceId);
-    return 0;
 }

@@ -1,8 +1,8 @@
 import {FONT_PRESETS} from './display-settings.js';
 
-const DENSITY_SCALE_START = 70;
-const DENSITY_SCALE_END = 120;
-const MIN_DENSITY_FONT_SCALE = 0.76;
+const DENSITY_SCALE_START = 90;
+const DENSITY_SCALE_END = 150;
+const MIN_DENSITY_FONT_SCALE = 0.88;
 
 /*
  * Display density estimates how much text one panel-side indicator is about to
@@ -33,6 +33,12 @@ export function getDensityFontScale(entries, fontPreset = FONT_PRESETS.SYSTEM) {
     const progress = Math.min(1, (density - DENSITY_SCALE_START) / (DENSITY_SCALE_END - DENSITY_SCALE_START));
     const scale = 1 - (progress * (1 - MIN_DENSITY_FONT_SCALE));
     return Math.round(scale * 100) / 100;
+}
+
+export function getSharedDensityFontScale(entryGroups, fontPreset = FONT_PRESETS.SYSTEM) {
+    return entryGroups.reduce((sharedScale, entries) => {
+        return Math.min(sharedScale, getDensityFontScale(entries, fontPreset));
+    }, 1);
 }
 
 function estimateEntriesDensity(entries) {

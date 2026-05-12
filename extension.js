@@ -3,6 +3,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {QuotesService} from './services/quotes.js';
 import {TickerIndicator} from './ui/indicator.js';
+import {getSharedDensityFontScale} from './utils/display-density.js';
 import {createLoadingEntries} from './utils/format.js';
 import {
     getTickersForSide,
@@ -79,16 +80,22 @@ export default class TickerPriceExtension extends Extension {
     /* Entry changes from QuotesService are fanned back out to both panel-side indicators here. */
     _syncIndicators(entries) {
         const displaySettings = loadDisplaySettings(this._settings);
-        this._ensureIndicatorForSide(LEFT_PANEL_SIDE, entries, displaySettings);
-        this._ensureIndicatorForSide(RIGHT_PANEL_SIDE, entries, displaySettings);
+        const leftEntries = this._getEntriesForSide(entries, LEFT_PANEL_SIDE);
+        const rightEntries = this._getEntriesForSide(entries, RIGHT_PANEL_SIDE);
+        const sharedDisplaySettings = {
+            ...displaySettings,
+            fontScaleOverride: getSharedDensityFontScale([leftEntries, rightEntries], displaySettings.fontPreset),
+        };
+
+        this._ensureIndicatorForSide(LEFT_PANEL_SIDE, leftEntries, sharedDisplaySettings);
+        this._ensureIndicatorForSide(RIGHT_PANEL_SIDE, rightEntries, sharedDisplaySettings);
     }
 
     /*
      * The extension keeps separate indicator instances per panel side so ticker
      * placement remains stable even as the saved list changes.
      */
-    _ensureIndicatorForSide(side, entries, displaySettings) {
-        const sideEntries = this._getEntriesForSide(entries, side);
+    _ensureIndicatorForSide(side, sideEntries, displaySettings) {
         const propertyName = side === LEFT_PANEL_SIDE ? '_leftIndicator' : '_rightIndicator';
         const areaName = side === LEFT_PANEL_SIDE ? `${this.uuid}-left` : `${this.uuid}-right`;
         const position = side === LEFT_PANEL_SIDE ? LEFT_PANEL_POSITION : 0;

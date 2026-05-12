@@ -1,5 +1,9 @@
 import {FONT_PRESETS} from '../utils/display-settings.js';
-import {getDensityFontScale, shouldFitFontPreset} from '../utils/display-density.js';
+import {
+    getDensityFontScale,
+    getSharedDensityFontScale,
+    shouldFitFontPreset,
+} from '../utils/display-density.js';
 import {assertEqual, assertFalse, assertTruthy} from './support/assert.js';
 
 export function runTests() {
@@ -20,12 +24,14 @@ export function runTests() {
     ];
     const crowdedMonoScale = getDensityFontScale(crowdedEntries, FONT_PRESETS.JETBRAINS_MONO);
 
-    assertTruthy(crowdedMonoScale <= 0.8,
-        'Crowded panel sides should scale down aggressively enough for full-detail right-side tickers');
+    assertTruthy(crowdedMonoScale < 1 && crowdedMonoScale >= 0.88,
+        'Crowded panel sides should scale mono fonts moderately without making them tiny');
     assertEqual(getDensityFontScale(crowdedEntries, FONT_PRESETS.SYSTEM), 1,
         'System font preset should not be pre-scaled by density');
     assertEqual(getDensityFontScale(crowdedEntries, FONT_PRESETS.INTER), 1,
         'Inter preset should not be pre-scaled by mono density policy');
+    assertEqual(getSharedDensityFontScale([shortEntries, crowdedEntries], FONT_PRESETS.JETBRAINS_MONO), crowdedMonoScale,
+        'Shared mono scale should use the tighter panel side so both indicators render at the same size');
     assertTruthy(shouldFitFontPreset(FONT_PRESETS.JETBRAINS_MONO),
         'JetBrains Mono should opt into measured fitting');
     assertFalse(shouldFitFontPreset(FONT_PRESETS.SYSTEM),
