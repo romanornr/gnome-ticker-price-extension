@@ -18,8 +18,8 @@ import {
  */
 export class KrakenLiveProvider extends LiveWebsocketProvider {
     /* Kraken only needs to supply its provider-specific hooks because lifecycle behavior comes from the base class. */
-    constructor({uuid, onQuotes}) {
-        super({uuid, onQuotes, filterTicker: isKrakenTicker});
+    constructor({uuid, onQuotes, onStale}) {
+        super({uuid, onQuotes, onStale, filterTicker: isKrakenTicker});
     }
 
     /* Shared websocket logging uses this provider name so errors stay distinguishable at runtime. */

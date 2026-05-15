@@ -12,6 +12,7 @@ export class QuoteStore {
     constructor() {
         this._quotesBySymbol = new Map();
         this._lastRefreshTimeBySymbol = new Map();
+        this._staleSymbols = new Set();
     }
 
     /* Providers write normalized quotes here so later layers read one stable shape. */
@@ -21,6 +22,7 @@ export class QuoteStore {
             return;
 
         this._quotesBySymbol.set(normalizedSymbol, {...quote});
+        this._staleSymbols.delete(normalizedSymbol);
     }
 
     /* Entry-building and provider fallback logic read from the same cache through this lookup. */
@@ -44,6 +46,11 @@ export class QuoteStore {
             if (!activeSymbolSet.has(symbol))
                 this._lastRefreshTimeBySymbol.delete(symbol);
         });
+
+        [...this._staleSymbols].forEach(symbol => {
+            if (!activeSymbolSet.has(symbol))
+                this._staleSymbols.delete(symbol);
+        });
     }
 
     /* After a refresh succeeds, scheduling records the new monotonic refresh timestamp here. */
@@ -51,9 +58,26 @@ export class QuoteStore {
         const refreshedAtUsec = GLib.get_monotonic_time();
         [...symbols].forEach(symbol => {
             const normalizedSymbol = normalizeSymbol(symbol?.symbol ?? symbol);
-            if (normalizedSymbol !== '')
+            if (normalizedSymbol !== '') {
                 this._lastRefreshTimeBySymbol.set(normalizedSymbol, refreshedAtUsec);
+                this._staleSymbols.delete(normalizedSymbol);
+            }
         });
+    }
+
+    /* Failed refresh attempts mark existing quotes stale so the panel can distinguish old data from live data. */
+    markStale(symbols) {
+        [...symbols].forEach(symbol => {
+            const normalizedSymbol = normalizeSymbol(symbol?.symbol ?? symbol);
+            if (normalizedSymbol !== '' && this._quotesBySymbol.has(normalizedSymbol))
+                this._staleSymbols.add(normalizedSymbol);
+        });
+    }
+
+    /* Entry-building asks this to decide whether a cached quote should render as stale. */
+    isStale(symbol) {
+        const normalizedSymbol = normalizeSymbol(symbol);
+        return normalizedSymbol !== '' && this._staleSymbols.has(normalizedSymbol);
     }
 
     /* Scheduling asks the store whether a symbol has waited long enough for another refresh. */
@@ -80,6 +104,7 @@ export class QuoteStore {
     clear() {
         this._quotesBySymbol.clear();
         this._lastRefreshTimeBySymbol.clear();
+        this._staleSymbols.clear();
     }
 }
 

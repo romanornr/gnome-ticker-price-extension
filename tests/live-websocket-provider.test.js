@@ -10,6 +10,7 @@ export function runTests() {
     testHandleSocketMessageIgnoresNonTextFrames();
     testHandleSocketMessageCanResetReconnectWithoutEmittingQuotes();
     testSharedMappingHelpersRemainAvailableThroughTheBaseClass();
+    testDisconnectMarksCurrentTickersStale();
 }
 
 function testHandleSocketMessageEmitsQuotesAndResetsReconnect() {
@@ -103,9 +104,23 @@ function testSharedMappingHelpersRemainAvailableThroughTheBaseClass() {
     'LiveWebsocketProvider should expose a symbol-to-ticker lookup map through the base helper');
 }
 
+function testDisconnectMarksCurrentTickersStale() {
+    const staleTickers = [];
+    const provider = new TestLiveWebsocketProvider({onStale: tickers => staleTickers.push(tickers)});
+    provider._running = true;
+    provider._tickers = [{liveSymbol: 'BTC/USD', symbol: 'btcusd'}];
+
+    provider._handleDisconnect();
+
+    assertDeepEqual(staleTickers, [[{liveSymbol: 'BTC/USD', symbol: 'btcusd'}]],
+        'LiveWebsocketProvider should report current tickers as stale when live transport disconnects');
+    assertEqual(provider.scheduleReconnectCalls, 1,
+        'LiveWebsocketProvider should still schedule reconnect after marking live tickers stale');
+}
+
 class TestLiveWebsocketProvider extends LiveWebsocketProvider {
-    constructor({onQuotes = null} = {}) {
-        super({uuid: 'test', onQuotes, filterTicker: ticker => Boolean(ticker?.liveSymbol)});
+    constructor({onQuotes = null, onStale = null} = {}) {
+        super({uuid: 'test', onQuotes, onStale, filterTicker: ticker => Boolean(ticker?.liveSymbol)});
         this._nextHandlePayloadResult = null;
         this.handlePayloadCalls = [];
         this.disconnectCalls = 0;

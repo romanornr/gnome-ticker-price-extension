@@ -19,9 +19,9 @@ import {refresh as refreshStooqQuotes} from './stooq.js';
  */
 
 /* QuotesService builds the runtime provider set once so orchestration logic can iterate one registry. */
-export function createRuntimeProviderRegistry({uuid, quoteStore, onQuotes}) {
-    const krakenLiveProvider = new KrakenLiveProvider({uuid, onQuotes});
-    const hyperliquidLiveProvider = new HyperliquidLiveProvider({uuid, quoteStore, onQuotes});
+export function createRuntimeProviderRegistry({uuid, quoteStore, onQuotes, onStale}) {
+    const krakenLiveProvider = new KrakenLiveProvider({uuid, onQuotes, onStale});
+    const hyperliquidLiveProvider = new HyperliquidLiveProvider({uuid, quoteStore, onQuotes, onStale});
 
     return [
         {

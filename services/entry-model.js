@@ -7,6 +7,7 @@ import {
     DEFAULT_TEXT_COLOR,
     NEGATIVE_COLOR,
     POSITIVE_COLOR,
+    STALE_TEXT_COLOR,
 } from '../utils/format.js';
 import {ASSET_CATEGORIES} from '../utils/asset-categories.js';
 
@@ -34,7 +35,9 @@ export function buildEntries(tickers, quoteStore, displaySettings, previousEntri
         if (!quote)
             return createErrorEntry(ticker, index, displaySettings);
 
-        return createDisplayEntry(ticker, quote, quote.previousClose, index, displaySettings);
+        return createDisplayEntry(ticker, quote, quote.previousClose, index, displaySettings, {
+            isStale: quoteStore.isStale(ticker.symbol),
+        });
     });
 
     return decorateEntriesWithPriceFlash(baseEntries, previousEntries);
@@ -42,7 +45,11 @@ export function buildEntries(tickers, quoteStore, displaySettings, previousEntri
 
 /* After the temporary flash window expires, entries return to the neutral text color. */
 export function clearPriceFlash(entries) {
-    return entries.map(entry => ({...entry, priceColor: DEFAULT_TEXT_COLOR}));
+    return entries.map(entry => ({
+        ...entry,
+        priceColor: entry.isStale ? STALE_TEXT_COLOR : DEFAULT_TEXT_COLOR,
+        priceFlash: false,
+    }));
 }
 
 /* Price flash compares the new view-model to the previous render, not to raw quotes. */
@@ -64,7 +71,11 @@ function decorateEntriesWithPriceFlash(entries, previousEntries) {
             return entry;
         }
 
-        return {...entry, priceColor: entry.displayPrice > previousPrice ? POSITIVE_COLOR : NEGATIVE_COLOR};
+        return {
+            ...entry,
+            priceColor: entry.displayPrice > previousPrice ? POSITIVE_COLOR : NEGATIVE_COLOR,
+            priceFlash: true,
+        };
     });
 }
 

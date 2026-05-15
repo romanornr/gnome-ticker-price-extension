@@ -1,8 +1,6 @@
 import GLib from 'gi://GLib';
 
 import {clearPriceFlash} from './entry-model.js';
-import {DEFAULT_TEXT_COLOR} from '../utils/format.js';
-
 const CRYPTO_UI_UPDATE_INTERVAL_SECONDS = 4;
 const PRICE_FLASH_DURATION_MS = 700;
 
@@ -94,7 +92,7 @@ export class QuotesCoordinator {
     schedulePriceFlashReset(entries) {
         this._priceFlashTimeoutId = removeTimeout(this._priceFlashTimeoutId);
 
-        if (!entries.some(entry => entry.priceColor !== DEFAULT_TEXT_COLOR))
+        if (!entries.some(entry => entry.priceFlash))
             return;
 
         this._priceFlashTimeoutId = GLib.timeout_add(

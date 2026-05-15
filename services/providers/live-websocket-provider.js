@@ -32,6 +32,7 @@ export function openWebsocketConnection(session, websocketUrl) {
  * - reconnect backoff
  * - subscription reconciliation when saved tickers change
  * - socket signal cleanup
+ * - stale quote notification when live transport drops
  *
  * Subclasses supply only the provider-specific pieces:
  * endpoint connection, subscribe payloads, and payload-to-quote parsing.
@@ -40,9 +41,10 @@ export function openWebsocketConnection(session, websocketUrl) {
  */
 export class LiveWebsocketProvider {
     /* Each subclass inherits one shared websocket state machine and only supplies provider-specific hooks. */
-    constructor({uuid, onQuotes, filterTicker}) {
+    constructor({uuid, onQuotes, onStale, filterTicker}) {
         this._uuid = uuid;
         this._onQuotes = onQuotes;
+        this._onStale = onStale;
         this._filterTicker = filterTicker;
         this._session = null;
         this._running = false;
@@ -151,6 +153,7 @@ export class LiveWebsocketProvider {
                 return;
 
             logError(error, `${this._uuid}: failed to connect ${this.logPrefix} websocket`);
+            this._notifyStaleTickers();
             this._scheduleReconnect();
         }
     }
@@ -180,7 +183,14 @@ export class LiveWebsocketProvider {
         if (!this._running || this._getDesiredSymbols().length === 0)
             return;
 
+        this._notifyStaleTickers();
         this._scheduleReconnect();
+    }
+
+    /* Transport failures tell QuotesService that cached live quotes should render as stale. */
+    _notifyStaleTickers() {
+        if (this._tickers.length > 0)
+            this._onStale?.(this._tickers);
     }
 
     /* All live providers share the same conservative reconnect policy so runtime behavior stays predictable. */
