@@ -1,12 +1,15 @@
+import GLib from 'gi://GLib';
+
 import {
     buildBatchQuoteUrl,
     buildLookupUrl,
     normalizeQuoteDate,
     parseBatchQuotes,
+    verifySymbol,
 } from '../services/providers/stooq.js';
 import {assertDeepEqual, assertEqual} from './support/assert.js';
 
-export function runTests() {
+export async function runTests() {
     assertEqual(buildLookupUrl('brk.b.us'),
         'https://stooq.com/q/l/?s=brk.b.us&f=sd2t2cp&i=d',
     'Stooq lookup URLs should preserve provider symbol punctuation');
@@ -49,4 +52,31 @@ export function runTests() {
 
     assertDeepEqual(Array.from(parseBatchQuotes('', 2).entries()), [],
         'Stooq batch parsing should return no quotes for an empty response');
+
+    const session = new FakeSession('aapl.us,2026-03-22,21:00:00,210.5,205.1');
+    const verifiedSymbol = await verifySymbol(session, 'aapl.us');
+    assertDeepEqual(verifiedSymbol, {symbol: 'aapl.us', quoteDate: '2026-03-22'},
+        'Stooq verification should parse a successful async Soup response');
+    assertEqual(session.sendCall.argumentCount, 4,
+        'Stooq verification should call Soup send_and_read_async with callback/finish arguments');
+}
+
+class FakeSession {
+    constructor(csv) {
+        this.bytes = GLib.Bytes.new(new TextEncoder().encode(csv));
+        this.sendCall = null;
+    }
+
+    send_and_read_async(...args) {
+        this.sendCall = {argumentCount: args.length};
+        const callback = args[3];
+        GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            callback(this, {});
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    send_and_read_finish(_result) {
+        return this.bytes;
+    }
 }

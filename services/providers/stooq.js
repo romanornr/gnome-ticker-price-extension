@@ -83,7 +83,7 @@ async function fetchText(session, url) {
     );
 
     try {
-        const bytes = await session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, cancellable);
+        const bytes = await sendAndRead(session, message, cancellable);
         return new TextDecoder().decode(bytes.get_data()).trim();
     } catch (error) {
         if (cancellable.is_cancelled())
@@ -94,6 +94,19 @@ async function fetchText(session, url) {
         if (timeoutId !== 0)
             GLib.Source.remove(timeoutId);
     }
+}
+
+/* GJS exposes Soup async methods through callback/finish pairs, so bridge them into the async/await flow here. */
+function sendAndRead(session, message, cancellable) {
+    return new Promise((resolve, reject) => {
+        session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, cancellable, (_session, result) => {
+            try {
+                resolve(session.send_and_read_finish(result));
+            } catch (error) {
+                reject(error);
+            }
+        });
+    });
 }
 
 /* Raw Stooq CSV rows are converted here into the normalized quote shape used by the rest of the system. */

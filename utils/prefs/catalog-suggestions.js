@@ -6,7 +6,7 @@ import {
     getCryptoCatalogUnavailableTitle,
     getCryptoEmptyStateSubtitle,
     getCryptoSearchPrompt,
-    getCryptoSearchQuery,
+    getCatalogSearchQuery,
 } from './ticker-dialog-state.js';
 
 /*
@@ -28,13 +28,10 @@ export function buildCatalogSuggestionRows({
     cryptoCatalog,
     cryptoCatalogLoading,
     cryptoCatalogError,
-    labelText,
-    symbolText,
+    searchText,
     maxSuggestions,
 }) {
-    const query = assetCategory === 'crypto'
-        ? getCryptoSearchQuery(labelText, symbolText)
-        : (symbolText.trim() || labelText.trim());
+    const query = getCatalogSearchQuery(searchText);
 
     if (assetCategory === 'crypto') {
         if (cryptoCatalogLoading) {
@@ -60,7 +57,7 @@ export function buildCatalogSuggestionRows({
             title: 'Start typing to search',
             subtitle: assetCategory === 'crypto'
                 ? getCryptoSearchPrompt(cryptoProvider)
-                : 'Curated matches stay hidden until you enter a label or symbol.',
+                : 'Curated matches stay hidden until you search the catalog.',
         }];
     }
 

@@ -9,7 +9,7 @@ import {
 import {
     buildTickerConfig,
     getCatalogMatches,
-    getCryptoSearchQuery,
+    getCatalogSearchQuery,
     getCryptoVerificationFailureMessage,
     getCryptoVerificationSuccessMessage,
     getSuggestionsDescription,
@@ -145,7 +145,10 @@ class TickerDialogController {
         this.cryptoProviderRow.visible = this.activeAssetCategory === 'crypto';
         formGroup.add(this.cryptoProviderRow);
 
-        this.labelRow = new Adw.EntryRow({title: 'Label', text: this.initialTicker.label ?? ''});
+        this.searchRow = new Adw.EntryRow({title: 'Search catalog'});
+        formGroup.add(this.searchRow);
+
+        this.labelRow = new Adw.EntryRow({title: 'Name', text: this.initialTicker.label ?? ''});
         formGroup.add(this.labelRow);
 
         this.symbolRow = new Adw.EntryRow({
@@ -185,7 +188,7 @@ class TickerDialogController {
 
         this.suggestionsGroup = new Adw.PreferencesGroup({
             title: 'Catalog matches',
-            description: 'Type a label or symbol above to search the built-in catalog. You can still save any custom Stooq symbol.',
+            description: 'Search the catalog above, then choose a match or enter a custom symbol.',
         });
         content.append(this.suggestionsGroup);
 
@@ -246,8 +249,11 @@ class TickerDialogController {
             this._updateSaveSensitivity();
         });
 
-        this.labelRow.connect('notify::text', () => {
+        this.searchRow.connect('notify::text', () => {
             this._renderCuratedSuggestions();
+        });
+
+        this.labelRow.connect('notify::text', () => {
             this._updateSaveSensitivity();
         });
 
@@ -270,7 +276,6 @@ class TickerDialogController {
                 }
             }
 
-            this._renderCuratedSuggestions();
             this._updateSaveSensitivity();
         });
 
@@ -425,8 +430,7 @@ class TickerDialogController {
             cryptoCatalog: this.cryptoCatalog,
             cryptoCatalogLoading: this.cryptoCatalogLoading,
             cryptoCatalogError: this.cryptoCatalogError,
-            labelText: this.labelRow.text,
-            symbolText: this.symbolRow.text,
+            searchText: this.searchRow.text,
             maxSuggestions: MAX_CURATED_SUGGESTIONS,
         }).forEach(rowModel => {
             const row = new Adw.ActionRow({title: rowModel.title, subtitle: rowModel.subtitle, sensitive: rowModel.kind === 'match'});
@@ -528,7 +532,7 @@ class TickerDialogController {
         const hasCryptoCatalogMatches = this.activeAssetCategory === 'crypto' &&
             getCatalogMatches(
                 this.activeAssetCategory,
-                getCryptoSearchQuery(this.labelRow.text, this.symbolRow.text),
+                getCatalogSearchQuery(this.searchRow.text),
                 this.cryptoCatalog,
                 this.activeCryptoProvider
             ).length > 0;
