@@ -2,6 +2,8 @@ import {buildEntries, clearPriceFlash} from '../services/entry-model.js';
 import {QuoteStore} from '../services/quote-store.js';
 import {DEFAULT_DISPLAY_SETTINGS} from '../utils/display-settings.js';
 import {DEFAULT_TEXT_COLOR, NEGATIVE_COLOR, POSITIVE_COLOR, STALE_TEXT_COLOR} from '../utils/format.js';
+import {createMarketScheduleNow} from '../utils/market-schedule.js';
+import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../utils/asset-categories.js';
 import {assertDeepEqual, assertEqual, assertFalse, assertTruthy} from './support/assert.js';
 
@@ -13,6 +15,7 @@ export function runTests() {
         symbol: '^spx',
         priceDecimals: 0,
         marketType: MARKET_TYPES.US_SESSION,
+        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         assetCategory: ASSET_CATEGORIES.EQUITY,
     };
     const liveCryptoTicker = {
@@ -54,10 +57,32 @@ export function runTests() {
         'Price decreases should flash negative color');
 
     quoteStore.markStale(['^spx']);
-    const staleEntries = buildEntries([stooqTicker], quoteStore, displaySettings, negativeFlashedEntries);
+    const mondayRegularHoursNy = createMarketScheduleNow(new Date('2026-03-23T15:00:00Z'), 10_000_000);
+    const staleEntries = buildEntries(
+        [stooqTicker],
+        quoteStore,
+        displaySettings,
+        negativeFlashedEntries,
+        mondayRegularHoursNy
+    );
     assertEqual(staleEntries[0].priceColor, STALE_TEXT_COLOR,
         'Stale cached quotes should render price text in the stale color');
     assertFalse(staleEntries[0].priceFlash, 'Stale cached quotes without a visible price move should not flash');
+
+    const fridayAfterRegularCloseNy = createMarketScheduleNow(new Date('2026-03-20T22:00:00Z'), 10_000_000);
+    const closedMarketEntries = buildEntries(
+        [stooqTicker],
+        quoteStore,
+        displaySettings,
+        staleEntries,
+        fridayAfterRegularCloseNy
+    );
+    assertEqual(closedMarketEntries[0].priceColor, DEFAULT_TEXT_COLOR,
+        'After-hours cached quotes should keep normal price color');
+    assertEqual(closedMarketEntries[0].changeColor, POSITIVE_COLOR,
+        'After-hours cached quotes should keep normal change color');
+    assertFalse(closedMarketEntries[0].isStale,
+        'After-hours cached quotes should not be exposed as visually stale');
 
     const clearedStaleEntries = clearPriceFlash(staleEntries);
     assertEqual(clearedStaleEntries[0].priceColor, STALE_TEXT_COLOR,

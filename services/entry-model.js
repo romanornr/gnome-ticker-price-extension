@@ -10,6 +10,7 @@ import {
     STALE_TEXT_COLOR,
 } from '../utils/format.js';
 import {ASSET_CATEGORIES} from '../utils/asset-categories.js';
+import {createMarketScheduleNow, getTickerSessionPhase} from '../utils/market-schedule.js';
 
 /*
  * This module translates normalized quote cache state into UI-facing entry
@@ -25,7 +26,7 @@ import {ASSET_CATEGORIES} from '../utils/asset-categories.js';
  * indicator-ready render models, including the distinction between loading,
  * error, and normal display states.
  */
-export function buildEntries(tickers, quoteStore, displaySettings, previousEntries = []) {
+export function buildEntries(tickers, quoteStore, displaySettings, previousEntries = [], now = createMarketScheduleNow()) {
     const baseEntries = tickers.map((ticker, index) => {
         const quote = quoteStore.getQuote(ticker.symbol);
 
@@ -36,7 +37,7 @@ export function buildEntries(tickers, quoteStore, displaySettings, previousEntri
             return createErrorEntry(ticker, index, displaySettings);
 
         return createDisplayEntry(ticker, quote, quote.previousClose, index, displaySettings, {
-            isStale: quoteStore.isStale(ticker.symbol),
+            isStale: shouldRenderStaleQuote(ticker, quoteStore, now),
         });
     });
 
@@ -84,4 +85,12 @@ function isLiveCryptoTicker(ticker) {
     return ticker?.assetCategory === ASSET_CATEGORIES.CRYPTO &&
         typeof ticker.liveSymbol === 'string' &&
         ticker.liveSymbol !== '';
+}
+
+/* Non-regular-session cached quotes are expected, so only regular-session stale quotes get muted. */
+function shouldRenderStaleQuote(ticker, quoteStore, now) {
+    if (!quoteStore.isStale(ticker.symbol))
+        return false;
+
+    return getTickerSessionPhase(ticker, now) === 'open';
 }
