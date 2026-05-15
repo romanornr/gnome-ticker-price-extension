@@ -70,7 +70,7 @@ export function getSeparatorOptions() {
 /* Font presets stay intentionally curated so panel rendering remains predictable across systems. */
 export function getFontPresetOptions() {
     return [
-        {value: FONT_PRESETS.SYSTEM, title: 'System / GNOME default'},
+        {value: FONT_PRESETS.SYSTEM, title: 'System'},
         {value: FONT_PRESETS.MONOSPACE, title: 'System monospace'},
         {value: FONT_PRESETS.IBM_PLEX_MONO, title: 'IBM Plex Mono'},
         {value: FONT_PRESETS.JETBRAINS_MONO, title: 'JetBrains Mono'},
