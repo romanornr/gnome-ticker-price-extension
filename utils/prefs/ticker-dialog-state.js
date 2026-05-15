@@ -21,7 +21,7 @@ export function getCatalogSearchQuery(searchText) {
 /* The controller reads this copy helper so provider-specific suggestion language lives with dialog state policy. */
 export function getSuggestionsDescription(assetCategory, cryptoProvider) {
     if (assetCategory !== ASSET_CATEGORIES.CRYPTO)
-        return 'Search the built-in catalog above, then choose a match or enter a custom Stooq symbol.';
+        return 'Search the built-in catalog above, then choose a match to fill the ticker fields.';
 
     return cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
         ? 'Search live Hyperliquid spot symbols and perps. Non-crypto assets still use the built-in catalog.'
@@ -93,7 +93,7 @@ export function validateTickerDraft(label, symbol, options = {}) {
     return validateTickerSymbol(symbol);
 }
 
-/* Non-crypto manual symbols still use this lightweight syntactic gate before network verification. */
+/* Non-crypto symbols still use this lightweight syntactic gate before network verification. */
 export function validateTickerSymbol(symbol) {
     if (symbol.trim() === '')
         return 'Enter a symbol.';

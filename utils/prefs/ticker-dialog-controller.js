@@ -148,7 +148,7 @@ class TickerDialogController {
         this.searchRow = new Adw.EntryRow({title: 'Search catalog'});
         formGroup.add(this.searchRow);
 
-        this.labelRow = new Adw.EntryRow({title: 'Name', text: this.initialTicker.label ?? ''});
+        this.labelRow = new Adw.EntryRow({title: 'Name', text: this.initialTicker.label ?? '', editable: false});
         formGroup.add(this.labelRow);
 
         this.symbolRow = new Adw.EntryRow({
@@ -156,6 +156,7 @@ class TickerDialogController {
             text: this.activeAssetCategory === 'crypto'
                 ? (this.initialTicker.liveSymbol ?? this.initialTicker.symbol ?? '')
                 : (this.initialTicker.symbol ?? ''),
+            editable: false,
         });
         formGroup.add(this.symbolRow);
 
@@ -188,7 +189,7 @@ class TickerDialogController {
 
         this.suggestionsGroup = new Adw.PreferencesGroup({
             title: 'Catalog matches',
-            description: 'Search the catalog above, then choose a match or enter a custom symbol.',
+            description: 'Search the catalog above, then choose a match to fill the ticker fields.',
         });
         content.append(this.suggestionsGroup);
 
@@ -314,7 +315,7 @@ class TickerDialogController {
         this._updateSaveSensitivity();
     }
 
-    /* Market-session selection stays editable for manual non-crypto tickers and follows the current asset type. */
+    /* Market-session selection stays editable and follows the current asset type. */
     _syncMarketSessionRow() {
         this.marketSessionOptions = getMarketSessionOptionsForAssetCategory(this.activeAssetCategory);
         this.marketSessionModel.splice(0, this.marketSessionModel.get_n_items(), this.marketSessionOptions.map(option => option.title));

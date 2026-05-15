@@ -32,7 +32,7 @@ export function runTests() {
     assertEqual(getCatalogSearchQuery('  Apple  '), 'Apple',
         'Catalog search should trim the dedicated search field');
     assertEqual(getSuggestionsDescription(ASSET_CATEGORIES.EQUITY, CRYPTO_PROVIDERS.KRAKEN),
-        'Search the built-in catalog above, then choose a match or enter a custom Stooq symbol.',
+        'Search the built-in catalog above, then choose a match to fill the ticker fields.',
         'Non-crypto suggestion copy should point to the dedicated catalog search field');
     assertEqual(getSuggestionsDescription(ASSET_CATEGORIES.CRYPTO, CRYPTO_PROVIDERS.KRAKEN),
         'Search live Kraken WebSocket pairs. Non-crypto assets still use the built-in catalog.',

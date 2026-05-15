@@ -68,7 +68,7 @@ export function buildCatalogSuggestionRows({
             title: 'No curated matches',
             subtitle: assetCategory === 'crypto'
                 ? getCryptoEmptyStateSubtitle(cryptoProvider)
-                : 'Keep your manual symbol and use Verify to check whether Stooq returns data for it.',
+                : 'Try another label, symbol, or category term.',
         }];
     }
 

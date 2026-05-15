@@ -38,7 +38,7 @@ Open the extension preferences and use `+ Add ticker`. You can search the built-
 - Kraken suggestions are loaded dynamically from Kraken WebSocket instrument metadata, so you can search pairs like `SOL`, `SOLUSD`, or `SOL/USD`.
 - Hyperliquid suggestions are loaded dynamically from the official spot/perp metadata endpoints, so you can search perps like `BTC`.
 
-If your non-crypto symbol is not in the catalog, enter the provider symbol manually and use `Verify` before saving. Crypto verification checks whether the selected provider currently supports the market.
+After choosing a match, `Verify` checks whether the selected provider currently returns data for that market before saving.
 
 Examples: `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD`, `USO`.
 
@@ -189,7 +189,7 @@ journalctl --user -f /usr/bin/gnome-shell
    confirm the indicator appears in the panel;
    confirm left-panel tickers still stay left and right-panel tickers stay right;
    confirm startup shows loading placeholders before live data arrives;
-   confirm non-crypto manual `Verify` still works;
+   confirm non-crypto `Verify` still works for selected catalog entries;
    confirm add, edit, remove, reorder, and reset-to-defaults still persist correctly;
    confirm switching `Crypto API` changes the searchable markets and verification behavior;
    confirm Kraken and Hyperliquid crypto entries receive live updates;
