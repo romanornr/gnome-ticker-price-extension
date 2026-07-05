@@ -4,7 +4,13 @@ import {
     KRAKEN_WEBSOCKET_URL,
     loadKrakenSpotPairs,
 } from './kraken/catalog.js';
-import {createKrakenQuote} from './kraken/quotes.js';
+import {
+    buildKrakenTickerUrl,
+    createKrakenQuote,
+    fetchKrakenTickerQuotes,
+    KRAKEN_REST_TICKER_URL,
+    parseKrakenTickerQuotes,
+} from './kraken/quotes.js';
 import {
     normalizeKrakenLiveSymbol,
     normalizeKrakenTickerSymbol,
@@ -20,12 +26,16 @@ import {
  * boundary instead of a legacy utility module.
  */
 export {
+    buildKrakenTickerUrl,
     createKrakenCatalogEntry,
     createKrakenQuote,
+    fetchKrakenTickerQuotes,
+    KRAKEN_REST_TICKER_URL,
     KRAKEN_WEBSOCKET_URL,
     loadKrakenSpotPairs,
     normalizeKrakenLiveSymbol,
     normalizeKrakenTickerSymbol,
+    parseKrakenTickerQuotes,
     scoreKrakenCatalogEntry,
 };
 
@@ -38,4 +48,5 @@ export const krakenAdapter = {
     normalizeTickerSymbol: normalizeKrakenTickerSymbol,
     scoreCatalogEntry: scoreKrakenCatalogEntry,
     createQuote: createKrakenQuote,
+    fetchTickerQuotes: fetchKrakenTickerQuotes,
 };

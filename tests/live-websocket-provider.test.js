@@ -1,7 +1,7 @@
 import Soup from 'gi://Soup?version=3.0';
 
 import {LiveWebsocketProvider} from '../services/providers/live-websocket-provider.js';
-import {assertDeepEqual, assertEqual} from './support/assert.js';
+import {assertDeepEqual, assertEqual, assertTruthy} from './support/assert.js';
 
 export function runTests() {
     testHandleSocketMessageEmitsQuotesAndResetsReconnect();
@@ -11,6 +11,9 @@ export function runTests() {
     testHandleSocketMessageCanResetReconnectWithoutEmittingQuotes();
     testSharedMappingHelpersRemainAvailableThroughTheBaseClass();
     testDisconnectMarksCurrentTickersStale();
+    testSocketMessagesRefreshLivenessTimestamps();
+    testLiveTrafficTimeoutDetection();
+    testSilentConnectionDropsMarksStaleAndReconnects();
 }
 
 function testHandleSocketMessageEmitsQuotesAndResetsReconnect() {
@@ -116,6 +119,52 @@ function testDisconnectMarksCurrentTickersStale() {
         'LiveWebsocketProvider should report current tickers as stale when live transport disconnects');
     assertEqual(provider.scheduleReconnectCalls, 1,
         'LiveWebsocketProvider should still schedule reconnect after marking live tickers stale');
+}
+
+function testSocketMessagesRefreshLivenessTimestamps() {
+    const provider = new TestLiveWebsocketProvider();
+    provider._lastMessageUsec = 0;
+
+    provider._handleSocketMessage(Soup.WebsocketDataType.TEXT, createTextMessageBytes('{"ok":true}'));
+    assertTruthy(provider._lastMessageUsec > 0,
+        'LiveWebsocketProvider should record liveness timestamps when text frames arrive');
+
+    provider._lastMessageUsec = 0;
+    provider._handleSocketMessage(Soup.WebsocketDataType.BINARY, createTextMessageBytes('ignored'));
+    assertTruthy(provider._lastMessageUsec > 0,
+        'LiveWebsocketProvider should count any inbound frame as proof of live transport');
+}
+
+function testLiveTrafficTimeoutDetection() {
+    const provider = new TestLiveWebsocketProvider();
+    provider._lastMessageUsec = 1_000;
+
+    assertEqual(provider._hasLiveTrafficTimedOut(1_000 + 59_000_000), false,
+        'LiveWebsocketProvider should not treat sub-threshold silence as dead transport');
+    assertEqual(provider._hasLiveTrafficTimedOut(1_000 + 60_000_000), true,
+        'LiveWebsocketProvider should treat silence beyond the timeout threshold as dead transport');
+}
+
+function testSilentConnectionDropsMarksStaleAndReconnects() {
+    const staleTickers = [];
+    const provider = new TestLiveWebsocketProvider({onStale: tickers => staleTickers.push(tickers)});
+    provider._running = true;
+    provider._tickers = [{liveSymbol: 'BTC/USD', symbol: 'btcusd'}];
+    const originalLog = globalThis.log;
+    globalThis.log = () => {};
+
+    try {
+        provider._handleSilentConnection();
+    } finally {
+        globalThis.log = originalLog;
+    }
+
+    assertEqual(provider.disconnectCalls, 1,
+        'LiveWebsocketProvider should drop silent sockets so reconnect can replace them');
+    assertDeepEqual(staleTickers, [[{liveSymbol: 'BTC/USD', symbol: 'btcusd'}]],
+        'LiveWebsocketProvider should mark current tickers stale when a silent socket is dropped');
+    assertEqual(provider.scheduleReconnectCalls, 1,
+        'LiveWebsocketProvider should schedule reconnect after dropping a silent socket');
 }
 
 class TestLiveWebsocketProvider extends LiveWebsocketProvider {

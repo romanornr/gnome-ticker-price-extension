@@ -1,3 +1,49 @@
+import {httpGetJson} from '../../http.js';
+
+export const KRAKEN_REST_TICKER_URL = 'https://api.kraken.com/0/public/Ticker';
+
+/* Kraken's REST Ticker endpoint accepts websocket pair names and echoes them back as result keys. */
+export function buildKrakenTickerUrl(liveSymbols) {
+    return `${KRAKEN_REST_TICKER_URL}?pair=${liveSymbols.map(encodeURIComponent).join(',')}`;
+}
+
+/* The REST polling fallback fetches quotes for the same pair names the websocket subscription uses. */
+export async function fetchKrakenTickerQuotes(session, liveSymbols) {
+    if (liveSymbols.length === 0) return new Map();
+
+    const payload = await httpGetJson(session, buildKrakenTickerUrl(liveSymbols));
+    return parseKrakenTickerQuotes(payload);
+}
+
+/*
+ * REST ticker rows are normalized into the same quote shape as websocket
+ * updates. REST has no per-quote timestamp, so the fetch time stands in, and
+ * today's open price stands in for the websocket feed's 24h-change-derived
+ * previous close.
+ */
+export function parseKrakenTickerQuotes(payload, timestamp = new Date().toISOString()) {
+    if (Array.isArray(payload?.error) && payload.error.length > 0)
+        throw new Error(`Kraken ticker request failed: ${payload.error.join(', ')}`);
+
+    const quoteDate = normalizeKrakenTimestampDate(timestamp);
+    const quotesByPair = new Map();
+
+    Object.entries(payload?.result ?? {}).forEach(([pair, entry]) => {
+        const price = Number.parseFloat(`${entry?.c?.[0] ?? ''}`);
+        const open = Number.parseFloat(`${entry?.o ?? ''}`);
+
+        if (!Number.isFinite(price) || quoteDate === '') return;
+
+        quotesByPair.set(pair, {
+            price,
+            quoteDate,
+            previousClose: Number.isFinite(open) && open > 0 ? open : null,
+        });
+    });
+
+    return quotesByPair;
+}
+
 /* Provider quote objects are normalized here so Kraken transport code stays focused on websocket mechanics. */
 export function createKrakenQuote(entry) {
     const price = Number.parseFloat(`${entry?.last ?? ''}`);

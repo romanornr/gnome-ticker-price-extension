@@ -3,7 +3,10 @@ import {
     HyperliquidLiveProvider,
     refresh as refreshHyperliquidQuotes,
 } from './hyperliquid-live.js';
-import {KrakenLiveProvider} from './kraken-live.js';
+import {
+    KrakenLiveProvider,
+    refresh as refreshKrakenQuotes,
+} from './kraken-live.js';
 import {
     isLiveCryptoTicker,
     isLiveCryptoTickerForProvider,
@@ -33,15 +36,22 @@ export function createRuntimeProviderRegistry({uuid, quoteStore, onQuotes, onSta
             id: CRYPTO_PROVIDERS.KRAKEN,
             provider: krakenLiveProvider,
             ownsTicker: isKrakenRuntimeTicker,
+            hasPollingFallback: isLiveTransportDown,
+            refreshFallback: (tickers, context) => refreshKrakenQuotes(tickers, context),
         },
         {
             id: CRYPTO_PROVIDERS.HYPERLIQUID,
             provider: hyperliquidLiveProvider,
             ownsTicker: isHyperliquidRuntimeTicker,
-            hasPollingFallback: providerEntry => !providerEntry.provider.isConnected(),
+            hasPollingFallback: isLiveTransportDown,
             refreshFallback: (tickers, context) => refreshHyperliquidQuotes(tickers, context),
         },
     ];
+}
+
+/* Live providers only need their REST polling fallback while the websocket transport is down. */
+function isLiveTransportDown(providerEntry) {
+    return !providerEntry.provider.isConnected();
 }
 
 /* QuotesService asks each provider entry for its current fallback-refresh candidates through this helper. */

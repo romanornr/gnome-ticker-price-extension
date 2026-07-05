@@ -1,6 +1,4 @@
-import Gio from 'gi://Gio';
-import GLib from 'gi://GLib';
-import Soup from 'gi://Soup?version=3.0';
+import {httpGetText} from '../../utils/http.js';
 
 const STOOQ_REQUEST_TIMEOUT_SECONDS = 12;
 
@@ -68,44 +66,11 @@ export function buildLookupUrl(symbol) {
     return `https://stooq.com/q/l/?s=${encodeURIComponent(symbol).replace(/%2B/g, '+')}&f=sd2t2cp&i=d`;
 }
 
-/* All Stooq interaction ultimately passes through this transport helper. */
-async function fetchText(session, url) {
-    const message = Soup.Message.new('GET', url);
-    const cancellable = new Gio.Cancellable();
-    let timeoutId = GLib.timeout_add_seconds(
-        GLib.PRIORITY_DEFAULT,
-        STOOQ_REQUEST_TIMEOUT_SECONDS,
-        () => {
-            timeoutId = 0;
-            cancellable.cancel();
-            return GLib.SOURCE_REMOVE;
-        }
-    );
-
-    try {
-        const bytes = await sendAndRead(session, message, cancellable);
-        return new TextDecoder().decode(bytes.get_data()).trim();
-    } catch (error) {
-        if (cancellable.is_cancelled())
-            throw new Error(`Timed out after ${STOOQ_REQUEST_TIMEOUT_SECONDS}s while loading Stooq quotes.`);
-
-        throw error;
-    } finally {
-        if (timeoutId !== 0)
-            GLib.Source.remove(timeoutId);
-    }
-}
-
-/* GJS exposes Soup async methods through callback/finish pairs, so bridge them into the async/await flow here. */
-function sendAndRead(session, message, cancellable) {
-    return new Promise((resolve, reject) => {
-        session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, cancellable, (_session, result) => {
-            try {
-                resolve(session.send_and_read_finish(result));
-            } catch (error) {
-                reject(error);
-            }
-        });
+/* All Stooq interaction ultimately passes through the shared HTTP transport with Stooq's timeout policy. */
+function fetchText(session, url) {
+    return httpGetText(session, url, {
+        timeoutSeconds: STOOQ_REQUEST_TIMEOUT_SECONDS,
+        timeoutMessage: `Timed out after ${STOOQ_REQUEST_TIMEOUT_SECONDS}s while loading Stooq quotes.`,
     });
 }
 

@@ -1,7 +1,9 @@
 import {
+    buildKrakenTickerUrl,
     createKrakenQuote,
     normalizeKrakenLiveSymbol,
     normalizeKrakenTickerSymbol,
+    parseKrakenTickerQuotes,
     scoreKrakenCatalogEntry,
 } from '../utils/crypto-providers/kraken-adapter.js';
 import {assertDeepEqual, assertEqual, assertTruthy} from './support/assert.js';
@@ -53,4 +55,29 @@ export function runTests() {
         last: '104321.50',
         timestamp: 'invalid',
     }), null, 'Kraken quote normalization should reject payloads without a valid quote date');
+
+    assertEqual(buildKrakenTickerUrl(['BTC/USD', 'ETH/USD']),
+        'https://api.kraken.com/0/public/Ticker?pair=BTC%2FUSD,ETH%2FUSD',
+        'Kraken REST ticker URLs should batch encoded websocket pair names');
+
+    assertDeepEqual(Array.from(parseKrakenTickerQuotes({
+        error: [],
+        result: {
+            'BTC/USD': {c: ['61751.3', '0.01'], o: '59964.3'},
+            'ETH/USD': {c: ['not-a-price'], o: '1600'},
+            'SOL/USD': {c: ['150.5'], o: '0'},
+        },
+    }, '2026-07-02T10:00:00Z').entries()), [
+        ['BTC/USD', {price: 61751.3, quoteDate: '20260702', previousClose: 59964.3}],
+        ['SOL/USD', {price: 150.5, quoteDate: '20260702', previousClose: null}],
+    ], 'Kraken REST ticker parsing should normalize valid rows and skip unparseable prices');
+
+    let restErrorMessage = '';
+    try {
+        parseKrakenTickerQuotes({error: ['EQuery:Unknown asset pair']}, '2026-07-02T10:00:00Z');
+    } catch (error) {
+        restErrorMessage = error.message;
+    }
+    assertEqual(restErrorMessage, 'Kraken ticker request failed: EQuery:Unknown asset pair',
+        'Kraken REST ticker parsing should surface provider errors so fallbacks mark tickers stale');
 }

@@ -88,6 +88,12 @@ function testCreateRuntimeProviderRegistry() {
     ], 'Runtime provider registry construction should expose Stooq, Kraken, and Hyperliquid entries in orchestration order');
     assertEqual(typeof registry[1].provider.start, 'function',
         'Runtime provider registry entries should expose live provider lifecycle objects where expected');
+    assertEqual(typeof registry[1].refreshFallback, 'function',
+        'The Kraken registry entry should expose a REST polling fallback');
+    assertEqual(registry[1].hasPollingFallback(registry[1]), true,
+        'Disconnected Kraken live transport should request the polling fallback');
+    assertEqual(registry[2].hasPollingFallback(registry[2]), true,
+        'Disconnected Hyperliquid live transport should request the polling fallback');
 }
 
 function testRefreshPlanSkipsProvidersWithoutRefreshFallback() {

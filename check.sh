@@ -30,6 +30,7 @@ gjs -m services/quote-store.js
 gjs -m utils/display-settings.js
 gjs -m utils/display-density.js
 gjs -m utils/market-schedule.js
+gjs -m utils/http.js
 gjs -m utils/settings.js
 gjs -m utils/ticker-config.js
 gjs -m utils/crypto-providers/kraken/catalog.js
