@@ -1,6 +1,6 @@
 import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
 
-/* Curated FX suggestions give prefs a searchable baseline for weekday currency markets backed by Stooq spot pairs. */
+/* Curated FX suggestions give prefs a searchable baseline for weekday currency markets derived from provider spot rates. */
 const FX_CURRENCY_DEFINITIONS = [
     {code: 'AUD', name: 'Australian dollar'},
     {code: 'BRL', name: 'Brazilian real'},
@@ -25,7 +25,7 @@ const FX_CURRENCY_DEFINITIONS = [
     {code: 'ZAR', name: 'South African rand'},
 ];
 
-/* This turns the verified Stooq currency matrix into searchable prefs entries without hand-maintaining hundreds of pairs. */
+/* This turns the supported currency matrix into searchable prefs entries without hand-maintaining hundreds of pairs. */
 function buildFxTickerDefinition(baseCurrency, quoteCurrency) {
     const label = `${baseCurrency.code}/${quoteCurrency.code}`;
     const symbol = `${baseCurrency.code}${quoteCurrency.code}`.toLowerCase();

@@ -24,11 +24,6 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         keywords: ['admiral group'],
     },
     {
-        label: 'AHT',
-        symbol: 'aht.uk',
-        keywords: ['ashtead group'],
-    },
-    {
         label: 'ANTO',
         symbol: 'anto.uk',
         keywords: ['antofagasta'],
@@ -74,8 +69,8 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         keywords: ['tritax big box'],
     },
     {
-        label: 'BDEV',
-        symbol: 'bdev.uk',
+        label: 'BTRW',
+        symbol: 'btrw.uk',
         keywords: ['barratt redrow', 'barratt developments'],
     },
     {
@@ -112,11 +107,6 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         label: 'CCH',
         symbol: 'cch.uk',
         keywords: ['coca-cola hbc'],
-    },
-    {
-        label: 'CCL',
-        symbol: 'ccl.uk',
-        keywords: ['carnival'],
     },
     {
         label: 'CNA',
@@ -179,11 +169,6 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         keywords: ['easyjet'],
     },
     {
-        label: 'FLTR',
-        symbol: 'fltr.uk',
-        keywords: ['flutter entertainment'],
-    },
-    {
         label: 'FRAS',
         symbol: 'fras.uk',
         keywords: ['frasers group'],
@@ -244,9 +229,9 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         keywords: ['international consolidated airlines', 'british airways', 'iberia'],
     },
     {
-        label: 'ICP',
-        symbol: 'icp.uk',
-        keywords: ['intermediate capital group'],
+        label: 'ICG',
+        symbol: 'icg.uk',
+        keywords: ['icg', 'intermediate capital group'],
     },
     {
         label: 'IHG',
@@ -364,9 +349,9 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         keywords: ['polar capital technology trust'],
     },
     {
-        label: 'PHNX',
-        symbol: 'phnx.uk',
-        keywords: ['phoenix group'],
+        label: 'SDLF',
+        symbol: 'sdlf.uk',
+        keywords: ['standard life', 'phoenix group'],
     },
     {
         label: 'PRU',

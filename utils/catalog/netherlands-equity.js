@@ -319,11 +319,6 @@ const NETHERLANDS_EQUITY_TICKER_DEFINITIONS = [
         keywords: ['ing'],
     },
     {
-        label: 'JDEP',
-        symbol: 'jdep.nl',
-        keywords: ['jde peets', "jde peet's"],
-    },
-    {
         label: 'KENDR',
         symbol: 'kendr.nl',
         keywords: ['kendrion'],
