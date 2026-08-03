@@ -72,7 +72,7 @@ const CRYPTO_PROVIDER_ORDER = [
 const CRYPTO_PROVIDER_METADATA = {
     [CRYPTO_PROVIDERS.KRAKEN]: {
         title: 'Kraken',
-        description: 'Available now with pair search, verification, and live websocket quotes.',
+        description: 'Available now with pair search, catalog validation, and live websocket quotes.',
         available: true,
     },
     [CRYPTO_PROVIDERS.HYPERLIQUID]: {

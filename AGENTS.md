@@ -42,7 +42,7 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/ticker-config.js`: saved ticker normalization, serialization, asset inference, and legacy compatibility policy
 - `utils/prefs/ticker-dialog-state.js`: pure ticker-dialog validation, crypto resolution, and form-to-config normalization helpers
 - `utils/prefs/catalog-suggestions.js`: prefs-side crypto catalog loading and suggestion row model generation
-- `utils/prefs/ticker-dialog-controller.js`: ticker dialog orchestration, state transitions, verification flow, and suggestion wiring for prefs
+- `utils/prefs/ticker-dialog-controller.js`: ticker dialog orchestration, state transitions, non-crypto verification, and suggestion wiring for prefs
 - `utils/http.js`: shared Soup transport with one timeout policy and request headers, used by every REST provider
 - `utils/display-density.js`: density estimation and mono-font scaling policy for crowded indicators
 - `utils/ticker-catalog.js`: curated ticker aggregation and search helpers for guided prefs selection

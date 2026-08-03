@@ -11,8 +11,6 @@ import {
     buildTickerConfig,
     getCatalogMatches,
     getCatalogSearchQuery,
-    getCryptoVerificationFailureMessage,
-    getCryptoVerificationSuccessMessage,
     getSuggestionsDescription,
     resolveSelectedCryptoTicker,
     validateTickerDraft,
@@ -29,7 +27,7 @@ import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from '../panel-sides.js';
 const MAX_CURATED_SUGGESTIONS = 8;
 
 /*
- * TickerDialogController owns mutable dialog state, catalog search, verification, and save wiring.
+ * TickerDialogController owns mutable dialog state, catalog search, non-crypto verification, and save wiring.
  * prefs.js retains page layout and row actions; this module exposes one small functional entrypoint.
  */
 class TickerDialogController {
@@ -202,6 +200,10 @@ class TickerDialogController {
                 ? (this.activeCryptoProvider || getDefaultCryptoProvider())
                 : '';
             this._resetCryptoCatalogState();
+            if (this.activeAssetCategory === 'crypto') {
+                this.verificationRequestId += 1;
+                this.verifyInProgress = false;
+            }
             this._clearVerificationState();
             this._syncMarketSessionRow();
             this.cryptoProviderRow.visible = this.activeAssetCategory === 'crypto';
@@ -468,48 +470,24 @@ class TickerDialogController {
         });
     }
 
-    /* Verify availability follows dialog validity/loading state so users only trigger meaningful checks. */
+    /* Verify is a live non-crypto quote check; crypto validity already comes from the loaded catalog. */
     _updateVerifyButtonSensitivity() {
+        const canVerify = this.activeAssetCategory !== 'crypto';
+        this.verifyButton.visible = canVerify;
         this.verifyButton.set_sensitive(
+            canVerify &&
             this._getSymbolText().trim() !== '' &&
-            !this.verifyInProgress &&
-            !(this.activeAssetCategory === 'crypto' && this.cryptoCatalogLoading)
+            !this.verifyInProgress
         );
     }
 
     /*
-     * Verification bridges dialog state to provider checks: crypto validates
-     * against the loaded runtime catalog, while non-crypto symbols round-trip
-     * through the same REST provider chain the runtime refresh uses.
+     * Non-crypto symbols round-trip through the same REST provider chain the
+     * runtime refresh uses. Crypto validity is enforced by Save instead.
      */
     async _runSymbolVerification() {
-        if (this.activeAssetCategory === 'crypto') {
-            await this._ensureCryptoCatalogLoaded();
-
-            if (this.cryptoCatalogLoading)
-                return;
-
-            if (this.cryptoCatalogError !== '') {
-                this._setVerificationMessage(this.cryptoCatalogError, true);
-                this._updateVerifyButtonSensitivity();
-                return;
-            }
-
-            const resolvedCryptoTicker = this._getResolvedCryptoTicker();
-            if (!resolvedCryptoTicker) {
-                this._setVerificationMessage(getCryptoVerificationFailureMessage(this.activeCryptoProvider), true);
-                this._updateVerifyButtonSensitivity();
-                return;
-            }
-
-            this.lastVerifiedSymbol = resolvedCryptoTicker.liveSymbol;
-            this._setVerificationMessage(getCryptoVerificationSuccessMessage(
-                this.activeCryptoProvider,
-                resolvedCryptoTicker.liveSymbol
-            ));
-            this._updateVerifyButtonSensitivity();
+        if (this.activeAssetCategory === 'crypto')
             return;
-        }
 
         const symbol = this._getSymbolText().trim().toLowerCase();
         const symbolValidationMessage = validateTickerSymbol(symbol);

@@ -39,7 +39,7 @@ import {presentTickerDialog} from './utils/prefs/ticker-dialog-controller.js';
  * - delegating complex dialog behavior to the ticker dialog controller
  *
  * That separation keeps this file focused on page structure while the dialog
- * controller owns the denser search/verification/save state machine.
+ * controller owns the denser search/validation/save state machine.
  */
 class TickerPreferencesPage extends Adw.PreferencesPage {
     static {
