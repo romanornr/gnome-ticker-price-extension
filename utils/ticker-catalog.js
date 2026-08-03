@@ -42,11 +42,6 @@ export function getCuratedTickersForCategory(assetCategory) {
         .map(cloneCatalogEntry);
 }
 
-/* Some prefs flows need the available top-level categories without loading provider-specific detail. */
-export function getCuratedTickerCategories() {
-    return Array.from(new Set(CATALOG.map(entry => entry.assetCategory)));
-}
-
 /* Exact catalog resolution converts dialog text back into a known ticker definition when possible. */
 export function findCuratedTicker({label = '', symbol = '', assetCategory = ''}, options = {}) {
     const normalizedLabel = label.trim().toLowerCase();

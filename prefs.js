@@ -9,7 +9,6 @@ import {
     cloneTicker,
     getCryptoProviderOptions,
     getMarketSessionForAssetCategory,
-    getMarketSessionOptions,
     getTickersForSide,
     hasSettingsKey,
     LEFT_PANEL_SIDE,
@@ -59,7 +58,6 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         this._refreshOptions = getRefreshIntervalOptions();
         this._assetCategoryOptions = getAssetCategoryOptions();
         this._cryptoProviderOptions = getCryptoProviderOptions();
-        this._marketSessionOptions = getMarketSessionOptions();
 
         this._build();
         this._rebuildTickerRows();
@@ -196,7 +194,6 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                     createComboRow: options => this._createComboRow(options),
                     createTextButton: (label, onClicked) => this._createTextButton(label, onClicked),
                     findOptionIndex: (options, value) => this._findOptionIndex(options, value),
-                    getMarketSessionTitle: marketSessionId => this._getMarketSessionTitle(marketSessionId),
                     onSave: updatedTicker => {
                         const nextTickers = [...tickers];
                         nextTickers[index] = updatedTicker;
@@ -237,7 +234,6 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                             createComboRow: options => this._createComboRow(options),
                             createTextButton: (label, onClicked) => this._createTextButton(label, onClicked),
                             findOptionIndex: (options, value) => this._findOptionIndex(options, value),
-                            getMarketSessionTitle: marketSessionId => this._getMarketSessionTitle(marketSessionId),
                             onSave: newTicker => {
                                 saveTickerConfigs(this._settings, [...tickers, newTicker]);
                                 this._rebuildTickerRows();
@@ -338,12 +334,6 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
     /* Option lookup is factored out so controller code can reuse the same selection convention. */
     _findOptionIndex(options, value) {
         return Math.max(0, options.findIndex(option => option.value === value));
-    }
-
-    /* Market-session titles are resolved here so page and dialog surfaces share the same wording. */
-    _getMarketSessionTitle(marketSessionId) {
-        const option = this._marketSessionOptions.find(candidate => candidate.value === marketSessionId);
-        return option?.title ?? 'Unknown market session';
     }
 
     /* Icon buttons centralize the small row-action styling used by reorder controls. */

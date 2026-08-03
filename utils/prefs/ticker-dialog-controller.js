@@ -44,7 +44,6 @@ class TickerDialogController {
         createComboRow,
         createTextButton,
         findOptionIndex,
-        getMarketSessionTitle,
     }) {
         this.window = window;
         this.title = title;
@@ -55,7 +54,6 @@ class TickerDialogController {
         this.createComboRow = createComboRow;
         this.createTextButton = createTextButton;
         this.findOptionIndex = findOptionIndex;
-        this.getMarketSessionTitle = getMarketSessionTitle;
 
         this.activeAssetCategory = initialTicker.assetCategory ?? assetCategoryOptions[0].value;
         this.activeMarketSessionId = initialTicker.marketSessionId ?? getMarketSessionForAssetCategory(this.activeAssetCategory);

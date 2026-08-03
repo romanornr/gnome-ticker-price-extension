@@ -224,21 +224,6 @@ const LEGACY_MARKET_TYPE_TO_SESSION_ID = {
     'us_session': MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
 };
 
-const SESSION_ID_TO_LEGACY_MARKET_TYPE = {
-    [MARKET_SESSION_IDS.ALWAYS_OPEN]: 'always-open',
-    [MARKET_SESSION_IDS.WEEKDAY_24H]: 'weekday-session',
-    [MARKET_SESSION_IDS.US_EQUITY_EXTENDED]: 'us-session',
-    [MARKET_SESSION_IDS.EUROPE_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.UK_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.JAPAN_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.CHINA_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.INDIA_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH]: 'us-session',
-};
-
 /* Callers use one accessor so session-profile data stays immutable at the module boundary. */
 export function getMarketSessionProfile(sessionId) {
     const profile = MARKET_SESSION_PROFILES[sessionId];
@@ -264,9 +249,4 @@ export function getMarketSessionOptions() {
 /* Legacy saved ticker configs still persist marketType, so normalization resolves that seam here. */
 export function getMarketSessionIdFromLegacyMarketType(marketType) {
     return LEGACY_MARKET_TYPE_TO_SESSION_ID[marketType] ?? MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
-}
-
-/* Legacy helpers can still derive the old enum shape while the rest of the app migrates to marketSessionId. */
-export function getLegacyMarketTypeForSessionId(sessionId) {
-    return SESSION_ID_TO_LEGACY_MARKET_TYPE[sessionId] ?? 'us-session';
 }

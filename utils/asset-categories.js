@@ -1,7 +1,4 @@
-import {
-    MARKET_SESSION_IDS,
-    getLegacyMarketTypeForSessionId,
-} from './market-sessions.js';
+import {MARKET_SESSION_IDS} from './market-sessions.js';
 
 /*
  * Asset/category metadata is the shared taxonomy for the entire extension.
@@ -89,15 +86,6 @@ const CRYPTO_PROVIDER_METADATA = {
     },
 };
 
-/* Callers read one normalized category descriptor here instead of touching the internal metadata tables directly. */
-export function getAssetCategoryMetadata(assetCategory) {
-    const metadata = ASSET_CATEGORY_METADATA[assetCategory];
-    if (!metadata)
-        return null;
-
-    return {value: assetCategory, ...metadata, searchKeywords: [...metadata.searchKeywords]};
-}
-
 /* prefs uses these options to keep UI labels and descriptions in sync with the shared metadata tables. */
 export function getAssetCategoryOptions() {
     return CATEGORY_ORDER.map(assetCategory => {
@@ -109,11 +97,6 @@ export function getAssetCategoryOptions() {
 /* Market-session defaults come from the taxonomy so ticker creation and normalization agree on session policy. */
 export function getAssetCategoryDefaultMarketSessionId(assetCategory) {
     return ASSET_CATEGORY_METADATA[assetCategory]?.defaultMarketSessionId ?? MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
-}
-
-/* Legacy callers can still derive marketType while the rest of the codebase migrates to marketSessionId. */
-export function getAssetCategoryDefaultMarketType(assetCategory) {
-    return getLegacyMarketTypeForSessionId(getAssetCategoryDefaultMarketSessionId(assetCategory));
 }
 
 /* A single default crypto provider keeps new ticker flows deterministic when the user has not chosen one yet. */
@@ -133,15 +116,6 @@ export function isLiveCryptoTicker(ticker, cryptoProvider = null) {
 
     return cryptoProvider === null ||
         (ticker.cryptoProvider ?? getDefaultCryptoProvider()) === cryptoProvider;
-}
-
-/* Provider metadata is exposed through one helper so prefs and runtime can share labels and availability. */
-export function getCryptoProviderMetadata(provider) {
-    const metadata = CRYPTO_PROVIDER_METADATA[provider];
-    if (!metadata)
-        return null;
-
-    return {value: provider, ...metadata};
 }
 
 /* prefs uses provider options from here so the UI and runtime provider vocabulary never drift apart. */
