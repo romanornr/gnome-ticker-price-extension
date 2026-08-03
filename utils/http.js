@@ -3,18 +3,14 @@ import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
 /*
- * Shared Soup HTTP transport helpers.
- *
- * GJS exposes Soup async methods through callback/finish pairs, and each REST
- * provider used to re-implement the same promise bridging and timeout guard
- * locally. Centralizing transport here keeps provider modules focused on wire
- * formats and lets every REST call share one timeout policy.
+ * Shared timeout-guarded Soup transport turns GJS callback APIs into promises.
+ * Providers supply only the HTTP method, endpoint, body/headers, and timeout wording.
  */
 
 export const DEFAULT_HTTP_TIMEOUT_SECONDS = 12;
 
 /* Every helper funnels through this timeout-guarded core so no request can hang a refresh pass forever. */
-export async function requestBytes(session, message, {timeoutSeconds = DEFAULT_HTTP_TIMEOUT_SECONDS, timeoutMessage = null, headers = null} = {}) {
+async function requestBytes(session, message, {timeoutSeconds = DEFAULT_HTTP_TIMEOUT_SECONDS, timeoutMessage = null, headers = null} = {}) {
     if (headers) {
         const requestHeaders = message.get_request_headers();
         Object.entries(headers).forEach(([name, value]) => requestHeaders.replace(name, value));
@@ -42,12 +38,6 @@ export async function requestBytes(session, message, {timeoutSeconds = DEFAULT_H
         if (timeoutId !== 0)
             GLib.Source.remove(timeoutId);
     }
-}
-
-/* Text endpoints read the whole body as trimmed UTF-8. */
-export async function httpGetText(session, url, options = {}) {
-    const bytes = await requestBytes(session, Soup.Message.new('GET', url), options);
-    return new TextDecoder().decode(bytes.get_data()).trim();
 }
 
 /* JSON GET endpoints (CNBC, Kraken REST) parse the body directly so callers only see decoded payloads. */

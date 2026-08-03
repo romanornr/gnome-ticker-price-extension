@@ -20,10 +20,8 @@ gjs -m tests/run.js
 
 printf '\nRunning import sanity checks...\n'
 gjs -m services/quotes.js
-gjs -m services/providers/live-quote-provider.js
 gjs -m services/providers/kraken-live.js
 gjs -m services/providers/hyperliquid-live.js
-gjs -m services/providers/runtime-provider-registry.js
 gjs -m services/providers/cnbc.js
 gjs -m services/providers/nasdaq.js
 gjs -m services/providers/open-er-api.js

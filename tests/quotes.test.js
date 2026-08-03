@@ -5,12 +5,12 @@ import {assertDeepEqual, assertEqual} from './support/assert.js';
 export async function runTests() {
     await testRefreshQuotesUsesProviderPlanAndMarksRefreshed();
     await testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh();
-    await testRefreshProviderFallbackPreservesPreviousClose();
-    await testRefreshProviderFallbackSwallowsProviderErrors();
+    await testPollProviderPreservesPreviousClose();
+    await testPollProviderSwallowsProviderErrors();
     await testRefreshQuotesContinuesAfterProviderError();
     testHandleLiveQuotesMergesQuotesAndRequestsThrottledUpdate();
     await testStartBootsProvidersAndSchedulesRefresh();
-    await testStartSkipsRegistryEntriesWithoutLiveProviders();
+    await testStartHandlesPollingOnlyProviders();
     testStopTearsDownProvidersAndClearsState();
     await testTickerSettingsChangeReloadsConfigurationAndRefreshes();
     testRefreshIntervalSettingChangeReschedulesCoordinator();
@@ -35,11 +35,11 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
                 entryUpdateRequests += 1;
         },
     };
-    service._runtimeProviders = [
+    service._providers = [
         {
             id: 'rest',
             ownsTicker: ticker => !ticker.liveSymbol,
-            refreshFallback: async tickers => {
+            poll: async tickers => {
                 refreshCalls.push(['rest', tickers.map(ticker => ticker.symbol)]);
                 return new Map([['AAPL.US', {
                     price: 210,
@@ -51,9 +51,8 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
         {
             id: CRYPTO_PROVIDERS.HYPERLIQUID,
             ownsTicker: ticker => ticker.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID,
-            provider: {isConnected: () => false},
-            hasPollingFallback: providerEntry => !providerEntry.provider.isConnected(),
-            refreshFallback: async tickers => {
+            shouldPoll: () => true,
+            poll: async tickers => {
                 refreshCalls.push(['hyperliquid', tickers.map(ticker => ticker.symbol)]);
                 return new Map([['PURRUSDC', {
                     price: 0.42,
@@ -67,7 +66,8 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
             ownsTicker: ticker => (ticker.cryptoProvider ?? CRYPTO_PROVIDERS.KRAKEN) === CRYPTO_PROVIDERS.KRAKEN &&
                 typeof ticker.liveSymbol === 'string' &&
                 ticker.liveSymbol !== '',
-            provider: {isConnected: () => true},
+            shouldPoll: () => false,
+            poll: async () => new Map(),
         },
     ];
     service._shouldRefreshTicker = ticker => ticker.symbol !== 'btcusd';
@@ -88,7 +88,7 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
         'QuotesService should mark refreshed symbols after a successful provider refresh');
 }
 
-async function testRefreshProviderFallbackPreservesPreviousClose() {
+async function testPollProviderPreservesPreviousClose() {
     const service = createQuotesService();
 
     service._running = true;
@@ -99,9 +99,9 @@ async function testRefreshProviderFallbackPreservesPreviousClose() {
         previousClose: 90,
     });
 
-    await service._refreshProviderFallback({
+    await service._pollProvider({
         id: CRYPTO_PROVIDERS.KRAKEN,
-        refreshFallback: async () => new Map([['BTCUSD', {
+        poll: async () => new Map([['BTCUSD', {
             price: 101,
             quoteDate: '20260322',
             previousClose: null,
@@ -127,11 +127,11 @@ async function testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh() {
             entryUpdateRequests += 1;
         },
     };
-    service._runtimeProviders = [{
+    service._providers = [{
         id: 'rest',
         ownsTicker: () => true,
-        hasPollingFallback: () => false,
-        refreshFallback: async () => new Map(),
+        shouldPoll: () => false,
+        poll: async () => new Map(),
     }];
 
     await service._refreshQuotes(true);
@@ -140,7 +140,7 @@ async function testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh() {
         'QuotesService should not request an entry update when the provider refresh plan is empty');
 }
 
-async function testRefreshProviderFallbackSwallowsProviderErrors() {
+async function testPollProviderSwallowsProviderErrors() {
     const service = createQuotesService();
     const originalLogError = globalThis.logError;
     globalThis.logError = () => {};
@@ -149,9 +149,9 @@ async function testRefreshProviderFallbackSwallowsProviderErrors() {
     service._session = {};
 
     try {
-        await service._refreshProviderFallback({
+        await service._pollProvider({
             id: 'broken-provider',
-            refreshFallback: async () => {
+            poll: async () => {
                 throw new Error('broken');
             },
         }, [{symbol: 'aapl.us'}]);
@@ -178,18 +178,18 @@ async function testRefreshQuotesContinuesAfterProviderError() {
                 entryUpdateRequests += 1;
         },
     };
-    service._runtimeProviders = [
+    service._providers = [
         {
             id: 'rest',
             ownsTicker: ticker => ticker.assetCategory === ASSET_CATEGORIES.EQUITY,
-            refreshFallback: async () => {
+            poll: async () => {
                 throw new Error('broken cnbc');
             },
         },
         {
             id: CRYPTO_PROVIDERS.HYPERLIQUID,
             ownsTicker: ticker => ticker.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID,
-            refreshFallback: async () => new Map([['PURRUSDC', {
+            poll: async () => new Map([['PURRUSDC', {
                 price: 0.42,
                 quoteDate: '20260322',
                 previousClose: 0.4,
@@ -240,16 +240,14 @@ async function testStartBootsProvidersAndSchedulesRefresh() {
     let scheduledRefreshInterval = 0;
     let subscriptionsUpdated = 0;
 
-    service._runtimeProviders = [{
-        provider: {
-            start(session) {
-                providerStarts.push(session);
-            },
-            stop() {
-            },
-            updateSubscriptions() {
-                subscriptionsUpdated += 1;
-            },
+    service._providers = [{
+        start(session) {
+            providerStarts.push(session);
+        },
+        stop() {
+        },
+        updateSubscriptions() {
+            subscriptionsUpdated += 1;
         },
     }];
     service._coordinator = {
@@ -282,28 +280,26 @@ async function testStartBootsProvidersAndSchedulesRefresh() {
     service.stop();
 }
 
-async function testStartSkipsRegistryEntriesWithoutLiveProviders() {
+async function testStartHandlesPollingOnlyProviders() {
     const service = createQuotesService();
     let providerStarts = 0;
     let subscriptionsUpdated = 0;
     let refreshRequested = false;
 
-    service._runtimeProviders = [
+    service._providers = [
         {
             id: 'rest',
-            refreshFallback: async () => new Map(),
+            poll: async () => new Map(),
         },
         {
             id: CRYPTO_PROVIDERS.KRAKEN,
-            provider: {
-                start() {
-                    providerStarts += 1;
-                },
-                stop() {
-                },
-                updateSubscriptions() {
-                    subscriptionsUpdated += 1;
-                },
+            start() {
+                providerStarts += 1;
+            },
+            stop() {
+            },
+            updateSubscriptions() {
+                subscriptionsUpdated += 1;
             },
         },
     ];
@@ -321,13 +317,13 @@ async function testStartSkipsRegistryEntriesWithoutLiveProviders() {
     await Promise.resolve();
 
     assertEqual(service._running, true,
-        'QuotesService.start() should still mark the service as running when registry entries omit live providers');
+        'QuotesService.start() should still run when polling providers omit live lifecycle methods');
     assertEqual(providerStarts, 1,
-        'QuotesService.start() should only start registry entries that expose live providers');
+        'QuotesService.start() should only start providers that expose live lifecycle methods');
     assertEqual(subscriptionsUpdated, 1,
-        'QuotesService.start() should only update subscriptions for registry entries that expose live providers');
+        'QuotesService.start() should only update providers that expose subscription methods');
     assertEqual(refreshRequested, true,
-        'QuotesService.start() should still trigger the initial refresh when registry entries omit live providers');
+        'QuotesService.start() should trigger the initial refresh with mixed provider capabilities');
 
     service.stop();
 }
@@ -344,11 +340,9 @@ function testStopTearsDownProvidersAndClearsState() {
             sessionAborts += 1;
         },
     };
-    service._runtimeProviders = [{
-        provider: {
-            stop() {
-                providerStops += 1;
-            },
+    service._providers = [{
+        stop() {
+            providerStops += 1;
         },
     }];
     service._coordinator = {
@@ -392,11 +386,9 @@ async function testTickerSettingsChangeReloadsConfigurationAndRefreshes() {
         quoteDate: '20260322',
         previousClose: 1,
     });
-    service._runtimeProviders = [{
-        provider: {
-            updateSubscriptions() {
-                subscriptionsUpdated += 1;
-            },
+    service._providers = [{
+        updateSubscriptions() {
+            subscriptionsUpdated += 1;
         },
     }];
     service._coordinator = {

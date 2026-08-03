@@ -1,18 +1,14 @@
 import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
-import {
-    createTickerSymbolMap,
-    getDesiredLiveSymbols,
-    removeTimeout,
-} from './live-quote-provider.js';
+import {isLiveCryptoTicker} from '../../utils/asset-categories.js';
 
 const LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
 const LIVE_SILENCE_TIMEOUT_SECONDS = 60;
 const LIVE_WATCHDOG_INTERVAL_SECONDS = 15;
 
-/* Concrete live providers share one websocket-connect helper because only the URL differs. */
-export function openWebsocketConnection(session, websocketUrl) {
+/* Soup's callback-style websocket handshake becomes the promise used by the shared lifecycle. */
+function openWebsocketConnection(session, websocketUrl) {
     const message = Soup.Message.new('GET', websocketUrl);
     return new Promise((resolve, reject) => {
         session.websocket_connect_async(message, null, [], GLib.PRIORITY_DEFAULT, null, (_session, result) => {
@@ -26,29 +22,18 @@ export function openWebsocketConnection(session, websocketUrl) {
 }
 
 /*
- * LiveWebsocketProvider is the shared lifecycle shell for concrete live quote
- * providers such as Kraken and Hyperliquid.
- *
- * It standardizes the parts that should behave the same across providers:
- * - connect/disconnect mechanics
- * - reconnect backoff
- * - subscription reconciliation when saved tickers change
- * - socket signal cleanup
- * - stale quote notification when live transport drops
- * - a liveness watchdog that treats prolonged socket silence as a disconnect
- *
- * Subclasses supply only the provider-specific pieces:
- * endpoint connection, subscribe payloads, and payload-to-quote parsing.
- * That keeps each provider focused on market semantics instead of websocket
- * housekeeping.
+ * Live providers share this websocket lifecycle while retaining their own REST
+ * polling, subscription payload, and quote parsing. Instances also implement
+ * the routing and polling gates consumed directly by QuotesService.
  */
 export class LiveWebsocketProvider {
-    /* Each subclass inherits one shared websocket state machine and only supplies provider-specific hooks. */
-    constructor({uuid, onQuotes, onStale, filterTicker}) {
+    constructor({id, name, websocketUrl, uuid, onQuotes, onStale}) {
+        this.id = id;
+        this._name = name;
+        this._websocketUrl = websocketUrl;
         this._uuid = uuid;
         this._onQuotes = onQuotes;
         this._onStale = onStale;
-        this._filterTicker = filterTicker;
         this._session = null;
         this._running = false;
         this._tickers = [];
@@ -61,14 +46,12 @@ export class LiveWebsocketProvider {
         this._lastMessageUsec = 0;
     }
 
-    /* start() attaches the shared Soup session and begins connection attempts for the current saved symbols. */
     start(session) {
         this._session = session;
         this._running = true;
         void this._connectIfNeeded();
     }
 
-    /* stop() clears both the live socket and the reconnect/subscription bookkeeping around it. */
     stop() {
         this._running = false;
         this._session = null;
@@ -79,9 +62,8 @@ export class LiveWebsocketProvider {
         this._disconnectWebsocket();
     }
 
-    /* Subscription reconciliation lets the provider react to saved ticker changes without restarting the service. */
     updateSubscriptions(tickers) {
-        this._tickers = tickers.filter(ticker => this._filterTicker(ticker));
+        this._tickers = tickers.filter(ticker => this.ownsTicker(ticker));
 
         const desiredSymbols = this._getDesiredSymbols();
         const currentSymbols = [...this._subscribedSymbols].sort().join('|');
@@ -100,30 +82,31 @@ export class LiveWebsocketProvider {
         void this._connectIfNeeded();
     }
 
-    /* QuotesService uses this as the single readiness signal for "is live transport available right now?" */
     isConnected() {
         return this._websocket !== null;
     }
 
-    /* Subclasses inherit how desired live symbols are derived from the current saved ticker set. */
+    /* Provider identity and live-symbol validity together define both subscription and polling ownership. */
+    ownsTicker(ticker) {
+        return isLiveCryptoTicker(ticker, this.id);
+    }
+
+    /* REST polling is the normal-cadence fallback while the provider's websocket is unavailable. */
+    shouldPoll() {
+        return !this.isConnected();
+    }
+
     _getDesiredSymbols() {
-        return getDesiredLiveSymbols(this._tickers);
+        return [...new Set(this._tickers.map(ticker => ticker.liveSymbol))];
     }
 
-    /* Provider payloads are translated back to saved ticker symbols through this shared mapping step. */
     _getSymbolToTickerSymbolMap() {
-        return createTickerSymbolMap(this._tickers);
+        return new Map(this._tickers.map(ticker => [ticker.liveSymbol, ticker.symbol.toUpperCase()]));
     }
 
-    /*
-     * Every live provider follows the same connection flow. If the socket opens,
-     * the subclass-specific subscription payload is sent immediately. If not, the
-     * shared reconnect policy applies.
-     */
     /*
      * _connectIfNeeded() is the shared socket bootstrap path used on startup,
-     * reconnect, and subscription changes. Subclasses only fill in the
-     * provider-specific connection and subscribe steps.
+     * reconnect, and subscription changes.
      */
     async _connectIfNeeded() {
         const liveSymbols = this._getDesiredSymbols();
@@ -131,7 +114,7 @@ export class LiveWebsocketProvider {
             return;
 
         try {
-            const websocket = await this._openConnection(this._session);
+            const websocket = await openWebsocketConnection(this._session, this._websocketUrl);
 
             if (!this._running) {
                 websocket.close(1000, null);
@@ -144,7 +127,7 @@ export class LiveWebsocketProvider {
                     this._handleSocketMessage(type, messageBytes);
                 }),
                 websocket.connect('error', (_connection, error) => {
-                    logError(error, `${this._uuid}: ${this.logPrefix} websocket error`);
+                    logError(error, `${this._uuid}: ${this._name} websocket error`);
                 }),
                 websocket.connect('closed', () => {
                     this._handleDisconnect();
@@ -159,7 +142,7 @@ export class LiveWebsocketProvider {
             if (!this._running)
                 return;
 
-            logError(error, `${this._uuid}: failed to connect ${this.logPrefix} websocket`);
+            logError(error, `${this._uuid}: failed to connect ${this._name} websocket`);
             this._notifyStaleTickers();
             this._scheduleReconnect();
         }
@@ -223,12 +206,8 @@ export class LiveWebsocketProvider {
     }
 
     /*
-     * A half-open TCP connection (suspend/resume, network switch, NAT timeout)
-     * never emits a closed signal, so without a watchdog the socket looks
-     * healthy forever while the panel silently freezes on the last quote. The
-     * watchdog treats prolonged silence as a disconnect: both providers
-     * subscribe to channels that push messages at least every few seconds, so
-     * a silent window this long always means dead transport.
+     * Half-open sockets can survive network changes without a close event.
+     * Prolonged silence therefore follows the normal disconnect recovery path.
      */
     _startWatchdog() {
         this._watchdogTimeoutId = removeTimeout(this._watchdogTimeoutId);
@@ -262,7 +241,7 @@ export class LiveWebsocketProvider {
 
     /* Silent sockets follow the same recovery path as closed sockets: drop, mark stale, reconnect. */
     _handleSilentConnection() {
-        log(`${this._uuid}: ${this.logPrefix} websocket silent for ${LIVE_SILENCE_TIMEOUT_SECONDS}s; reconnecting`);
+        log(`${this._uuid}: ${this._name} websocket silent for ${LIVE_SILENCE_TIMEOUT_SECONDS}s; reconnecting`);
         this._disconnectWebsocket();
         this._handleDisconnect();
     }
@@ -279,7 +258,7 @@ export class LiveWebsocketProvider {
         try {
             payload = JSON.parse(new TextDecoder().decode(messageBytes.get_data()));
         } catch (error) {
-            logError(error, `${this._uuid}: failed to parse ${this.logPrefix} websocket payload`);
+            logError(error, `${this._uuid}: failed to parse ${this._name} websocket payload`);
             return;
         }
 
@@ -298,11 +277,6 @@ export class LiveWebsocketProvider {
             this._onQuotes?.(result.quotesBySymbol);
     }
 
-    /* Hook: open the provider-specific websocket endpoint. */
-    async _openConnection(_session) {
-        throw new Error('Subclasses must implement _openConnection()');
-    }
-
     /* Hook: send the provider-specific subscription messages. */
     _subscribe(_websocket, _symbols) {
         throw new Error('Subclasses must implement _subscribe()');
@@ -312,9 +286,11 @@ export class LiveWebsocketProvider {
     _handlePayload(_payload) {
         throw new Error('Subclasses must implement _handlePayload()');
     }
+}
 
-    /* Hook: subclasses override the provider name used in shared logs. */
-    get logPrefix() {
-        return 'provider';
-    }
+function removeTimeout(sourceId) {
+    if (sourceId === 0) return 0;
+
+    GLib.Source.remove(sourceId);
+    return 0;
 }

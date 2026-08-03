@@ -10,25 +10,22 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `extension.js`: extension lifecycle orchestration, panel registration, service startup/shutdown
 - `prefs.js`: GNOME preferences window for ticker configuration, refresh cadence, and display options
 - `ui/indicator.js`: panel indicator rendering
-- `services/quotes.js`: quote fetching, Kraken WebSocket lifecycle, cache management, update scheduling
+- `services/quotes.js`: settings-backed composition of REST/live providers, quote storage, and entry updates
 - `services/quote-store.js`: in-memory quote cache and refresh-cadence timestamps for normalized symbols
 - `services/entry-model.js`: panel entry/view-model building, including loading/error states and price-flash decoration
 - `services/quotes-coordinator.js`: refresh timer, throttled entry rebuild scheduling, and price-flash reset coordination for `QuotesService`
-- `services/providers/rest-quotes.js`: REST refresh orchestrator — CNBC primary with narrow Nasdaq/FX-rate-table fallbacks for missed symbols
-- `services/providers/cnbc.js`: batched CNBC quote fetching/parsing, FX derivation from USD spot rates, and symbol verification helpers
+- `services/providers/rest-quotes.js`: shared REST refresh/verification capability — CNBC primary with narrow Nasdaq/FX-rate-table fallbacks for missed symbols
+- `services/providers/cnbc.js`: batched CNBC quote fetching/parsing and FX derivation from USD spot rates
 - `services/providers/cnbc-symbols.js`: catalog-symbol-to-CNBC-grammar mapping (suffix rules, futures/index overrides, FX pair parsing)
 - `services/providers/nasdaq.js`: per-symbol Nasdaq fallback for US listings only (foreign symbols would resolve to differently-priced ADRs)
 - `services/providers/open-er-api.js`: daily USD rate table fallback deriving FX pairs when CNBC's spot vector is unavailable
-- `services/providers/live-quote-provider.js`: shared live-provider contract notes and helper utilities for symbol subscription/state parity
-- `services/providers/live-websocket-provider.js`: shared websocket lifecycle base for connect/disconnect/reconnect mechanics across live crypto providers
-- `services/providers/kraken-live.js`: Kraken live quote adapter, subscription management, and reconnect handling
-- `services/providers/hyperliquid-live.js`: Hyperliquid live quote adapter plus REST fallback snapshot normalization
-- `services/providers/runtime-provider-registry.js`: QuotesService-facing runtime provider registry for ownership, lifecycle wiring, and fallback-refresh capabilities
+- `services/providers/live-websocket-provider.js`: direct live-provider routing plus shared websocket connect/reconnect/watchdog lifecycle
+- `services/providers/kraken-live.js`: Kraken runtime provider with REST polling fallback and websocket protocol handling
+- `services/providers/hyperliquid-live.js`: Hyperliquid runtime provider with REST snapshot fallback and websocket protocol handling
 - `README.md`: user-facing setup notes, ticker add flow, and curated catalog editing guide
-- `PROVIDER_ADAPTER_REFACTOR_PLAN.md`: historical note marking the completed adapter migration and redirecting to the current long-term architecture doc
 - `CODE_STYLE_GUIDE.md`: repo-local coding and commenting contract intended to be understandable by human contributors and coding agents
 - `utils/format.js`: display-entry formatting and color helpers
-- `utils/asset-categories.js`: shared asset-category metadata, category search terms, and default market-type mapping
+- `utils/asset-categories.js`: shared asset/provider taxonomy, live-ticker routing, search terms, and defaults
 - `utils/market-sessions.js`: shared market-session profile registry, including behavior-based session ids, legacy market-type migration helpers, and prefs session option metadata
 - `utils/crypto-providers/index.js`: crypto provider switchboard that exposes the shared adapter seam to prefs and ticker normalization layers
 - `utils/crypto-providers/kraken-adapter.js`: Kraken provider adapter implementation for catalog loading, symbol normalization, scoring, and websocket metadata
@@ -48,7 +45,6 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/prefs/ticker-dialog-state.js`: pure ticker-dialog validation, crypto resolution, and form-to-config normalization helpers
 - `utils/prefs/catalog-suggestions.js`: prefs-side crypto catalog loading and suggestion row model generation
 - `utils/prefs/ticker-dialog-controller.js`: ticker dialog orchestration, state transitions, verification flow, and suggestion wiring for prefs
-- `utils/prefs/quote-verifier.js`: prefs-side quote provider verification wrapper
 - `utils/http.js`: shared Soup transport with one timeout policy and request headers, used by every REST provider
 - `utils/display-density.js`: density estimation and mono-font scaling policy for crowded indicators
 - `utils/ticker-catalog.js`: curated ticker aggregation and search helpers for guided prefs selection
@@ -71,7 +67,7 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 
 ## Data And API Conventions
 
-- Non-crypto market data is fetched from CNBC's batch quote webservice, with Nasdaq as a narrow fallback for missed U.S. listings and open.er-api.com as a fallback for the USD FX vector. Kraken WebSocket v2 and Hyperliquid REST/WebSocket APIs are used for crypto market discovery and live crypto updates.
+- Non-crypto refreshes and prefs verification share one REST chain: CNBC's batch quote webservice, with Nasdaq as a narrow fallback for missed U.S. listings and open.er-api.com as a fallback for the USD FX vector. Kraken WebSocket v2 and Hyperliquid REST/WebSocket APIs are used for crypto market discovery and live crypto updates.
 - Catalog symbols keep their historical Stooq-style form (`aapl.us`, `700.hk`) because saved user settings contain them; `services/providers/cnbc-symbols.js` owns the translation to CNBC grammar.
 - CNBC rejects well-known tool user agents, so a `curl` check needs a custom UA, e.g. `curl -A 'test/1.0' 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=AAPL&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json&events=1'`.
 - FX pairs have no direct CNBC symbol; the provider derives every pair from the per-currency USD spot vector (`EUR=`, `JPY=`, ...).
