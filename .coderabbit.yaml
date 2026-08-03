@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: en-US
+
+tone_instructions: >
+  Reviewer for a GNOME Shell extension (GJS/ESM, no build step, no runtime
+  dependencies). Prioritize correctness of market-data handling, provider
+  boundary discipline, and shell lifecycle safety over style nits. A quote
+  that renders a plausible but wrong number is the worst failure mode here,
+  worse than a crash.
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    # dev is the default branch, so PRs into main need main listed explicitly.
+    base_branches:
+      - "main"
+
+  path_filters:
+    - "!.brv/**"
+    - "!.gitnexus/**"
+
+  path_instructions:
+    - path: "utils/catalog/**"
+      instructions: >-
+        Curated catalog data. Symbols use a historical Stooq-style form
+        (aapl.us, 700.hk, eurusd) that is frozen: saved user gsettings
+        contain these strings, so renaming the format silently breaks
+        existing installs. Providers translate at their own boundary
+        instead. Entries stay alphabetized by label. New or changed
+        symbols must be verified against the live provider before merge;
+        flag any that look unverified, and be suspicious of short tickers
+        that can silently resolve to a different company on another
+        exchange.
+
+    - path: "services/providers/**"
+      instructions: >-
+        Provider adapters own wire formats and nothing else. They must
+        normalize into {price, quoteDate: 'YYYYMMDD', previousClose|null}
+        keyed by uppercase catalog symbol before anything downstream sees
+        the data. CNBC is the primary REST source; Nasdaq and the FX rate
+        table are fallbacks that must only claim symbols they genuinely
+        serve. Nasdaq in particular must never own non-US symbols, because
+        it returns a real but wrong price for foreign listings (their US
+        ADR). Batch parsing stays tolerant: one unusable entry must not
+        discard the rest of the batch.
+
+    - path: "services/**"
+      instructions: >-
+        Runtime orchestration. Watch for anything that can hang or leak
+        across enable/disable: unbounded requests, timers or signal
+        handlers without teardown, websocket reconnect loops, and async
+        callbacks that touch state after stop(). Provider-specific parsing
+        does not belong at this layer.
+
+    - path: "**/*.js"
+      instructions: >-
+        GJS/ESM targeting GNOME Shell 49-50, no build step and no runtime
+        dependencies: flag any Node-only API, bundler assumption, or new
+        third-party import. Comments follow CODE_STYLE_GUIDE.md — file and
+        exported-symbol comments explain system role, boundaries, and
+        invariants; comments that restate syntax should be flagged as
+        noise.
+
+    - path: "tests/**"
+      instructions: >-
+        Plain GJS test suites run by tests/run.js with no framework. New
+        provider behavior should come with fixture-based parsing tests and
+        failure-path coverage, not only happy paths.
+
+chat:
+  auto_reply: true
