@@ -1,6 +1,10 @@
-import {verifySymbol} from '../../services/providers/cnbc.js';
+import {verifySymbol} from '../../services/providers/rest-quotes.js';
 
-/* prefs uses the same CNBC verification logic as the runtime provider instead of duplicating symbol checks. */
-export async function verifyTickerSymbol(session, symbol) {
-    return verifySymbol(session, symbol);
+/*
+ * prefs verification goes through the same REST chain as a runtime refresh, so
+ * the dialog never rejects a symbol the panel would display. The asset category
+ * travels with the symbol because provider ownership depends on it.
+ */
+export async function verifyTickerSymbol(session, symbol, assetCategory = null) {
+    return verifySymbol(session, symbol, assetCategory);
 }

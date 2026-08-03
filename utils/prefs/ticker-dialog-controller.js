@@ -497,7 +497,7 @@ class TickerDialogController {
     /*
      * Verification bridges dialog state to provider checks: crypto validates
      * against the loaded runtime catalog, while non-crypto symbols round-trip
-     * through the CNBC quote provider.
+     * through the same REST provider chain the runtime refresh uses.
      */
     async _runSymbolVerification() {
         if (this.activeAssetCategory === 'crypto') {
@@ -544,7 +544,7 @@ class TickerDialogController {
         this._setVerificationMessage(`Checking ${symbol}...`);
 
         try {
-            const result = await verifyTickerSymbol(this.verificationSession, symbol);
+            const result = await verifyTickerSymbol(this.verificationSession, symbol, this.activeAssetCategory);
             if (requestId !== this.verificationRequestId)
                 return;
 

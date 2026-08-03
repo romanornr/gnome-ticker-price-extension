@@ -241,7 +241,7 @@ async function fetchQuotes(session, cnbcSymbols) {
 }
 
 /* The verification dialog shows a human-readable date, so YYYYMMDD gains its dashes back. */
-function formatVerifyDate(quoteDate) {
+export function formatVerifyDate(quoteDate) {
     return `${quoteDate.slice(0, 4)}-${quoteDate.slice(4, 6)}-${quoteDate.slice(6)}`;
 }
 

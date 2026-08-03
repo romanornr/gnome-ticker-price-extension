@@ -12,7 +12,10 @@ import {
     deriveFxQuotes,
     normalizeUpdateTimestamp,
 } from '../services/providers/open-er-api.js';
-import {refresh as refreshRestQuotes} from '../services/providers/rest-quotes.js';
+import {
+    refresh as refreshRestQuotes,
+    verifySymbol as verifyRestSymbol,
+} from '../services/providers/rest-quotes.js';
 import {assertDeepEqual, assertEqual} from './support/assert.js';
 
 export async function runTests() {
@@ -134,6 +137,61 @@ export async function runTests() {
     }
     assertEqual(thrownMessage, 'cnbc down',
         'A dead CNBC endpoint with no applicable fallback should rethrow the primary error');
+
+    /* Verification: the primary answers, so no fallback request is issued. */
+    const verifyPrimarySession = new RoutingFakeSession([
+        ['quote.cnbc.com', cnbcPayload([{symbol: 'AAPL', last: '100.5', last_time: '2026-08-03'}])],
+    ]);
+    assertDeepEqual(await verifyRestSymbol(verifyPrimarySession, 'aapl.us', ASSET_CATEGORIES.EQUITY),
+        {symbol: 'aapl.us', quoteDate: '2026-08-03'},
+        'Verification should resolve through the CNBC primary');
+    assertEqual(verifyPrimarySession.requestedUrls.some(url => url.includes('nasdaq')), false,
+        'Verification should not call a fallback when the primary answers');
+
+    /* Verification parity: a symbol CNBC misses must still verify if the panel would show it. */
+    const verifyFallbackSession = new RoutingFakeSession([
+        ['quote.cnbc.com', cnbcPayload([{symbol: 'SPY', code: 1}])],
+        ['api.nasdaq.com', {data: {primaryData: {lastSalePrice: '$750', netChange: '+10', lastTradeTimestamp: 'Aug 3, 2026 12:27 PM ET'}}}],
+    ]);
+    assertDeepEqual(await verifyRestSymbol(verifyFallbackSession, 'spy.us', ASSET_CATEGORIES.ETF),
+        {symbol: 'spy.us', quoteDate: '2026-08-03'},
+        'Verification should fall back to Nasdaq when CNBC has no quote');
+
+    /* An FX pair CNBC cannot price still verifies through the rate table. */
+    const verifyFxSession = new RoutingFakeSession([
+        ['quote.cnbc.com', cnbcPayload([])],
+        ['open.er-api.com', rateTable],
+    ]);
+    assertDeepEqual(await verifyRestSymbol(verifyFxSession, 'eurjpy', ASSET_CATEGORIES.FX),
+        {symbol: 'eurjpy', quoteDate: '2026-08-03'},
+        'Verification should fall back to the FX rate table when CNBC has no spot legs');
+
+    /* Without an asset category, Nasdaq cannot pick an asset class and must not answer. */
+    const verifyNoCategorySession = new RoutingFakeSession([
+        ['quote.cnbc.com', cnbcPayload([{symbol: 'SPY', code: 1}])],
+        ['api.nasdaq.com', {data: {primaryData: {lastSalePrice: '$750', netChange: '+10', lastTradeTimestamp: 'Aug 3, 2026 12:27 PM ET'}}}],
+    ]);
+    let noCategoryMessage = '';
+    try {
+        await verifyRestSymbol(verifyNoCategorySession, 'spy.us');
+    } catch (error) {
+        noCategoryMessage = error.message;
+    }
+    assertEqual(noCategoryMessage, 'Could not verify spy.us. No quote data was returned by CNBC.',
+        'Verification without an asset category should surface the primary error rather than guess a Nasdaq asset class');
+
+    /* A genuinely unknown symbol still reports the primary provider's message. */
+    const verifyUnknownSession = new RoutingFakeSession([
+        ['quote.cnbc.com', cnbcPayload([{symbol: 'ZZZQ-NL', code: 1}])],
+    ]);
+    let unknownMessage = '';
+    try {
+        await verifyRestSymbol(verifyUnknownSession, 'zzzq.nl', ASSET_CATEGORIES.EQUITY);
+    } catch (error) {
+        unknownMessage = error.message;
+    }
+    assertEqual(unknownMessage, 'Could not verify zzzq.nl. No quote data was returned by CNBC.',
+        'Verification failures should keep the primary provider message users already see');
 }
 
 function cnbcPayload(quotes) {

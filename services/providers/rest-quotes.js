@@ -1,4 +1,8 @@
-import {refresh as refreshCnbcQuotes} from './cnbc.js';
+import {
+    formatVerifyDate,
+    refresh as refreshCnbcQuotes,
+    verifySymbol as verifyCnbcSymbol,
+} from './cnbc.js';
 import {ownsFallbackTicker as isNasdaqFallbackTicker, refresh as refreshNasdaqQuotes} from './nasdaq.js';
 import {refresh as refreshFallbackFxQuotes} from './open-er-api.js';
 import {parseFxPairSymbol} from './cnbc-symbols.js';
@@ -35,6 +39,36 @@ export async function refresh(tickers, context) {
         throw cnbcError;
 
     return quotesBySymbol;
+}
+
+/*
+ * Prefs verification resolves through the same chain as a refresh pass, so the
+ * dialog cannot reject a symbol that the panel would then display happily.
+ * The asset category comes from the dialog because Nasdaq needs it to pick an
+ * asset class; without one, only CNBC and the FX table can answer.
+ */
+export async function verifySymbol(session, symbol, assetCategory = null) {
+    try {
+        return await verifyCnbcSymbol(session, symbol);
+    } catch (primaryError) {
+        const quote = await verifyThroughFallbacks(session, symbol, assetCategory);
+        if (!quote)
+            throw primaryError;
+
+        return {
+            symbol: `${symbol ?? ''}`.trim().toLowerCase(),
+            quoteDate: formatVerifyDate(quote.quoteDate),
+        };
+    }
+}
+
+/* Verification reuses the refresh fallback plan rather than duplicating provider ownership rules. */
+async function verifyThroughFallbacks(session, symbol, assetCategory) {
+    const ticker = {symbol: `${symbol ?? ''}`.trim(), assetCategory};
+    const quotesBySymbol = new Map();
+
+    await runFallbacks([ticker], {session}, quotesBySymbol);
+    return quotesBySymbol.get(ticker.symbol.toUpperCase()) ?? null;
 }
 
 /* Each fallback failure is contained so one broken fallback cannot cost the other's recoveries. */
