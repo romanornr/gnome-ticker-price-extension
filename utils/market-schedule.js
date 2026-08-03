@@ -14,6 +14,14 @@ import {
  * Keeping these rules here prevents time-zone/session policy from being spread
  * across QuotesService, providers, and prefs code.
  */
+
+/*
+ * A closed market cannot move its price, so polling only picks up a revised
+ * closing print and any ticker added while the market was shut. Hourly covers
+ * both; the session profiles no longer each restate this.
+ */
+const CLOSED_MARKET_REFRESH_SECONDS = 3600;
+
 /* The scheduler snapshots both wall-clock date and monotonic time here so policy and cadence share one input shape. */
 export function createMarketScheduleNow(date = new Date(), monotonicUsec = GLib.get_monotonic_time()) {
     return {date, monotonicUsec};
@@ -54,12 +62,9 @@ export function getRefreshIntervalSecondsForTicker(
     if (!profile || profile.id === MARKET_SESSION_IDS.ALWAYS_OPEN || profile.kind === 'weekday-24h')
         return intervalSeconds;
 
-    const phase = getProfileSessionPhase(profile, now.date);
-    const phaseRefreshPolicy = profile.refreshPolicy?.[phase] ?? 'base';
-    if (phaseRefreshPolicy === 'base')
-        return intervalSeconds;
-
-    return Math.max(intervalSeconds, phaseRefreshPolicy);
+    return getProfileSessionPhase(profile, now.date) === 'closed'
+        ? Math.max(intervalSeconds, CLOSED_MARKET_REFRESH_SECONDS)
+        : intervalSeconds;
 }
 
 /* UI layers use this to distinguish expected closed-market cache reuse from data failures. */
