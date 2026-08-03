@@ -1,5 +1,6 @@
 import {QuotesService} from '../services/quotes.js';
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, SETTINGS_KEYS} from '../utils/settings.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
+import {SETTINGS_KEYS} from '../utils/settings.js';
 import {assertDeepEqual, assertEqual} from './support/assert.js';
 
 export async function runTests() {

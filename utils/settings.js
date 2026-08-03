@@ -1,15 +1,8 @@
 import {
     ASSET_CATEGORIES,
     CRYPTO_PROVIDERS,
-    getAssetCategoryDefaultMarketSessionId,
-    getAssetCategoryOptions,
-    getCryptoProviderOptions,
-    getDefaultCryptoProvider,
 } from './asset-categories.js';
-import {
-    MARKET_SESSION_IDS,
-    getMarketSessionOptions,
-} from './market-sessions.js';
+import {MARKET_SESSION_IDS} from './market-sessions.js';
 import {
     DEFAULT_DISPLAY_SETTINGS,
     DEFAULT_REFRESH_INTERVAL_SECONDS,
@@ -19,7 +12,7 @@ import {
 } from './display-settings.js';
 import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './panel-sides.js';
 import {
-    cloneTicker as cloneTickerConfig,
+    cloneTicker,
     normalizeTickerConfig,
     serializeTickerConfig,
 } from './ticker-config.js';
@@ -34,15 +27,6 @@ export const SETTINGS_KEYS = {
     SEPARATOR_STYLE: 'separator-style',
     FONT_PRESET: 'font-preset',
 };
-
-export {ASSET_CATEGORIES, getAssetCategoryOptions};
-export {
-    CRYPTO_PROVIDERS,
-    getCryptoProviderOptions,
-    getDefaultCryptoProvider,
-};
-export {MARKET_SESSION_IDS, getMarketSessionOptions};
-export {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE};
 
 export const DEFAULT_TICKERS = [
     {
@@ -145,9 +129,21 @@ export function resetTickerConfigs(settings) {
 }
 
 export function loadDisplaySettings(settings) {
-    const formatPreset = normalizeFormatPreset(settings?.get_string(SETTINGS_KEYS.FORMAT_PRESET));
-    const separatorStyle = normalizeSeparatorStyle(settings?.get_string(SETTINGS_KEYS.SEPARATOR_STYLE));
-    const fontPreset = normalizeFontPreset(getOptionalStringSetting(settings, SETTINGS_KEYS.FONT_PRESET));
+    const formatPreset = normalizeEnum(
+        settings?.get_string(SETTINGS_KEYS.FORMAT_PRESET),
+        FORMAT_PRESETS,
+        DEFAULT_DISPLAY_SETTINGS.formatPreset
+    );
+    const separatorStyle = normalizeEnum(
+        settings?.get_string(SETTINGS_KEYS.SEPARATOR_STYLE),
+        SEPARATOR_STYLES,
+        DEFAULT_DISPLAY_SETTINGS.separatorStyle
+    );
+    const fontPreset = normalizeEnum(
+        getOptionalStringSetting(settings, SETTINGS_KEYS.FONT_PRESET),
+        FONT_PRESETS,
+        DEFAULT_DISPLAY_SETTINGS.fontPreset
+    );
 
     return {
         formatPreset,
@@ -176,74 +172,12 @@ export function getTickersForSide(tickers, side) {
     return tickers.filter(ticker => (ticker.panelSide ?? RIGHT_PANEL_SIDE) === side);
 }
 
-export function getMarketSessionForAssetCategory(assetCategory) {
-    return getAssetCategoryDefaultMarketSessionId(assetCategory);
-}
-
-export function getMarketSessionOptionsForAssetCategory(assetCategory) {
-    const equitySessionValues = new Set([
-        MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
-        MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
-        MARKET_SESSION_IDS.UK_EQUITY_CASH,
-        MARKET_SESSION_IDS.JAPAN_EQUITY_CASH,
-        MARKET_SESSION_IDS.CHINA_EQUITY_CASH,
-        MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH,
-        MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH,
-        MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH,
-        MARKET_SESSION_IDS.INDIA_EQUITY_CASH,
-        MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH,
-    ]);
-
-    if (assetCategory === ASSET_CATEGORIES.CRYPTO)
-        return getMarketSessionOptions().filter(option => option.value === MARKET_SESSION_IDS.ALWAYS_OPEN);
-
-    if (assetCategory === ASSET_CATEGORIES.COMMODITY || assetCategory === ASSET_CATEGORIES.FX)
-        return getMarketSessionOptions().filter(option => option.value === MARKET_SESSION_IDS.WEEKDAY_24H);
-
-    return getMarketSessionOptions().filter(option => equitySessionValues.has(option.value));
-}
-
-export function cloneTicker(ticker) {
-    return cloneTickerConfig(ticker);
-}
-
 function cloneTickers(tickers) {
     return tickers.map(cloneTicker);
 }
 
-function normalizeFormatPreset(formatPreset) {
-    switch (formatPreset) {
-    case FORMAT_PRESETS.CHANGE:
-    case FORMAT_PRESETS.PRICE:
-    case FORMAT_PRESETS.DEFAULT:
-        return formatPreset;
-    default:
-        return DEFAULT_DISPLAY_SETTINGS.formatPreset;
-    }
-}
-
-function normalizeSeparatorStyle(separatorStyle) {
-    switch (separatorStyle) {
-    case SEPARATOR_STYLES.PIPES:
-    case SEPARATOR_STYLES.SPACE:
-    case SEPARATOR_STYLES.DOT:
-        return separatorStyle;
-    default:
-        return DEFAULT_DISPLAY_SETTINGS.separatorStyle;
-    }
-}
-
-function normalizeFontPreset(fontPreset) {
-    switch (fontPreset) {
-    case FONT_PRESETS.MONOSPACE:
-    case FONT_PRESETS.IBM_PLEX_MONO:
-    case FONT_PRESETS.JETBRAINS_MONO:
-    case FONT_PRESETS.INTER:
-    case FONT_PRESETS.SYSTEM:
-        return fontPreset;
-    default:
-        return DEFAULT_DISPLAY_SETTINGS.fontPreset;
-    }
+function normalizeEnum(value, enumValues, fallback) {
+    return Object.values(enumValues).includes(value) ? value : fallback;
 }
 
 function getOptionalStringSetting(settings, key) {

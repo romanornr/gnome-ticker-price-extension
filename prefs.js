@@ -5,21 +5,22 @@ import Gtk from 'gi://Gtk';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 import {
+    getAssetCategoryDefaultMarketSessionId,
     getAssetCategoryOptions,
-    cloneTicker,
     getCryptoProviderOptions,
-    getMarketSessionForAssetCategory,
+} from './utils/asset-categories.js';
+import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './utils/panel-sides.js';
+import {
     getTickersForSide,
     hasSettingsKey,
-    LEFT_PANEL_SIDE,
     loadDisplaySettings,
     loadRefreshIntervalSeconds,
     loadTickerConfigs,
     resetTickerConfigs,
-    RIGHT_PANEL_SIDE,
     saveTickerConfigs,
     SETTINGS_KEYS,
 } from './utils/settings.js';
+import {cloneTicker} from './utils/ticker-config.js';
 import {
     formatRefreshIntervalLabel,
     getFontPresetOptions,
@@ -227,7 +228,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                                 priceDecimals: 2,
                                 panelSide: addSide,
                                 assetCategory,
-                                marketSessionId: getMarketSessionForAssetCategory(assetCategory),
+                                marketSessionId: getAssetCategoryDefaultMarketSessionId(assetCategory),
                             },
                             assetCategoryOptions: this._assetCategoryOptions,
                             cryptoProviderOptions: this._cryptoProviderOptions,

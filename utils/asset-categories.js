@@ -1,4 +1,8 @@
-import {MARKET_SESSION_IDS} from './market-sessions.js';
+import {
+    MARKET_SESSION_IDS,
+    getMarketSessionOptions,
+    isEquityMarketSessionId,
+} from './market-sessions.js';
 
 /*
  * Asset/category metadata is the shared taxonomy for the entire extension.
@@ -18,8 +22,6 @@ export const ASSET_CATEGORIES = {
     COMMODITY: 'commodity',
     FX: 'fx',
     CRYPTO: 'crypto',
-    US_EQUITY: 'equity',
-    US_ETF: 'etf',
 };
 
 export const CRYPTO_PROVIDERS = {
@@ -97,6 +99,15 @@ export function getAssetCategoryOptions() {
 /* Market-session defaults come from the taxonomy so ticker creation and normalization agree on session policy. */
 export function getAssetCategoryDefaultMarketSessionId(assetCategory) {
     return ASSET_CATEGORY_METADATA[assetCategory]?.defaultMarketSessionId ?? MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
+}
+
+/* Category policy narrows the shared session registry to the choices valid for one ticker type. */
+export function getMarketSessionOptionsForAssetCategory(assetCategory) {
+    const defaultSessionId = getAssetCategoryDefaultMarketSessionId(assetCategory);
+    if ([ASSET_CATEGORIES.CRYPTO, ASSET_CATEGORIES.COMMODITY, ASSET_CATEGORIES.FX].includes(assetCategory))
+        return getMarketSessionOptions().filter(option => option.value === defaultSessionId);
+
+    return getMarketSessionOptions().filter(option => isEquityMarketSessionId(option.value));
 }
 
 /* A single default crypto provider keeps new ticker flows deterministic when the user has not chosen one yet. */

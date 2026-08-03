@@ -4,10 +4,26 @@ import {
     getTickerSessionPhase,
     shouldRefreshTicker,
 } from '../utils/market-schedule.js';
-import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
+import {
+    MARKET_SESSION_IDS,
+    getMarketSessionOptions,
+    getMarketSessionProfile,
+    hasMarketSessionId,
+    isEquityMarketSessionId,
+} from '../utils/market-sessions.js';
 import {assertEqual} from './support/assert.js';
 
 export function runTests() {
+    const sessionOptions = getMarketSessionOptions();
+    assertEqual(sessionOptions[0].value, MARKET_SESSION_IDS.ALWAYS_OPEN,
+        'Session registry declaration order should remain the prefs option order');
+    assertEqual(getMarketSessionProfile(MARKET_SESSION_IDS.EUROPE_EQUITY_CASH).id, MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
+        'Session profile access should restore the registry key as its public id');
+    assertEqual(hasMarketSessionId('invalid-session'), false,
+        'Unknown session ids should not pass registry membership checks');
+    assertEqual(isEquityMarketSessionId(MARKET_SESSION_IDS.WEEKDAY_24H), false,
+        'Non-equity session profiles should not become equity choices');
+
     const alwaysOpenTicker = {marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN};
     const weekdayTicker = {marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H};
     const usTicker = {marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED};

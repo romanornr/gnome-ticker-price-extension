@@ -169,7 +169,7 @@ export const US_ETF_TICKERS = [
     {label: 'XLY', keywords: ['consumer discretionary etf', 'discretionary']},
     {label: 'XOP', keywords: ['oil gas explorers etf', 'exploration and production']},
 ].map(entry => ({
-    assetCategory: ASSET_CATEGORIES.US_ETF,
+    assetCategory: ASSET_CATEGORIES.ETF,
     label: entry.label,
     symbol: `${entry.label.toLowerCase()}.us`,
     priceDecimals: 2,

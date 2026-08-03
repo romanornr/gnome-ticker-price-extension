@@ -20,12 +20,11 @@ import {
 } from './ticker-dialog-state.js';
 import {verifySymbol as verifyTickerSymbol} from '../../services/providers/rest-quotes.js';
 import {
+    getAssetCategoryDefaultMarketSessionId,
     getDefaultCryptoProvider,
-    getMarketSessionForAssetCategory,
     getMarketSessionOptionsForAssetCategory,
-    LEFT_PANEL_SIDE,
-    RIGHT_PANEL_SIDE,
-} from '../settings.js';
+} from '../asset-categories.js';
+import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from '../panel-sides.js';
 
 const MAX_CURATED_SUGGESTIONS = 8;
 
@@ -56,7 +55,7 @@ class TickerDialogController {
         this.findOptionIndex = findOptionIndex;
 
         this.activeAssetCategory = initialTicker.assetCategory ?? assetCategoryOptions[0].value;
-        this.activeMarketSessionId = initialTicker.marketSessionId ?? getMarketSessionForAssetCategory(this.activeAssetCategory);
+        this.activeMarketSessionId = initialTicker.marketSessionId ?? getAssetCategoryDefaultMarketSessionId(this.activeAssetCategory);
         this.activeCryptoProvider = this.activeAssetCategory === 'crypto'
             ? (initialTicker.cryptoProvider ?? getDefaultCryptoProvider())
             : '';
@@ -198,7 +197,7 @@ class TickerDialogController {
                 return;
 
             this.activeAssetCategory = option.value;
-            this.activeMarketSessionId = getMarketSessionForAssetCategory(this.activeAssetCategory);
+            this.activeMarketSessionId = getAssetCategoryDefaultMarketSessionId(this.activeAssetCategory);
             this.activeCryptoProvider = this.activeAssetCategory === 'crypto'
                 ? (this.activeCryptoProvider || getDefaultCryptoProvider())
                 : '';
@@ -264,7 +263,7 @@ class TickerDialogController {
             : curatedTicker.symbol);
         this.decimalsRow.value = curatedTicker.priceDecimals;
         this.activeAssetCategory = curatedTicker.assetCategory;
-        this.activeMarketSessionId = curatedTicker.marketSessionId ?? getMarketSessionForAssetCategory(curatedTicker.assetCategory);
+        this.activeMarketSessionId = curatedTicker.marketSessionId ?? getAssetCategoryDefaultMarketSessionId(curatedTicker.assetCategory);
         this.activeCryptoProvider = curatedTicker.assetCategory === 'crypto'
             ? (curatedTicker.cryptoProvider ?? getDefaultCryptoProvider())
             : '';

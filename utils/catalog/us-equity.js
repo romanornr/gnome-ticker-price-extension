@@ -134,7 +134,7 @@ export const US_EQUITY_TICKERS = [
     {label: 'XOM', keywords: ['exxon', 'exxon mobil']},
     {label: 'ZTS', keywords: ['zoetis']},
 ].map(entry => ({
-    assetCategory: ASSET_CATEGORIES.US_EQUITY,
+    assetCategory: ASSET_CATEGORIES.EQUITY,
     label: entry.label,
     symbol: entry.symbol ?? `${entry.label.toLowerCase()}.us`,
     priceDecimals: entry.priceDecimals ?? 2,

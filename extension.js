@@ -5,12 +5,11 @@ import {QuotesService} from './services/quotes.js';
 import {TickerIndicator} from './ui/indicator.js';
 import {getSharedDensityFontScale} from './utils/display-density.js';
 import {createLoadingEntries} from './utils/format.js';
+import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './utils/panel-sides.js';
 import {
     getTickersForSide,
-    LEFT_PANEL_SIDE,
     loadDisplaySettings,
     loadTickerConfigs,
-    RIGHT_PANEL_SIDE,
     SETTINGS_KEYS,
 } from './utils/settings.js';
 
