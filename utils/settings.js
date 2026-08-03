@@ -109,6 +109,11 @@ export function loadTickerConfigs(settings) {
         if (!Array.isArray(parsed))
             return cloneTickers(DEFAULT_TICKERS);
 
+        /* Deleting the last ticker in prefs saves [], and the panel must then show nothing. */
+        /* Defaults are only for a first run or a setting we cannot read, not for a list the user emptied. */
+        if (parsed.length === 0)
+            return [];
+
         const tickers = parsed
             .map(normalizeTickerConfig)
             .filter(ticker => ticker !== null);

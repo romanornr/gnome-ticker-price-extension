@@ -49,8 +49,8 @@ export function runTests() {
         'U.S. session tickers should skip weekends');
     assertEqual(getRefreshIntervalSecondsForTicker(usTicker, mondayRegularHoursNy, 300), 300,
         'U.S. session tickers should use base cadence during extended hours');
-    assertEqual(getRefreshIntervalSecondsForTicker(usTicker, mondayOvernightNy, 300), 1800,
-        'U.S. session tickers should slow down overnight');
+    assertEqual(getRefreshIntervalSecondsForTicker(usTicker, mondayOvernightNy, 300), 3600,
+        'U.S. session tickers should slow to hourly overnight, when the price cannot move');
 
     assertEqual(shouldRefreshTicker(usTicker, mondayRegularHoursNy, 9_900_000, 300), false,
         'U.S. session tickers should respect cadence when recently refreshed');
@@ -60,14 +60,14 @@ export function runTests() {
         'U.S. session tickers should report after-hours as extended');
     assertEqual(getTickerSessionPhase(usTicker, saturdayMorningNy), 'closed',
         'U.S. session tickers should report weekends as closed');
-    assertEqual(getRefreshIntervalSecondsForTicker(europeTicker, mondayOvernightNy, 300), 1800,
+    assertEqual(getRefreshIntervalSecondsForTicker(europeTicker, mondayOvernightNy, 300), 3600,
         'European equity profiles should be able to slow down outside their cash session');
-    assertEqual(getRefreshIntervalSecondsForTicker(ukTicker, mondayOvernightNy, 300), 1800,
+    assertEqual(getRefreshIntervalSecondsForTicker(ukTicker, mondayOvernightNy, 300), 3600,
         'U.K. equity profiles should be able to slow down outside their cash session');
     assertEqual(getRefreshIntervalSecondsForTicker(japanTicker, mondayOvernightNy, 300), 300,
         'Japan equity profiles should use base cadence during Tokyo daytime trading');
-    assertEqual(getRefreshIntervalSecondsForTicker(chinaTicker, mondayRegularHoursNy, 300), 1800,
+    assertEqual(getRefreshIntervalSecondsForTicker(chinaTicker, mondayRegularHoursNy, 300), 3600,
         'China equity profiles should slow down when the Shanghai session is closed');
-    assertEqual(getRefreshIntervalSecondsForTicker(australiaTicker, mondayRegularHoursNy, 300), 1800,
+    assertEqual(getRefreshIntervalSecondsForTicker(australiaTicker, mondayRegularHoursNy, 300), 3600,
         'Australia equity profiles should slow down when the Sydney session is closed');
 }
