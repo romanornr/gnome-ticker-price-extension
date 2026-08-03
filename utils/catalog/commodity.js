@@ -38,7 +38,7 @@ export const COMMODITY_TICKERS = [
     {label: 'GNR', symbol: 'gnr.us', keywords: ['natural resources', 'resources etf']},
     {label: 'GSG', symbol: 'gsg.us', keywords: ['commodity index', 'broad commodities']},
     {label: 'Gasoline', symbol: 'rb.f', keywords: ['gasoline futures']},
-    {label: 'Gold', symbol: 'xauusd', keywords: ['xau', 'spot gold']},
+    {label: 'Gold', symbol: 'xauusd', priceDecimals: 0, keywords: ['xau', 'spot gold']},
     {label: 'HE.F', symbol: 'he.f', keywords: ['lean hogs futures', 'livestock']},
     {label: 'Heating Oil', symbol: 'ho.f', keywords: ['heating oil futures']},
     {label: 'IAU', symbol: 'iau.us', keywords: ['gold trust etf', 'gold etf']},
@@ -98,9 +98,6 @@ export const COMMODITY_TICKERS = [
     label: entry.label,
     symbol: entry.symbol,
     priceDecimals: entry.priceDecimals ?? 2,
-    /* Exchange-listed funds follow U.S. equity hours; futures and spot metals trade around the clock on weekdays. */
-    marketSessionId: entry.symbol.endsWith('.us')
-        ? MARKET_SESSION_IDS.US_EQUITY_EXTENDED
-        : MARKET_SESSION_IDS.WEEKDAY_24H,
+    marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
     keywords: [...entry.keywords],
 }));
