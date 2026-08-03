@@ -140,12 +140,18 @@ export async function runTests() {
         ['open.er-api.com', rateTable],
     ]);
     /* Fallbacks resolve concurrently, so quote map insertion order is not part of the contract. */
-    const mixedQuotes = await refreshRestQuotes(mixedTickers, {session: mixedSession});
+    const {result: mixedQuotes, logs: mixedLogs} = await captureLogs(
+        () => refreshRestQuotes(mixedTickers, {session: mixedSession})
+    );
     assertDeepEqual(Array.from(mixedQuotes.entries()).sort(), [
         ['AAPL.US', {price: 100.5, quoteDate: '20260803', previousClose: null}],
         ['EURUSD', {price: 1.25, quoteDate: '20260803', previousClose: null}],
         ['SPY.US', {price: 750, quoteDate: '20260803', previousClose: 740}],
     ], 'CNBC misses should recover through the Nasdaq and rate table fallbacks');
+    assertEqual(mixedLogs.some(message => message.includes('CNBC batch missed 2 symbol(s)')), true,
+        'Runtime refresh should report the primary CNBC miss count');
+    assertEqual(mixedLogs.some(message => message.includes('CNBC missed 2 symbol(s); fallbacks recovered 2.')), true,
+        'Runtime refresh should report the fallback recovery count');
 
     /* Orchestrator: total CNBC failure with working fallbacks returns partial results. */
     const partialSession = new RoutingFakeSession([
@@ -227,6 +233,27 @@ export async function runTests() {
     }
     assertEqual(unknownMessage, 'Could not verify zzzq.nl. No quote data was returned by CNBC.',
         'Verification failures should keep the primary provider message users already see');
+
+    /* Verification misses are expected user input and must not emit runtime provider warnings. */
+    const {logs: quietLogs} = await captureLogs(
+        () => verifyRestSymbol(new RoutingFakeSession([
+            ['quote.cnbc.com', cnbcPayload([{symbol: 'TYPO-NL', code: 1}])],
+        ]), 'typo.nl', ASSET_CATEGORIES.EQUITY).catch(() => {})
+    );
+    assertDeepEqual(quietLogs, [],
+        'Verification misses should stay quiet rather than resemble runtime provider failures');
+}
+
+async function captureLogs(callback) {
+    const logs = [];
+    const originalLog = globalThis.log;
+    globalThis.log = message => logs.push(message);
+
+    try {
+        return {result: await callback(), logs};
+    } finally {
+        globalThis.log = originalLog;
+    }
 }
 
 function cnbcPayload(quotes) {

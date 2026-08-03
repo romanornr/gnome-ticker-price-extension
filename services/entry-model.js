@@ -9,22 +9,12 @@ import {
     POSITIVE_COLOR,
     STALE_TEXT_COLOR,
 } from '../utils/format.js';
-import {ASSET_CATEGORIES} from '../utils/asset-categories.js';
+import {isLiveCryptoTicker} from '../utils/asset-categories.js';
 import {createMarketScheduleNow, getTickerSessionPhase} from '../utils/market-schedule.js';
 
 /*
- * This module translates normalized quote cache state into UI-facing entry
- * models. It is the boundary between "we have quotes" and "the panel knows how
- * to render them".
- *
- * QuotesService and QuoteStore remain concerned with data freshness; this module
- * is concerned with user-visible states such as loading, error, formatted quote
- * display, and the temporary price-flash effect.
- */
-/*
- * buildEntries() is the single translation step from normalized quotes into
- * indicator-ready render models, including the distinction between loading,
- * error, and normal display states.
+ * This module translates QuoteStore state into loading, error, and display entries.
+ * It decorates price changes while provider and schedule concerns remain upstream.
  */
 export function buildEntries(tickers, quoteStore, displaySettings, previousEntries = [], now = createMarketScheduleNow()) {
     const baseEntries = tickers.map((ticker, index) => {
@@ -78,13 +68,6 @@ function decorateEntriesWithPriceFlash(entries, previousEntries) {
             priceFlash: true,
         };
     });
-}
-
-/* Live crypto should render as loading until the socket or fallback populates a quote. */
-function isLiveCryptoTicker(ticker) {
-    return ticker?.assetCategory === ASSET_CATEGORIES.CRYPTO &&
-        typeof ticker.liveSymbol === 'string' &&
-        ticker.liveSymbol !== '';
 }
 
 /* Non-regular-session cached quotes are expected, so only regular-session stale quotes get muted. */

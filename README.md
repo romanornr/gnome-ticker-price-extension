@@ -165,8 +165,8 @@ The current test suite covers:
 
 - market schedule policy
 - entry-model rendering
-- shared live-provider and live-websocket helpers
-- provider adapters and runtime provider registry
+- live-websocket lifecycle and direct provider routing
+- provider adapters and REST fallback boundaries
 - non-crypto quote parsing and live-provider payload handling
 - QuotesService orchestration, coordinator scheduling, and lifecycle
 - ticker config and prefs dialog state

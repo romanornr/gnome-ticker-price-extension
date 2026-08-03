@@ -78,7 +78,7 @@ visually dense in context.
 Examples:
 
 ```js
-const provider = new KrakenLiveProvider({uuid, onQuotes});
+const provider = new KrakenProvider({uuid, onQuotes});
 return {price, quoteDate, previousClose};
 
 return {

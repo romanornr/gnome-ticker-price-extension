@@ -169,7 +169,14 @@ function testSilentConnectionDropsMarksStaleAndReconnects() {
 
 class TestLiveWebsocketProvider extends LiveWebsocketProvider {
     constructor({onQuotes = null, onStale = null} = {}) {
-        super({uuid: 'test', onQuotes, onStale, filterTicker: ticker => Boolean(ticker?.liveSymbol)});
+        super({
+            id: 'test-provider',
+            name: 'Test',
+            websocketUrl: 'wss://example.invalid',
+            uuid: 'test',
+            onQuotes,
+            onStale,
+        });
         this._nextHandlePayloadResult = null;
         this.handlePayloadCalls = [];
         this.disconnectCalls = 0;
@@ -186,10 +193,6 @@ class TestLiveWebsocketProvider extends LiveWebsocketProvider {
 
     _scheduleReconnect() {
         this.scheduleReconnectCalls += 1;
-    }
-
-    async _openConnection() {
-        return null;
     }
 
     _subscribe() {

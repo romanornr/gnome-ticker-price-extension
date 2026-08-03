@@ -1,7 +1,6 @@
-import {httpGetJson} from '../../utils/http.js';
+import {DEFAULT_HTTP_TIMEOUT_SECONDS, httpGetJson} from '../../utils/http.js';
 import {parseFxPairSymbol} from './cnbc-symbols.js';
 
-const ER_API_REQUEST_TIMEOUT_SECONDS = 12;
 const ER_API_ENDPOINT = 'https://open.er-api.com/v6/latest/USD';
 
 /*
@@ -22,8 +21,7 @@ export async function refresh(tickers, {session}) {
         return new Map();
 
     const payload = await httpGetJson(session, ER_API_ENDPOINT, {
-        timeoutSeconds: ER_API_REQUEST_TIMEOUT_SECONDS,
-        timeoutMessage: `Timed out after ${ER_API_REQUEST_TIMEOUT_SECONDS}s while loading fallback FX rates.`,
+        timeoutMessage: `Timed out after ${DEFAULT_HTTP_TIMEOUT_SECONDS}s while loading fallback FX rates.`,
     });
 
     return deriveFxQuotes(payload, fxRequests);

@@ -18,7 +18,7 @@ import {
     validateTickerDraft,
     validateTickerSymbol,
 } from './ticker-dialog-state.js';
-import {verifyTickerSymbol} from './quote-verifier.js';
+import {verifySymbol as verifyTickerSymbol} from '../../services/providers/rest-quotes.js';
 import {
     getDefaultCryptoProvider,
     getMarketSessionForAssetCategory,
@@ -30,22 +30,8 @@ import {
 const MAX_CURATED_SUGGESTIONS = 8;
 
 /*
- * This controller owns the ticker dialog as one cohesive prefs subsystem.
- *
- * prefs.js remains responsible for the preferences page and row-level actions,
- * but it delegates the dialog's internal state machine here:
- * - asset/provider selection
- * - crypto catalog loading
- * - symbol verification
- * - suggestion rendering
- * - validation and save wiring
- *
- * That keeps the page file readable while preserving the current UX and helper
- * structure.
- */
-/*
- * This class keeps the dialog's mutable prefs state in one place while the
- * module continues to expose a small functional entrypoint to prefs.js.
+ * TickerDialogController owns mutable dialog state, catalog search, verification, and save wiring.
+ * prefs.js retains page layout and row actions; this module exposes one small functional entrypoint.
  */
 class TickerDialogController {
     constructor({
