@@ -20,6 +20,7 @@ import {getCryptoProviderAdapter} from './crypto-providers/index.js';
  * runtime, then exposes one search/match API so the dialog controller does not
  * need to know where each candidate came from.
  */
+/* Preserve block and entry order: equal-score duplicate labels use stable source order to break suggestion ties. */
 const CATALOG = [
     ...MAINLAND_CHINA_EQUITY_TICKERS,
     ...GERMANY_EQUITY_TICKERS,

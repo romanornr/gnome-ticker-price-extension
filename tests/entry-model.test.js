@@ -15,7 +15,6 @@ export function runTests() {
         symbol: '^spx',
         priceDecimals: 0,
         marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
-        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         assetCategory: ASSET_CATEGORIES.EQUITY,
     };
     const liveCryptoTicker = {

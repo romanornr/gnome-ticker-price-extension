@@ -138,8 +138,10 @@ Shared category labels, descriptions, default market sessions, and category sear
 
 When adding a curated ticker:
 
-- put it in the file for its asset category
-- keep `assetCategory`, `marketSessionId`, and `priceDecimals` aligned with similar entries
+- put one compact source record in the file for its asset category and preserve the file's label order
+- let the file-local mapper supply its shared `assetCategory`, `marketSessionId`, regional keywords, and precision policy
+- equity and ETF symbols normally derive from the lowercase label plus the file's market suffix; keep verified exceptions explicit, as `us-equity.js` does for `BRK.B`, `NDX`, and `SPX`
+- keep commodity symbols explicit, and add `priceDecimals` only in files whose mapper supports a row-level override
 - add a few helpful `keywords` so catalog search is forgiving
 - verify the provider symbol first for non-crypto instruments
 - crypto suggestions come from the selected live provider at runtime rather than a manually maintained static catalog
