@@ -13,6 +13,14 @@ GNOME Shell extension that shows market tickers in the top bar, with curated sug
 - `./install-dev.sh` for a symlinked development install
 - `./remove.sh` to uninstall the extension files when you still have this checkout available
 
+If you installed before the UUID settled on `ticker-price-extension@romanornr`, the
+old copy stays behind under its own directory and shows a second indicator in the
+panel. Remove it once:
+
+```bash
+rm -rf ~/.local/share/gnome-shell/extensions/ticker-price-extension@romano
+```
+
 ## Default Tickers
 
 The extension ships with the following tickers out of the box:
