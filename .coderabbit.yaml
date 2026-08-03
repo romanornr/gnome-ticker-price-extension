@@ -22,12 +22,6 @@ reviews:
     base_branches:
       - "main"
 
-  path_filters:
-    - "!.brv/**"
-    - "!.gitnexus/**"
-    - "!.agents/**"
-    - "!schemas/gschemas.compiled"
-
   path_instructions:
     - path: "utils/catalog/**"
       instructions: >-

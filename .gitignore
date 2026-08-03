@@ -1,3 +1,8 @@
 schemas/gschemas.compiled
+
+# Local agent tooling: caches, indexes, and generated skills, not project source.
+.agents/
+.brv/
+.claude/
 .codex
-.brv/*
+.gitnexus/
