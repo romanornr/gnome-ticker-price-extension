@@ -4,13 +4,11 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {QuotesService} from './services/quotes.js';
 import {TickerIndicator} from './ui/indicator.js';
 import {getSharedDensityFontScale} from './utils/display-density.js';
-import {createLoadingEntries} from './utils/format.js';
 import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './utils/panel-sides.js';
 import {
     getTickersForSide,
     loadDisplaySettings,
     loadTickerConfigs,
-    SETTINGS_KEYS,
 } from './utils/settings.js';
 
 const LEFT_PANEL_POSITION = 999;
@@ -35,7 +33,6 @@ export default class TickerPriceExtension extends Extension {
         this._quotesService = null;
         this._quotesChangedId = 0;
         this._settings = null;
-        this._settingsSignalIds = [];
     }
 
     /* enable() is the shell entry hook that boots the extension's runtime graph. */
@@ -48,7 +45,7 @@ export default class TickerPriceExtension extends Extension {
         this._shutdown();
     }
 
-    /* Startup creates the runtime service, subscribes to entry changes, and seeds the panel with placeholders. */
+    /* Startup creates the runtime service and subscribes the panel to its entry snapshots. */
     _startup() {
         this._shutdown();
 
@@ -58,22 +55,7 @@ export default class TickerPriceExtension extends Extension {
         this._quotesChangedId = this._quotesService.connect('entries-changed', () => {
             this._syncIndicators(this._quotesService.getEntries());
         });
-
-        this._settingsSignalIds = [
-            this._settings.connect(`changed::${SETTINGS_KEYS.TICKERS_JSON}`, () => {
-                this._syncIndicators(this._quotesService?.getEntries() ?? this._getLoadingEntries());
-            }),
-        ];
-
-        this._syncIndicators(this._getLoadingEntries());
         this._quotesService.start();
-    }
-
-    /* Before live data arrives, the shell still needs placeholder entries to render. */
-    _getLoadingEntries() {
-        const tickers = loadTickerConfigs(this._settings);
-        const displaySettings = loadDisplaySettings(this._settings);
-        return createLoadingEntries(tickers, displaySettings);
     }
 
     /* Entry changes from QuotesService are fanned back out to both panel-side indicators here. */
@@ -130,9 +112,6 @@ export default class TickerPriceExtension extends Extension {
 
     /* Shutdown tears the shell-facing boundary down cleanly so a later enable starts from a blank slate. */
     _shutdown() {
-        this._settingsSignalIds.forEach(signalId => this._settings?.disconnect(signalId));
-        this._settingsSignalIds = [];
-
         if (this._quotesService && this._quotesChangedId !== 0) {
             this._quotesService.disconnect(this._quotesChangedId);
             this._quotesChangedId = 0;
