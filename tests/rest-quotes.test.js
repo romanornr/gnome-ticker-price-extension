@@ -93,6 +93,41 @@ export async function runTests() {
     assertEqual(fullSession.requestedUrls.some(url => !url.includes('quote.cnbc.com')), false,
         'A fully successful CNBC pass should issue no fallback requests');
 
+    /* Orchestrator: one failed CNBC batch must not discard another batch's quote. */
+    const largeTickers = [
+        ...Array.from({length: 30}, (_, index) => ({
+            symbol: `missing${index}.nl`,
+            assetCategory: ASSET_CATEGORIES.EQUITY,
+        })),
+        {symbol: 'asml.nl', assetCategory: ASSET_CATEGORIES.EQUITY},
+    ];
+    const partialBatchSession = new RoutingFakeSession([
+        ['symbols=ASML-NL&', cnbcPayload([{symbol: 'ASML-NL', last: '700', last_time: '2026-08-03'}])],
+        ['quote.cnbc.com', new Error('first batch failed')],
+    ]);
+    const partialBatchQuotes = await refreshRestQuotes(largeTickers, {session: partialBatchSession});
+    assertDeepEqual(partialBatchQuotes.get('ASML.NL'),
+        {price: 700, quoteDate: '20260803', previousClose: null},
+        'A failed CNBC batch should not discard quotes returned by another batch');
+    assertEqual(partialBatchSession.requestedUrls.filter(url => url.includes('quote.cnbc.com')).length, 2,
+        'A CNBC request plan with more than 30 symbols should issue multiple batches');
+
+    /* Orchestrator: a foreign CNBC miss must not fall through to a Nasdaq ADR. */
+    const foreignMissSession = new RoutingFakeSession([
+        ['quote.cnbc.com', cnbcPayload([{symbol: 'ASML-NL', code: 1}])],
+        ['api.nasdaq.com/api/quote/ASML/', {data: {primaryData: {
+            lastSalePrice: '$900', netChange: '+10', lastTradeTimestamp: 'Aug 3, 2026 12:27 PM ET',
+        }}}],
+    ]);
+    const foreignMissQuotes = await refreshRestQuotes(
+        [{symbol: 'asml.nl', assetCategory: ASSET_CATEGORIES.EQUITY}],
+        {session: foreignMissSession}
+    );
+    assertEqual(foreignMissQuotes.size, 0,
+        'A CNBC miss for a foreign listing should remain missing rather than use an ADR quote');
+    assertEqual(foreignMissSession.requestedUrls.some(url => url.includes('api.nasdaq.com')), false,
+        'A CNBC miss for a foreign listing should issue no Nasdaq request');
+
     /* Orchestrator: CNBC misses split across both fallbacks. */
     const mixedTickers = [
         {symbol: 'aapl.us', assetCategory: ASSET_CATEGORIES.EQUITY},
