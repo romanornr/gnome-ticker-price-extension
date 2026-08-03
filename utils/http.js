@@ -14,7 +14,12 @@ import Soup from 'gi://Soup?version=3.0';
 export const DEFAULT_HTTP_TIMEOUT_SECONDS = 12;
 
 /* Every helper funnels through this timeout-guarded core so no request can hang a refresh pass forever. */
-export async function requestBytes(session, message, {timeoutSeconds = DEFAULT_HTTP_TIMEOUT_SECONDS, timeoutMessage = null} = {}) {
+export async function requestBytes(session, message, {timeoutSeconds = DEFAULT_HTTP_TIMEOUT_SECONDS, timeoutMessage = null, headers = null} = {}) {
+    if (headers) {
+        const requestHeaders = message.get_request_headers();
+        Object.entries(headers).forEach(([name, value]) => requestHeaders.replace(name, value));
+    }
+
     const cancellable = new Gio.Cancellable();
     let timeoutId = GLib.timeout_add_seconds(
         GLib.PRIORITY_DEFAULT,
@@ -39,13 +44,13 @@ export async function requestBytes(session, message, {timeoutSeconds = DEFAULT_H
     }
 }
 
-/* Text endpoints (Stooq CSV) read the whole body as trimmed UTF-8. */
+/* Text endpoints read the whole body as trimmed UTF-8. */
 export async function httpGetText(session, url, options = {}) {
     const bytes = await requestBytes(session, Soup.Message.new('GET', url), options);
     return new TextDecoder().decode(bytes.get_data()).trim();
 }
 
-/* JSON GET endpoints (Kraken REST) parse the body directly so callers only see decoded payloads. */
+/* JSON GET endpoints (CNBC, Kraken REST) parse the body directly so callers only see decoded payloads. */
 export async function httpGetJson(session, url, options = {}) {
     const bytes = await requestBytes(session, Soup.Message.new('GET', url), options);
     return JSON.parse(new TextDecoder().decode(bytes.get_data()));

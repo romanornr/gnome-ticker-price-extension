@@ -18,7 +18,7 @@ import {
     validateTickerDraft,
     validateTickerSymbol,
 } from './ticker-dialog-state.js';
-import {verifyTickerSymbol} from './stooq-verifier.js';
+import {verifyTickerSymbol} from './quote-verifier.js';
 import {
     getDefaultCryptoProvider,
     getMarketSessionForAssetCategory,
@@ -497,7 +497,7 @@ class TickerDialogController {
     /*
      * Verification bridges dialog state to provider checks: crypto validates
      * against the loaded runtime catalog, while non-crypto symbols round-trip
-     * through Stooq.
+     * through the CNBC quote provider.
      */
     async _runSymbolVerification() {
         if (this.activeAssetCategory === 'crypto') {
@@ -541,7 +541,7 @@ class TickerDialogController {
         const requestId = this.verificationRequestId;
         this.verifyInProgress = true;
         this._updateVerifyButtonSensitivity();
-        this._setVerificationMessage(`Checking ${symbol} on Stooq...`);
+        this._setVerificationMessage(`Checking ${symbol}...`);
 
         try {
             const result = await verifyTickerSymbol(this.verificationSession, symbol);
@@ -550,7 +550,7 @@ class TickerDialogController {
 
             this.lastVerifiedSymbol = symbol;
             this._setVerificationMessage(
-                `Verified ${result.symbol}. Stooq returned quote data dated ${result.quoteDate}.`
+                `Verified ${result.symbol}. Quote data dated ${result.quoteDate}.`
             );
         } catch (error) {
             if (requestId !== this.verificationRequestId)

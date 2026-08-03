@@ -136,7 +136,7 @@ export const QuotesService = GObject.registerClass({
     /*
      * A refresh pass first decides what needs data right now, then delegates to
      * the right provider layer. The provider registry owns refresh entrypoints
-     * for both normal polling providers such as Stooq and live providers that
+     * for both normal polling providers such as CNBC and live providers that
      * expose a fallback REST path when their socket is unavailable.
      */
     async _refreshQuotes(forceRefreshAll = false) {

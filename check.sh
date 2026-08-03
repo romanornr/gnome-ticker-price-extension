@@ -24,7 +24,7 @@ gjs -m services/providers/live-quote-provider.js
 gjs -m services/providers/kraken-live.js
 gjs -m services/providers/hyperliquid-live.js
 gjs -m services/providers/runtime-provider-registry.js
-gjs -m services/providers/stooq.js
+gjs -m services/providers/cnbc.js
 gjs -m services/entry-model.js
 gjs -m services/quote-store.js
 gjs -m utils/display-settings.js

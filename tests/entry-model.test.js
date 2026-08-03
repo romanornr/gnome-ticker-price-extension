@@ -10,7 +10,7 @@ import {assertDeepEqual, assertEqual, assertFalse, assertTruthy} from './support
 export function runTests() {
     const displaySettings = {...DEFAULT_DISPLAY_SETTINGS};
     const quoteStore = new QuoteStore();
-    const stooqTicker = {
+    const restTicker = {
         label: 'SPX',
         symbol: '^spx',
         priceDecimals: 0,
@@ -28,12 +28,12 @@ export function runTests() {
         liveSymbol: 'BTC/USD',
     };
 
-    let entries = buildEntries([stooqTicker, liveCryptoTicker], quoteStore, displaySettings);
+    let entries = buildEntries([restTicker, liveCryptoTicker], quoteStore, displaySettings);
     assertEqual(entries[0].priceText, '--', 'Missing non-live quotes should render error entries');
     assertEqual(entries[1].priceText, '...', 'Missing live crypto quotes should render loading entries');
 
     quoteStore.setQuote('^spx', {price: 5100, quoteDate: '20260323', previousClose: 5000});
-    entries = buildEntries([stooqTicker], quoteStore, displaySettings);
+    entries = buildEntries([restTicker], quoteStore, displaySettings);
     assertEqual(entries[0].priceText, '5,100', 'Known quotes should render formatted prices');
     assertEqual(entries[0].percentText, '2.0%', 'Known quotes should render percent change');
     assertEqual(entries[0].priceColor, DEFAULT_TEXT_COLOR,
@@ -41,7 +41,7 @@ export function runTests() {
     assertFalse(entries[0].priceFlash, 'Fresh known quotes should not be marked as flashing');
 
     quoteStore.setQuote('^spx', {price: 5200, quoteDate: '20260323', previousClose: 5000});
-    const flashedEntries = buildEntries([stooqTicker], quoteStore, displaySettings, entries);
+    const flashedEntries = buildEntries([restTicker], quoteStore, displaySettings, entries);
     assertEqual(flashedEntries[0].priceColor, POSITIVE_COLOR,
         'Price increases should flash positive color');
     assertTruthy(flashedEntries[0].priceFlash, 'Price increases should mark the entry as flashing');
@@ -52,14 +52,14 @@ export function runTests() {
     assertFalse(clearedEntries[0].priceFlash, 'Flash clearing should reset flash state');
 
     quoteStore.setQuote('^spx', {price: 5100, quoteDate: '20260323', previousClose: 5000});
-    const negativeFlashedEntries = buildEntries([stooqTicker], quoteStore, displaySettings, clearedEntries);
+    const negativeFlashedEntries = buildEntries([restTicker], quoteStore, displaySettings, clearedEntries);
     assertEqual(negativeFlashedEntries[0].priceColor, NEGATIVE_COLOR,
         'Price decreases should flash negative color');
 
     quoteStore.markStale(['^spx']);
     const mondayRegularHoursNy = createMarketScheduleNow(new Date('2026-03-23T15:00:00Z'), 10_000_000);
     const staleEntries = buildEntries(
-        [stooqTicker],
+        [restTicker],
         quoteStore,
         displaySettings,
         negativeFlashedEntries,
@@ -71,7 +71,7 @@ export function runTests() {
 
     const fridayAfterRegularCloseNy = createMarketScheduleNow(new Date('2026-03-20T22:00:00Z'), 10_000_000);
     const closedMarketEntries = buildEntries(
-        [stooqTicker],
+        [restTicker],
         quoteStore,
         displaySettings,
         staleEntries,
@@ -89,7 +89,7 @@ export function runTests() {
         'Flash clearing should preserve stale quote color');
 
     quoteStore.markRefreshed(['^spx']);
-    const refreshedEntries = buildEntries([stooqTicker], quoteStore, displaySettings, staleEntries);
+    const refreshedEntries = buildEntries([restTicker], quoteStore, displaySettings, staleEntries);
     assertEqual(refreshedEntries[0].priceColor, DEFAULT_TEXT_COLOR,
         'Successful refresh should return stale cached quotes to the default color');
 

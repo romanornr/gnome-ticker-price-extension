@@ -11,7 +11,7 @@ import {
     isLiveCryptoTicker,
     isLiveCryptoTickerForProvider,
 } from './live-quote-provider.js';
-import {refresh as refreshStooqQuotes} from './stooq.js';
+import {refresh as refreshCnbcQuotes} from './cnbc.js';
 
 /*
  * This module is the runtime provider registry used by QuotesService.
@@ -28,9 +28,9 @@ export function createRuntimeProviderRegistry({uuid, quoteStore, onQuotes, onSta
 
     return [
         {
-            id: 'stooq',
+            id: 'cnbc',
             ownsTicker: ticker => !isLiveCryptoTicker(ticker),
-            refreshFallback: (tickers, context) => refreshStooqQuotes(tickers, context),
+            refreshFallback: (tickers, context) => refreshCnbcQuotes(tickers, context),
         },
         {
             id: CRYPTO_PROVIDERS.KRAKEN,

@@ -37,10 +37,10 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
     };
     service._runtimeProviders = [
         {
-            id: 'stooq',
+            id: 'cnbc',
             ownsTicker: ticker => !ticker.liveSymbol,
             refreshFallback: async tickers => {
-                refreshCalls.push(['stooq', tickers.map(ticker => ticker.symbol)]);
+                refreshCalls.push(['cnbc', tickers.map(ticker => ticker.symbol)]);
                 return new Map([['AAPL.US', {
                     price: 210,
                     quoteDate: '20260322',
@@ -75,13 +75,13 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
     await service._refreshQuotes(false);
 
     assertDeepEqual(refreshCalls, [
-        ['stooq', ['aapl.us']],
+        ['cnbc', ['aapl.us']],
         ['hyperliquid', ['purrusdc']],
     ], 'QuotesService should refresh only the provider plans returned for due tickers');
     assertEqual(entryUpdateRequests, 1,
         'QuotesService should request one immediate entry rebuild after polling refreshes');
     assertEqual(service._quoteStore.getQuote('aapl.us').price, 210,
-        'QuotesService should merge Stooq refresh results into the quote store');
+        'QuotesService should merge CNBC refresh results into the quote store');
     assertEqual(service._quoteStore.getQuote('purrusdc').price, 0.42,
         'QuotesService should merge provider fallback refresh results into the quote store');
     assertEqual(service._quoteStore.getLastRefreshUsec('aapl.us') > 0, true,
@@ -128,7 +128,7 @@ async function testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh() {
         },
     };
     service._runtimeProviders = [{
-        id: 'stooq',
+        id: 'cnbc',
         ownsTicker: () => true,
         hasPollingFallback: () => false,
         refreshFallback: async () => new Map(),
@@ -180,10 +180,10 @@ async function testRefreshQuotesContinuesAfterProviderError() {
     };
     service._runtimeProviders = [
         {
-            id: 'stooq',
+            id: 'cnbc',
             ownsTicker: ticker => ticker.assetCategory === ASSET_CATEGORIES.EQUITY,
             refreshFallback: async () => {
-                throw new Error('broken stooq');
+                throw new Error('broken cnbc');
             },
         },
         {
@@ -290,7 +290,7 @@ async function testStartSkipsRegistryEntriesWithoutLiveProviders() {
 
     service._runtimeProviders = [
         {
-            id: 'stooq',
+            id: 'cnbc',
             refreshFallback: async () => new Map(),
         },
         {
