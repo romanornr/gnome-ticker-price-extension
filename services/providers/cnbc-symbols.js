@@ -48,8 +48,9 @@ const FX_CURRENCY_CODES = new Set([
 ]);
 
 /*
- * CNBC's per-currency spot symbols ("EUR=") follow FX market convention: these
- * four quote as currency-per-USD, every other code quotes as USD-per-currency.
+ * CNBC's per-currency spot symbols follow FX market convention on direction.
+ * These four quote as USD per currency unit ("EUR=" is 1.15 USD per euro).
+ * Every other code quotes as currency units per USD ("JPY=" is 155 yen per dollar).
  */
 const USD_QUOTED_CURRENCIES = new Set(['EUR', 'GBP', 'AUD', 'NZD']);
 
