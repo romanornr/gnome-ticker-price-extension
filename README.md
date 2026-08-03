@@ -69,12 +69,12 @@ Non-crypto tickers are polled on a configurable refresh interval with market-awa
 |---|---|---|
 | **Markets** | Spot pairs | Perps + Spot pairs |
 | **Live transport** | WebSocket v2 | WebSocket |
-| **REST fallback** | — | (when WebSocket disconnects) |
+| **REST fallback** | Ticker endpoint | Market snapshots |
 | **Catalog discovery** | Dynamic from instrument metadata | Dynamic from spot/perp metadata endpoints |
 | **Search examples** | `SOL`, `SOLUSD`, `SOL/USD` | `BTC`, `ETH`, `ETH/USDC` |
 | **Connection model** | Single socket, batch subscribe | Single socket, per-symbol subscribe |
 
-Both providers maintain one persistent WebSocket connection for all saved crypto pairs rather than opening one socket per ticker. If Hyperliquid's WebSocket disconnects, it falls back to REST polling on the normal refresh cadence. Kraken quotes wait for reconnect.
+Both providers maintain one persistent WebSocket connection for all saved crypto pairs rather than opening one socket per ticker. If either WebSocket disconnects, its provider falls back to REST polling on the normal refresh cadence while reconnecting conservatively.
 
 ## Display Settings
 
