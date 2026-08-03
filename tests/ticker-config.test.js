@@ -1,7 +1,8 @@
 import {
     ASSET_CATEGORIES,
     CRYPTO_PROVIDERS,
-    getMarketSessionOptionsForAssetCategory,
+    getTickerMarketSessionOptions,
+    getTickerMarketSessionPolicy,
 } from '../utils/asset-categories.js';
 import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
 import {
@@ -27,15 +28,26 @@ export function runTests() {
     'Known ETF symbols should infer as ETFs');
 
     assertDeepEqual(
-        getMarketSessionOptionsForAssetCategory(ASSET_CATEGORIES.CRYPTO).map(option => option.value),
+        getTickerMarketSessionOptions({assetCategory: ASSET_CATEGORIES.CRYPTO}).map(option => option.value),
         [MARKET_SESSION_IDS.ALWAYS_OPEN],
         'Crypto category options should stay limited to the always-open profile'
     );
     assertDeepEqual(
-        getMarketSessionOptionsForAssetCategory(ASSET_CATEGORIES.FX).map(option => option.value),
+        getTickerMarketSessionOptions({assetCategory: ASSET_CATEGORIES.FX}).map(option => option.value),
         [MARKET_SESSION_IDS.WEEKDAY_24H],
         'FX category options should stay limited to the weekday profile'
     );
+
+    const listedCommodityPolicy = getTickerMarketSessionPolicy({assetCategory: ASSET_CATEGORIES.COMMODITY, symbol: 'gld.us'});
+    assertDeepEqual({
+        defaultMarketSessionId: listedCommodityPolicy.defaultMarketSessionId,
+        missingMarketSessionId: listedCommodityPolicy.missingMarketSessionId,
+        allowedMarketSessionIds: listedCommodityPolicy.allowedMarketSessionIds,
+    }, {
+        defaultMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        missingMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
+        allowedMarketSessionIds: [MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+    }, 'Listed commodities should separate their venue default from the saved-data fallback');
 
     const legacyKrakenTicker = normalizeTickerConfig({label: 'BTC', symbol: 'btc.v', marketType: 'always-open', liveSymbol: 'BTC/USD'});
     assertDeepEqual(legacyKrakenTicker, {
@@ -50,41 +62,34 @@ export function runTests() {
     }, 'Legacy Kraken ticker shapes should normalize to current crypto config');
 
     [
-        ['always_open', 'btcusd', MARKET_SESSION_IDS.ALWAYS_OPEN],
-        ['weekday-session', 'eurusd', MARKET_SESSION_IDS.WEEKDAY_24H],
-        ['weekday_session', 'eurusd', MARKET_SESSION_IDS.WEEKDAY_24H],
-        ['us-session', 'aapl.us', MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
-        ['us_session', 'aapl.us', MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
-    ].forEach(([marketType, symbol, expectedSessionId]) => {
-        const ticker = normalizeTickerConfig({label: 'Legacy', symbol, marketType});
-        assertEqual(ticker.marketSessionId, expectedSessionId,
-            `Legacy marketType ${marketType} should remain readable`);
+        ['fieldless listed commodity', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['listed commodity with weekday session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['listed commodity with modern US session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['listed commodity with legacy US session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketType: 'us_session'}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['listed commodity with disallowed Europe session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['fieldless spot commodity', {symbol: 'xauusd', assetCategory: ASSET_CATEGORIES.COMMODITY}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['fieldless FX', {symbol: 'eurusd', assetCategory: ASSET_CATEGORIES.FX}, ASSET_CATEGORIES.FX, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['fieldless crypto', {symbol: 'btcusd', assetCategory: ASSET_CATEGORIES.CRYPTO}, ASSET_CATEGORIES.CRYPTO, MARKET_SESSION_IDS.ALWAYS_OPEN],
+        ['fieldless equity', {symbol: 'aapl.us', assetCategory: ASSET_CATEGORIES.EQUITY}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['fieldless ETF', {symbol: 'spy.us', assetCategory: ASSET_CATEGORIES.ETF}, ASSET_CATEGORIES.ETF, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['category-free GLD', {symbol: 'gld.us'}, ASSET_CATEGORIES.ETF, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['category-free spot gold', {symbol: 'xauusd'}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['legacy always_open', {symbol: 'btcusd', marketType: 'always_open'}, ASSET_CATEGORIES.CRYPTO, MARKET_SESSION_IDS.ALWAYS_OPEN],
+        ['legacy weekday-session', {symbol: 'eurusd', marketType: 'weekday-session'}, ASSET_CATEGORIES.FX, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['legacy weekday_session', {symbol: 'eurusd', marketType: 'weekday_session'}, ASSET_CATEGORIES.FX, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['legacy us-session', {symbol: 'aapl.us', marketType: 'us-session'}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['legacy us_session', {symbol: 'aapl.us', marketType: 'us_session'}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['legacy us-equity alias', {symbol: 'legacy.us', assetCategory: 'us-equity'}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['legacy us_etf alias with Europe session', {symbol: 'legacy.us', assetCategory: 'us_etf', marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH}, ASSET_CATEGORIES.ETF, MARKET_SESSION_IDS.EUROPE_EQUITY_CASH],
+        ['invalid equity session', {symbol: 'aapl.us', marketSessionId: 'invalid-session'}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+    ].forEach(([description, rawTicker, expectedAssetCategory, expectedMarketSessionId]) => {
+        const ticker = normalizeTickerConfig({label: 'Saved', ...rawTicker});
+        assertEqual(ticker.assetCategory, expectedAssetCategory, `${description} should preserve its category meaning`);
+        assertEqual(ticker.marketSessionId, expectedMarketSessionId, `${description} should resolve to the expected session`);
+        assertEqual(serializeTickerConfig(ticker).marketSessionId, expectedMarketSessionId, `${description} should serialize unchanged`);
+        assertEqual(getTickerMarketSessionOptions(ticker).some(option => option.value === expectedMarketSessionId), true,
+            `${description} prefs should include the effective session`);
     });
-
-    [
-        ['us-equity', ASSET_CATEGORIES.EQUITY],
-        ['us_equity', ASSET_CATEGORIES.EQUITY],
-        ['us-etf', ASSET_CATEGORIES.ETF],
-        ['us_etf', ASSET_CATEGORIES.ETF],
-    ].forEach(([assetCategory, expectedAssetCategory]) => {
-        const ticker = normalizeTickerConfig({label: 'Legacy', symbol: 'legacy.us', assetCategory});
-        assertEqual(ticker.assetCategory, expectedAssetCategory,
-            `Legacy asset category ${assetCategory} should remain readable`);
-    });
-
-    const internationalTicker = normalizeTickerConfig({
-        label: 'ASML',
-        symbol: 'asml.nl',
-        priceDecimals: 2,
-        marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
-        assetCategory: ASSET_CATEGORIES.EQUITY,
-    });
-    assertEqual(internationalTicker.marketSessionId, MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
-        'Registered international equity sessions should survive normalization');
-
-    const invalidSessionTicker = normalizeTickerConfig({label: 'AAPL', symbol: 'aapl.us', marketSessionId: 'invalid-session'});
-    assertEqual(invalidSessionTicker.marketSessionId, MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
-        'Unknown session ids should fall back through legacy-compatible normalization');
 
     const hyperliquidTicker = normalizeTickerConfig({
         label: 'PURR',

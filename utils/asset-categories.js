@@ -1,6 +1,8 @@
 import {
     MARKET_SESSION_IDS,
+    getMarketSessionIdFromLegacyMarketType,
     getMarketSessionOptions,
+    hasMarketSessionId,
     isEquityMarketSessionId,
 } from './market-sessions.js';
 
@@ -31,35 +33,46 @@ const CATEGORY_ORDER = [
     ASSET_CATEGORIES.CRYPTO,
 ];
 
+const EQUITY_ASSET_CATEGORIES = [ASSET_CATEGORIES.EQUITY, ASSET_CATEGORIES.ETF];
+const LISTING_MARKET_SESSIONS = {
+    '.cn': {marketSessionId: MARKET_SESSION_IDS.CHINA_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.de': {marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.hk': {marketSessionId: MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.jp': {marketSessionId: MARKET_SESSION_IDS.JAPAN_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.nl': {marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.uk': {marketSessionId: MARKET_SESSION_IDS.UK_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.us': {marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED, assetCategories: [...EQUITY_ASSET_CATEGORIES, ASSET_CATEGORIES.COMMODITY]},
+};
+
 const ASSET_CATEGORY_METADATA = {
     [ASSET_CATEGORIES.EQUITY]: {
         title: 'Equity',
         description: 'Individual stocks and major equity indexes.',
-        defaultMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        missingMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         searchKeywords: ['equity', 'stock', 'stocks', 'index', 'indexes'],
     },
     [ASSET_CATEGORIES.ETF]: {
         title: 'ETF',
         description: 'Exchange-traded funds that follow an equity market session.',
-        defaultMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        missingMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         searchKeywords: ['etf', 'etfs', 'fund', 'funds'],
     },
     [ASSET_CATEGORIES.COMMODITY]: {
         title: 'Commodity',
         description: 'Metals and energy markets that refresh on weekdays.',
-        defaultMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
+        missingMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         searchKeywords: ['commodity', 'commodities', 'metals', 'energy'],
     },
     [ASSET_CATEGORIES.FX]: {
         title: 'FX',
         description: 'Forex pairs and DXY-style currency products.',
-        defaultMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
+        missingMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         searchKeywords: ['forex', 'currency', 'currencies'],
     },
     [ASSET_CATEGORIES.CRYPTO]: {
         title: 'Crypto',
         description: 'Always-open crypto markets. Kraken is available now, with more providers planned.',
-        defaultMarketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
+        missingMarketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         searchKeywords: ['crypto', 'cryptocurrency', 'cryptocurrencies'],
     },
 };
@@ -90,18 +103,53 @@ export function getAssetCategoryOptions() {
     });
 }
 
-/* Market-session defaults come from the taxonomy so ticker creation and normalization agree on session policy. */
-export function getAssetCategoryDefaultMarketSessionId(assetCategory) {
-    return ASSET_CATEGORY_METADATA[assetCategory]?.defaultMarketSessionId ?? MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
+/*
+ * This is the single policy seam between instrument identity and exchange schedule.
+ * Listing metadata supplies new defaults while category fallbacks preserve fieldless saved data.
+ */
+export function getTickerMarketSessionPolicy(ticker = {}) {
+    const assetCategory = ticker.assetCategory;
+    const categoryMetadata = ASSET_CATEGORY_METADATA[assetCategory];
+    const metadata = categoryMetadata ?? ASSET_CATEGORY_METADATA[ASSET_CATEGORIES.EQUITY];
+    const missingMarketSessionId = metadata.missingMarketSessionId;
+    const defaultMarketSessionId = getListingMarketSessionId(assetCategory, ticker.symbol) ?? missingMarketSessionId;
+    const marketSessionOptions = getMarketSessionOptions();
+    const allowedMarketSessionIds = !categoryMetadata
+        ? marketSessionOptions.map(option => option.value)
+        : EQUITY_ASSET_CATEGORIES.includes(assetCategory)
+            ? marketSessionOptions.filter(option => isEquityMarketSessionId(option.value)).map(option => option.value)
+            : [defaultMarketSessionId];
+    const hasExplicitMarketSessionId = hasMarketSessionId(ticker.marketSessionId);
+    const configuredMarketSessionId = hasExplicitMarketSessionId
+        ? ticker.marketSessionId
+        : getMarketSessionIdFromLegacyMarketType(ticker.marketType);
+    const compatibleMarketSessionIds = hasExplicitMarketSessionId || !categoryMetadata
+        ? allowedMarketSessionIds
+        : [missingMarketSessionId];
+    const marketSessionId = compatibleMarketSessionIds.includes(configuredMarketSessionId)
+        ? configuredMarketSessionId
+        : missingMarketSessionId;
+
+    return {defaultMarketSessionId, missingMarketSessionId, allowedMarketSessionIds, marketSessionId};
 }
 
-/* Category policy narrows the shared session registry to the choices valid for one ticker type. */
-export function getMarketSessionOptionsForAssetCategory(assetCategory) {
-    const defaultSessionId = getAssetCategoryDefaultMarketSessionId(assetCategory);
-    if ([ASSET_CATEGORIES.CRYPTO, ASSET_CATEGORIES.COMMODITY, ASSET_CATEGORIES.FX].includes(assetCategory))
-        return getMarketSessionOptions().filter(option => option.value === defaultSessionId);
+/* Catalogs and shipped defaults materialize the policy default before they enter saved-config normalization. */
+export function withDefaultMarketSession(ticker) {
+    return {...ticker, marketSessionId: getTickerMarketSessionPolicy(ticker).defaultMarketSessionId};
+}
 
-    return getMarketSessionOptions().filter(option => isEquityMarketSessionId(option.value));
+/* prefs includes the effective compatibility value so editing can never conceal the session actually in use. */
+export function getTickerMarketSessionOptions(ticker) {
+    const policy = getTickerMarketSessionPolicy(ticker);
+    const visibleMarketSessionIds = new Set([...policy.allowedMarketSessionIds, policy.marketSessionId]);
+    return getMarketSessionOptions().filter(option => visibleMarketSessionIds.has(option.value));
+}
+
+/* Known provider suffixes identify listing schedules without pretending every dotted symbol is a venue. */
+function getListingMarketSessionId(assetCategory, symbol) {
+    const normalizedSymbol = `${symbol ?? ''}`.trim().toLowerCase();
+    const listing = LISTING_MARKET_SESSIONS[normalizedSymbol.slice(normalizedSymbol.lastIndexOf('.'))];
+    return listing?.assetCategories.includes(assetCategory) ? listing.marketSessionId : null;
 }
 
 /* A single default crypto provider keeps new ticker flows deterministic when the user has not chosen one yet. */

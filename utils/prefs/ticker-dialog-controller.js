@@ -18,9 +18,9 @@ import {
 } from './ticker-dialog-state.js';
 import {verifySymbol as verifyTickerSymbol} from '../../services/providers/rest-quotes.js';
 import {
-    getAssetCategoryDefaultMarketSessionId,
     getDefaultCryptoProvider,
-    getMarketSessionOptionsForAssetCategory,
+    getTickerMarketSessionOptions,
+    getTickerMarketSessionPolicy,
 } from '../asset-categories.js';
 import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from '../panel-sides.js';
 
@@ -55,11 +55,11 @@ class TickerDialogController {
         this.findOptionIndex = findOptionIndex;
 
         this.activeAssetCategory = initialTicker.assetCategory ?? assetCategoryOptions[0].value;
-        this.activeMarketSessionId = initialTicker.marketSessionId ?? getAssetCategoryDefaultMarketSessionId(this.activeAssetCategory);
+        this.activeMarketSessionId = getTickerMarketSessionPolicy({...initialTicker, assetCategory: this.activeAssetCategory}).marketSessionId;
         this.activeCryptoProvider = this.activeAssetCategory === 'crypto'
             ? (initialTicker.cryptoProvider ?? getDefaultCryptoProvider())
             : '';
-        this.marketSessionOptions = getMarketSessionOptionsForAssetCategory(this.activeAssetCategory);
+        this.marketSessionOptions = getTickerMarketSessionOptions({...initialTicker, assetCategory: this.activeAssetCategory});
         this.cryptoCatalog = null;
         this.cryptoCatalogProvider = '';
         this.cryptoCatalogError = '';
@@ -197,7 +197,7 @@ class TickerDialogController {
                 return;
 
             this.activeAssetCategory = option.value;
-            this.activeMarketSessionId = getAssetCategoryDefaultMarketSessionId(this.activeAssetCategory);
+            this.activeMarketSessionId = getTickerMarketSessionPolicy({assetCategory: this.activeAssetCategory}).defaultMarketSessionId;
             this.activeCryptoProvider = this.activeAssetCategory === 'crypto'
                 ? (this.activeCryptoProvider || getDefaultCryptoProvider())
                 : '';
@@ -267,7 +267,7 @@ class TickerDialogController {
             : curatedTicker.symbol);
         this.decimalsRow.value = curatedTicker.priceDecimals;
         this.activeAssetCategory = curatedTicker.assetCategory;
-        this.activeMarketSessionId = curatedTicker.marketSessionId ?? getAssetCategoryDefaultMarketSessionId(curatedTicker.assetCategory);
+        this.activeMarketSessionId = curatedTicker.marketSessionId ?? getTickerMarketSessionPolicy(curatedTicker).defaultMarketSessionId;
         this.activeCryptoProvider = curatedTicker.assetCategory === 'crypto'
             ? (curatedTicker.cryptoProvider ?? getDefaultCryptoProvider())
             : '';
@@ -342,7 +342,11 @@ class TickerDialogController {
 
     /* Market-session selection stays editable and follows the current asset type. */
     _syncMarketSessionRow() {
-        this.marketSessionOptions = getMarketSessionOptionsForAssetCategory(this.activeAssetCategory);
+        this.marketSessionOptions = getTickerMarketSessionOptions({
+            assetCategory: this.activeAssetCategory,
+            marketSessionId: this.activeMarketSessionId,
+            symbol: this._getSymbolText(),
+        });
         this.marketSessionModel.splice(0, this.marketSessionModel.get_n_items(), this.marketSessionOptions.map(option => option.title));
         this.marketSessionRow.selected = Math.max(0, this.marketSessionOptions.findIndex(option => option.value === this.activeMarketSessionId));
     }

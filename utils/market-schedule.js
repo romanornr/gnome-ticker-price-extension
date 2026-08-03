@@ -1,9 +1,9 @@
 import GLib from 'gi://GLib';
 
+import {getTickerMarketSessionPolicy} from './asset-categories.js';
 import {DEFAULT_REFRESH_INTERVAL_SECONDS} from './display-settings.js';
 import {
     MARKET_SESSION_IDS,
-    getMarketSessionIdFromLegacyMarketType,
     getMarketSessionProfile,
 } from './market-sessions.js';
 
@@ -95,8 +95,7 @@ function hasReachedCadence(lastRefreshUsec, refreshIntervalSeconds, nowUsec) {
 
 /* Each ticker resolves to one session profile so scheduling policy stays data-driven. */
 function getTickerMarketSessionProfile(ticker) {
-    const sessionId = ticker?.marketSessionId ?? getMarketSessionIdFromLegacyMarketType(ticker?.marketType);
-    return getMarketSessionProfile(sessionId);
+    return getMarketSessionProfile(getTickerMarketSessionPolicy(ticker).marketSessionId);
 }
 
 /* Weekend rules are evaluated in the profile timezone rather than the user's local timezone. */

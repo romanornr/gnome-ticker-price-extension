@@ -5,9 +5,9 @@ import Gtk from 'gi://Gtk';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 import {
-    getAssetCategoryDefaultMarketSessionId,
     getAssetCategoryOptions,
     getCryptoProviderOptions,
+    getTickerMarketSessionPolicy,
 } from './utils/asset-categories.js';
 import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './utils/panel-sides.js';
 import {
@@ -228,7 +228,7 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                                 priceDecimals: 2,
                                 panelSide: addSide,
                                 assetCategory,
-                                marketSessionId: getAssetCategoryDefaultMarketSessionId(assetCategory),
+                                marketSessionId: getTickerMarketSessionPolicy({assetCategory}).defaultMarketSessionId,
                             },
                             assetCategoryOptions: this._assetCategoryOptions,
                             cryptoProviderOptions: this._cryptoProviderOptions,
