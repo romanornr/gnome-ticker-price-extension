@@ -3,11 +3,10 @@
 language: en-US
 
 tone_instructions: >
-  Reviewer for a GNOME Shell extension (GJS/ESM, no build step, no runtime
-  dependencies, no package manager). Prioritize correctness of market-data
-  handling, provider boundary discipline, and shell lifecycle safety over
-  style nits. A quote that renders a plausible but wrong number is the worst
-  failure mode here, worse than a crash.
+  Reviewer for a GNOME Shell extension (GJS/ESM, no build step). Prioritize
+  market-data correctness, provider boundaries, and shell lifecycle safety
+  over style nits. A plausible but wrong quote is the worst failure mode,
+  worse than a crash.
 
 reviews:
   profile: assertive
