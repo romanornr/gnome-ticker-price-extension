@@ -121,6 +121,20 @@ export function getDefaultCryptoProvider() {
     return CRYPTO_PROVIDERS.KRAKEN;
 }
 
+/* Runtime routing treats any crypto ticker with a live symbol as live, then optionally narrows by provider. */
+export function isLiveCryptoTicker(ticker, cryptoProvider = null) {
+    if (
+        ticker?.assetCategory !== ASSET_CATEGORIES.CRYPTO ||
+        typeof ticker.liveSymbol !== 'string' ||
+        ticker.liveSymbol === ''
+    ) {
+        return false;
+    }
+
+    return cryptoProvider === null ||
+        (ticker.cryptoProvider ?? getDefaultCryptoProvider()) === cryptoProvider;
+}
+
 /* Provider metadata is exposed through one helper so prefs and runtime can share labels and availability. */
 export function getCryptoProviderMetadata(provider) {
     const metadata = CRYPTO_PROVIDER_METADATA[provider];

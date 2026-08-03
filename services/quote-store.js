@@ -1,11 +1,8 @@
 import GLib from 'gi://GLib';
 
 /*
- * QuoteStore is the shared in-memory state for normalized quote data.
- *
- * Providers write quotes here, schedulers consult refresh timestamps here, and
- * entry building reads from here. That makes this store the stable data boundary
- * between the transport layer and the UI-facing formatting layer.
+ * QuoteStore is the normalized in-memory boundary shared by providers and entries.
+ * It owns quote merging, refresh timestamps, and stale flags.
  */
 export class QuoteStore {
     /* The store keeps both quote values and refresh timestamps because scheduling depends on both. */
@@ -21,7 +18,11 @@ export class QuoteStore {
         if (normalizedSymbol === '' || !quote)
             return;
 
-        this._quotesBySymbol.set(normalizedSymbol, {...quote});
+        const cachedPreviousClose = this._quotesBySymbol.get(normalizedSymbol)?.previousClose ?? null;
+        this._quotesBySymbol.set(normalizedSymbol, {
+            ...quote,
+            previousClose: quote.previousClose === null ? cachedPreviousClose : quote.previousClose,
+        });
         this._staleSymbols.delete(normalizedSymbol);
     }
 
@@ -78,20 +79,6 @@ export class QuoteStore {
     isStale(symbol) {
         const normalizedSymbol = normalizeSymbol(symbol);
         return normalizedSymbol !== '' && this._staleSymbols.has(normalizedSymbol);
-    }
-
-    /* Scheduling asks the store whether a symbol has waited long enough for another refresh. */
-    hasReachedCadence(symbol, refreshIntervalSeconds, nowUsec = GLib.get_monotonic_time()) {
-        const normalizedSymbol = normalizeSymbol(symbol);
-        if (normalizedSymbol === '')
-            return true;
-
-        const lastRefreshUsec = this._lastRefreshTimeBySymbol.get(normalizedSymbol);
-        if (!lastRefreshUsec)
-            return true;
-
-        const elapsedSeconds = (nowUsec - lastRefreshUsec) / 1_000_000;
-        return elapsedSeconds >= refreshIntervalSeconds;
     }
 
     /* QuotesService asks for the last refresh timestamp when delegating schedule-policy decisions. */

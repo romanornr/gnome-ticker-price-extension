@@ -13,7 +13,7 @@ GNOME Shell extension (GJS/ESM, Shell 49–50) showing market tickers in the top
 
 - Catalog and settings symbols stay in historical Stooq-style form (`aapl.us`, `700.hk`, `eurusd`); providers translate at their boundary. Never change saved-symbol format — user gsettings contain it.
 - Non-crypto REST quotes come from CNBC's batch webservice (`services/providers/cnbc.js`); symbol grammar mapping lives in `services/providers/cnbc-symbols.js`. FX pairs are derived from the per-currency USD spot vector, never fetched per-pair.
-- Crypto is live via Kraken/Hyperliquid websockets with REST fallbacks; provider ownership is wired in `services/providers/runtime-provider-registry.js`.
+- `QuotesService` composes direct REST, Kraken, and Hyperliquid providers; live providers poll their REST fallback only while their websocket is down.
 - Normalized quote shape everywhere past the provider boundary: `{price, quoteDate: 'YYYYMMDD', previousClose|null}` keyed by uppercase catalog symbol.
 - `AGENTS.md` holds the file map and data/API conventions; update it in the same change when key files are added, renamed, or removed.
 

@@ -12,8 +12,8 @@ import {
     parseQuoteNumber,
     parseRestQuoteResponse,
     refresh,
-    verifySymbol,
 } from '../services/providers/cnbc.js';
+import {verifySymbol} from '../services/providers/rest-quotes.js';
 import {assertDeepEqual, assertEqual} from './support/assert.js';
 
 export async function runTests() {

@@ -4,10 +4,9 @@ import Soup from 'gi://Soup?version=3.0';
 import {buildEntries} from './entry-model.js';
 import {QuotesCoordinator} from './quotes-coordinator.js';
 import {QuoteStore} from './quote-store.js';
-import {
-    createRuntimeProviderRegistry,
-    getProviderRefreshPlan,
-} from './providers/runtime-provider-registry.js';
+import {HyperliquidProvider} from './providers/hyperliquid-live.js';
+import {KrakenProvider} from './providers/kraken-live.js';
+import {restProvider} from './providers/rest-quotes.js';
 import {createLoadingEntries} from '../utils/format.js';
 import {
     hasSettingsKey,
@@ -19,19 +18,8 @@ import {
 import {createMarketScheduleNow, shouldRefreshTicker} from '../utils/market-schedule.js';
 
 /*
- * QuotesService is the top-level runtime orchestrator for market data.
- *
- * It sits between GNOME settings/UI state and the lower-level quote plumbing:
- * - loads ticker/display configuration from settings
- * - decides which tickers need refreshes on each pass
- * - coordinates REST and live websocket providers
- * - stores normalized quotes in QuoteStore
- * - asks the coordinator to rebuild panel entries at the right cadence
- *
- * It deliberately does not own provider-specific parsing, market schedule rules,
- * or entry formatting details. Those responsibilities live in the provider,
- * schedule, store, and entry-model modules so the whole quote pipeline reads as
- * one system instead of one giant service class.
+ * Top-level market-data orchestration runs settings -> providers -> QuoteStore -> entries.
+ * Provider formats, schedule policy, and display formatting remain outside this class.
  */
 export const QuotesService = GObject.registerClass({
     Signals: {
@@ -39,11 +27,8 @@ export const QuotesService = GObject.registerClass({
     },
 }, class QuotesService extends GObject.Object {
     /*
-     * The constructor wires the runtime graph together once:
-     * settings -> service -> providers/store/coordinator -> entries-changed.
-     *
-     * After startup, the rest of the system flows through those collaborators
-     * instead of accumulating more state machines inside this class.
+     * Construction wires provider and timer events into the entry pipeline.
+     * The flat provider list below is the single runtime composition point.
      */
     _init(uuid, settings) {
         super._init();
@@ -83,12 +68,16 @@ export const QuotesService = GObject.registerClass({
                 this.emit('entries-changed');
             },
         });
-        this._runtimeProviders = createRuntimeProviderRegistry({
+        const liveProviderOptions = {
             uuid,
             onQuotes: quotesBySymbol => this._handleLiveQuotes(quotesBySymbol),
             onStale: tickers => this._handleStaleTickers(tickers),
-            quoteStore: this._quoteStore,
-        });
+        };
+        this._providers = [
+            restProvider,
+            new KrakenProvider(liveProviderOptions),
+            new HyperliquidProvider(liveProviderOptions),
+        ];
     }
 
     /* start() boots the full quote pipeline: settings, providers, initial loading state, and timers. */
@@ -103,7 +92,7 @@ export const QuotesService = GObject.registerClass({
         this._entries = createLoadingEntries(this._tickers, this._displaySettings);
         this.emit('entries-changed');
 
-        this._runtimeProviders.forEach(({provider}) => provider?.start(this._session));
+        this._providers.forEach(provider => provider.start?.(this._session));
         this._updateProviderSubscriptions();
 
         void this._refreshQuotes(true);
@@ -120,7 +109,7 @@ export const QuotesService = GObject.registerClass({
         this._disconnectSettingsSignals();
         this._coordinator.stop();
 
-        this._runtimeProviders.forEach(({provider}) => provider?.stop());
+        this._providers.forEach(provider => provider.stop?.());
         this._session?.abort();
         this._session = null;
 
@@ -135,9 +124,8 @@ export const QuotesService = GObject.registerClass({
 
     /*
      * A refresh pass first decides what needs data right now, then delegates to
-     * the right provider layer. The provider registry owns refresh entrypoints
-     * for both normal polling providers such as CNBC and live providers that
-     * expose a fallback REST path when their socket is unavailable.
+     * the provider that owns each ticker. Live providers participate in normal
+     * polling only while their websocket is unavailable.
      */
     async _refreshQuotes(forceRefreshAll = false) {
         if (!this._running)
@@ -147,10 +135,16 @@ export const QuotesService = GObject.registerClass({
         const tickersToRefresh = forceRefreshAll
             ? this._tickers
             : this._tickers.filter(ticker => this._shouldRefreshTicker(ticker, now));
-        const providerRefreshPlan = getProviderRefreshPlan(tickersToRefresh, this._runtimeProviders);
+        const providerRefreshPlan = this._providers
+            .filter(provider => provider.shouldPoll?.() ?? true)
+            .map(provider => ({
+                provider,
+                tickers: tickersToRefresh.filter(ticker => provider.ownsTicker(ticker)),
+            }))
+            .filter(({tickers}) => tickers.length > 0);
 
-        for (const {providerEntry, tickers} of providerRefreshPlan)
-            await this._refreshProviderFallback(providerEntry, tickers);
+        for (const {provider, tickers} of providerRefreshPlan)
+            await this._pollProvider(provider, tickers);
 
         if (providerRefreshPlan.length > 0)
             this._coordinator.requestEntriesUpdate(true);
@@ -211,21 +205,16 @@ export const QuotesService = GObject.registerClass({
         this._refreshIntervalSeconds = loadRefreshIntervalSeconds(this._settings);
     }
 
-    /*
-     * Provider refreshes always normalize into the same in-memory quote shape so
-     * the rest of the system can stay provider-agnostic after this point.
-     */
-    /* Provider fallback refreshes are only used by runtime entries that explicitly define a polling path. */
-    async _refreshProviderFallback(providerEntry, tickers) {
+    /* Provider polls are isolated and merge into the same normalized QuoteStore boundary. */
+    async _pollProvider(provider, tickers) {
         try {
-            const quotesBySymbol = await providerEntry.refreshFallback(tickers, {
+            const quotesBySymbol = await provider.poll(tickers, {
                 session: this._session,
-                quoteStore: this._quoteStore,
             });
             if (!this._running)
                 return;
 
-            this._mergeQuotes(quotesBySymbol);
+            quotesBySymbol.forEach((quote, symbol) => this._quoteStore.setQuote(symbol, quote));
             const refreshedTickers = tickers.filter(ticker => quotesBySymbol.has(ticker.symbol.toUpperCase()));
             const staleTickers = tickers.filter(ticker => !quotesBySymbol.has(ticker.symbol.toUpperCase()));
             this._quoteStore.markRefreshed(refreshedTickers);
@@ -233,7 +222,7 @@ export const QuotesService = GObject.registerClass({
         } catch (error) {
             this._quoteStore.markStale(tickers);
             if (this._running)
-                logError(error, `${this._uuid}: failed to refresh ${providerEntry.id} fallback quotes`);
+                logError(error, `${this._uuid}: failed to poll ${provider.id} quotes`);
         }
     }
 
@@ -242,7 +231,7 @@ export const QuotesService = GObject.registerClass({
         if (!this._running || !quotesBySymbol || quotesBySymbol.size === 0)
             return;
 
-        this._mergeQuotes(quotesBySymbol);
+        quotesBySymbol.forEach((quote, symbol) => this._quoteStore.setQuote(symbol, quote));
         this._coordinator.requestEntriesUpdate(false);
     }
 
@@ -255,27 +244,9 @@ export const QuotesService = GObject.registerClass({
         this._coordinator.requestEntriesUpdate(true);
     }
 
-    /*
-     * QuoteStore is the system boundary where provider-specific quote updates
-     * become a single normalized cache keyed by ticker symbol. From here onward,
-     * entry building and panel rendering no longer care where the quote came from.
-     */
-    _mergeQuotes(quotesBySymbol) {
-        quotesBySymbol.forEach((quote, symbol) => {
-            const existingQuote = this._quoteStore.getQuote(symbol);
-            const nextQuote = {
-                ...quote,
-                previousClose: Number.isFinite(quote?.previousClose)
-                    ? quote.previousClose
-                    : (existingQuote?.previousClose ?? null),
-            };
-            this._quoteStore.setQuote(symbol, nextQuote);
-        });
-    }
-
     /* Saved ticker changes are reconciled into both live providers through this shared handoff. */
     _updateProviderSubscriptions() {
-        this._runtimeProviders.forEach(({provider}) => provider?.updateSubscriptions(this._tickers));
+        this._providers.forEach(provider => provider.updateSubscriptions?.(this._tickers));
     }
 
     /*

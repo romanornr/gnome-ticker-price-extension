@@ -1,61 +1,37 @@
 import {CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
 import {hyperliquidAdapter} from '../../utils/crypto-providers/hyperliquid-adapter.js';
-import {isLiveCryptoTickerForProvider} from './live-quote-provider.js';
-import {
-    LiveWebsocketProvider,
-    openWebsocketConnection,
-} from './live-websocket-provider.js';
+import {LiveWebsocketProvider} from './live-websocket-provider.js';
 
 /*
- * Hyperliquid uses both REST snapshots and a live websocket in the same provider
- * area:
- * - refresh() handles the REST fallback path used when live data is unavailable
- * - HyperliquidLiveProvider handles the persistent websocket path
- *
- * Both paths normalize into the same quote shape so QuotesService can treat
- * Hyperliquid as one provider regardless of where the latest quote came from.
+ * HyperliquidProvider owns snapshot polling and websocket protocol messages.
+ * LiveWebsocketProvider supplies routing, lifecycle, reconnect, and stale notification.
  */
-export async function refresh(tickers, {session, quoteStore}) {
-    if (!session || tickers.length === 0) return new Map();
-
-    const snapshots = await hyperliquidAdapter.fetchMarketSnapshots(session);
-    const perpsBySymbol = new Map(snapshots.perps.map(entry => [entry.liveSymbol, entry]));
-    const spotsBySymbol = new Map(snapshots.spots.map(entry => [entry.liveSymbol, entry]));
-    const quotesBySymbol = new Map();
-
-    tickers.forEach(ticker => {
-        const entry = (ticker.liveSymbol ?? '').includes('/')
-            ? spotsBySymbol.get(ticker.liveSymbol)
-            : perpsBySymbol.get(ticker.liveSymbol);
-        const existingQuote = quoteStore?.getQuote(ticker.symbol);
-        const quote = hyperliquidAdapter.createQuote(entry, existingQuote?.previousClose);
-        if (quote)
-            quotesBySymbol.set(ticker.symbol.toUpperCase(), quote);
-    });
-
-    return quotesBySymbol;
-}
-
-/*
- * HyperliquidLiveProvider mirrors KrakenLiveProvider structurally, but its
- * provider-specific logic is different: one subscription per market symbol and
- * payload parsing that uses the shared Hyperliquid quote normalizer.
- */
-export class HyperliquidLiveProvider extends LiveWebsocketProvider {
-    /* Hyperliquid adds quoteStore access because live updates may need previous-close fallback context. */
-    constructor({uuid, onQuotes, onStale, quoteStore}) {
-        super({uuid, onQuotes, onStale, filterTicker: isHyperliquidTicker});
-        this._quoteStore = quoteStore;
+export class HyperliquidProvider extends LiveWebsocketProvider {
+    constructor(options) {
+        super({
+            ...options,
+            id: CRYPTO_PROVIDERS.HYPERLIQUID,
+            name: 'Hyperliquid',
+            websocketUrl: hyperliquidAdapter.websocketUrl,
+        });
     }
 
-    /* Shared websocket logging uses this provider name so Hyperliquid lifecycle events are easy to spot. */
-    get logPrefix() {
-        return 'Hyperliquid';
-    }
+    /* One snapshot response covers every requested Hyperliquid perp and spot market. */
+    async poll(tickers, {session}) {
+        if (!session || tickers.length === 0) return new Map();
 
-    /* Hyperliquid connection setup is just the provider-specific websocket endpoint for the shared base lifecycle. */
-    async _openConnection(session) {
-        return openWebsocketConnection(session, hyperliquidAdapter.websocketUrl);
+        const snapshots = await hyperliquidAdapter.fetchMarketSnapshots(session);
+        const perpsBySymbol = new Map(snapshots.perps.map(entry => [entry.liveSymbol, entry]));
+        const spotsBySymbol = new Map(snapshots.spots.map(entry => [entry.liveSymbol, entry]));
+        const quotesBySymbol = new Map();
+
+        tickers.forEach(ticker => {
+            const entries = ticker.liveSymbol.includes('/') ? spotsBySymbol : perpsBySymbol;
+            const quote = hyperliquidAdapter.createQuote(entries.get(ticker.liveSymbol));
+            if (quote) quotesBySymbol.set(ticker.symbol.toUpperCase(), quote);
+        });
+
+        return quotesBySymbol;
     }
 
     /* Hyperliquid requires one subscribe message per live market symbol. */
@@ -81,16 +57,10 @@ export class HyperliquidLiveProvider extends LiveWebsocketProvider {
         const tickerSymbol = this._getSymbolToTickerSymbolMap().get(liveSymbol);
         if (!tickerSymbol) return null;
 
-        const existingQuote = this._quoteStore?.getQuote(tickerSymbol);
-        const quote = hyperliquidAdapter.createQuote({liveSymbol, ctx: payload.data.ctx}, existingQuote?.previousClose);
+        const quote = hyperliquidAdapter.createQuote({liveSymbol, ctx: payload.data.ctx});
 
         if (!quote) return null;
 
         return {resetReconnect: true, quotesBySymbol: new Map([[tickerSymbol, quote]])};
     }
-}
-
-/* Hyperliquid live updates only apply to crypto tickers explicitly assigned there. */
-function isHyperliquidTicker(ticker) {
-    return isLiveCryptoTickerForProvider(ticker, CRYPTO_PROVIDERS.HYPERLIQUID);
 }

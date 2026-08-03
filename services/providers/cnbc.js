@@ -1,4 +1,4 @@
-import {httpGetJson} from '../../utils/http.js';
+import {DEFAULT_HTTP_TIMEOUT_SECONDS, httpGetJson} from '../../utils/http.js';
 import {
     buildFxSpotSymbol,
     mapSymbolToCnbc,
@@ -6,66 +6,27 @@ import {
     toUsdPerUnit,
 } from './cnbc-symbols.js';
 
-const CNBC_REQUEST_TIMEOUT_SECONDS = 12;
 const CNBC_BATCH_SIZE = 30;
 /* CNBC rejects well-known tool user agents (curl, wget), so identify honestly as this extension. */
 const CNBC_USER_AGENT = 'gnome-ticker-price-extension/1.0';
 const CNBC_QUOTE_ENDPOINT = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
 
 /*
- * CNBC's quote webservice is the REST provider for non-live symbols and the
- * manual prefs verification flow.
- *
- * This module isolates the CNBC wire format from the rest of the system:
- * QuotesService asks for normalized quotes, and prefs verification asks whether
- * a symbol resolves, without either caller caring about raw JSON details.
- * FX pairs have no direct CNBC symbol; both directions of every pair derive
- * from the per-currency USD spot vector fetched in the same batch.
+ * CNBC maps catalog tickers into batched wire symbols and normalized quotes.
+ * FX pairs derive from per-currency USD spot legs fetched in those same batches.
  */
-export async function refresh(tickers, {session}) {
+export async function refresh(tickers, {session, quiet = false}) {
     if (!session || tickers.length === 0)
         return new Map();
 
     const plan = buildRequestPlan(tickers);
-    if (plan.unmappedSymbols.length > 0)
+    if (!quiet && plan.unmappedSymbols.length > 0)
         logCnbcWarning(`No CNBC mapping for ${plan.unmappedSymbols.length} symbol(s): ${plan.unmappedSymbols.join(', ')}`);
 
-    try {
-        const quotesByCnbcSymbol = await fetchQuotes(session, plan.requestSymbols);
-        const quotesBySymbol = assembleQuotes(plan, quotesByCnbcSymbol);
-        logRefreshResult(tickers, quotesBySymbol);
-        return quotesBySymbol;
-    } catch (error) {
-        logCnbcWarning(`CNBC batch request failed for ${tickers.length} symbol(s): ${error.message}`);
-        throw error;
-    }
-}
-
-/* prefs and runtime both use the same verification path so symbol validation stays consistent. */
-export async function verifySymbol(session, symbol) {
-    const normalizedSymbol = `${symbol ?? ''}`.trim().toLowerCase();
-    const fxPair = parseFxPairSymbol(normalizedSymbol);
-
-    if (fxPair) {
-        const legSymbols = fxLegSymbols(fxPair);
-        const quotesByCnbcSymbol = await fetchQuotes(session, legSymbols);
-        const quote = deriveFxQuote(fxPair, quotesByCnbcSymbol);
-        if (!quote)
-            throw new Error(`Could not verify ${symbol}. No quote data was returned by CNBC.`);
-
-        return {symbol: normalizedSymbol, quoteDate: formatVerifyDate(quote.quoteDate)};
-    }
-
-    const cnbcSymbol = mapSymbolToCnbc(normalizedSymbol);
-    if (!cnbcSymbol)
-        throw new Error(`Could not verify ${symbol}. The symbol format is not supported.`);
-
-    const quotesByCnbcSymbol = await fetchQuotes(session, [cnbcSymbol]);
-    const quote = quotesByCnbcSymbol.get(cnbcSymbol);
-    if (!quote)
-        throw new Error(`Could not verify ${symbol}. No quote data was returned by CNBC.`);
-
-    return {symbol: normalizedSymbol, quoteDate: formatVerifyDate(quote.quoteDate)};
+    const quotesByCnbcSymbol = await fetchQuotes(session, plan.requestSymbols, quiet);
+    const quotesBySymbol = assembleQuotes(plan, quotesByCnbcSymbol);
+    if (!quiet) logRefreshResult(tickers, quotesBySymbol);
+    return quotesBySymbol;
 }
 
 /* One batched URL serves runtime polling and verification; "=" and "|" must survive encoding for CNBC's grammar. */
@@ -229,7 +190,7 @@ function assembleQuotes({directRequests, fxRequests}, quotesByCnbcSymbol) {
  * only a pass where every batch failed rethrows, so the caller can still fall
  * back or mark stale.
  */
-async function fetchQuotes(session, cnbcSymbols) {
+async function fetchQuotes(session, cnbcSymbols, quiet) {
     const quotesByCnbcSymbol = new Map();
     let lastError = null;
     let succeededCount = 0;
@@ -238,15 +199,15 @@ async function fetchQuotes(session, cnbcSymbols) {
         const batch = cnbcSymbols.slice(index, index + CNBC_BATCH_SIZE);
         try {
             const payload = await httpGetJson(session, buildQuoteUrl(batch), {
-                timeoutSeconds: CNBC_REQUEST_TIMEOUT_SECONDS,
-                timeoutMessage: `Timed out after ${CNBC_REQUEST_TIMEOUT_SECONDS}s while loading CNBC quotes.`,
+                timeoutMessage: `Timed out after ${DEFAULT_HTTP_TIMEOUT_SECONDS}s while loading CNBC quotes.`,
                 headers: {'User-Agent': CNBC_USER_AGENT},
             });
             parseRestQuoteResponse(payload).forEach((quote, cnbcSymbol) => quotesByCnbcSymbol.set(cnbcSymbol, quote));
             succeededCount += 1;
         } catch (error) {
             lastError = error;
-            logCnbcWarning(`CNBC batch of ${batch.length} symbol(s) failed: ${error.message}`);
+            if (!quiet)
+                logCnbcWarning(`CNBC batch of ${batch.length} symbol(s) failed: ${error.message}`);
         }
     }
 
@@ -256,23 +217,15 @@ async function fetchQuotes(session, cnbcSymbols) {
     return quotesByCnbcSymbol;
 }
 
-/* The verification dialog shows a human-readable date, so YYYYMMDD gains its dashes back. */
-export function formatVerifyDate(quoteDate) {
-    return `${quoteDate.slice(0, 4)}-${quoteDate.slice(4, 6)}-${quoteDate.slice(6)}`;
-}
-
-/* Provider diagnostics are centralized so tolerant parsing still leaves useful GNOME Shell logs. */
+/* Runtime diagnostics distinguish an empty primary response from a partially usable batch. */
 function logRefreshResult(tickers, quotesBySymbol) {
     const missingSymbols = tickers
         .map(ticker => `${ticker?.symbol ?? ''}`.trim().toUpperCase())
         .filter(storeKey => storeKey !== '' && !quotesBySymbol.has(storeKey));
 
-    if (quotesBySymbol.size === 0) {
+    if (quotesBySymbol.size === 0)
         logCnbcWarning('CNBC batch returned no usable quotes.');
-        return;
-    }
-
-    if (missingSymbols.length > 0)
+    else if (missingSymbols.length > 0)
         logCnbcWarning(`CNBC batch missed ${missingSymbols.length} symbol(s): ${missingSymbols.join(', ')}`);
 }
 
