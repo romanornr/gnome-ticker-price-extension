@@ -16,7 +16,6 @@ const SUPPORTED_LIVE_TICKERS = [
     {
         label: 'BTC',
         symbol: 'btcusd',
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         liveSymbol: 'BTC/USD',
@@ -24,7 +23,6 @@ const SUPPORTED_LIVE_TICKERS = [
     {
         label: 'ETH',
         symbol: 'ethusd',
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         liveSymbol: 'ETH/USD',
@@ -217,7 +215,6 @@ function getSupportedLiveSymbol(ticker, rawLiveSymbol) {
     const supportedTicker = SUPPORTED_LIVE_TICKERS.find(candidate =>
         candidate.label === ticker.label &&
         candidate.symbol === ticker.symbol &&
-        candidate.marketSessionId === ticker.marketSessionId &&
         candidate.assetCategory === ticker.assetCategory &&
         candidate.cryptoProvider === ticker.cryptoProvider &&
         (explicitLiveSymbol === '' || explicitLiveSymbol === candidate.liveSymbol)

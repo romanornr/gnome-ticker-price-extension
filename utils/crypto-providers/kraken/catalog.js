@@ -1,8 +1,7 @@
 import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../asset-categories.js';
-import {MARKET_SESSION_IDS} from '../../market-sessions.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, withDefaultMarketSession} from '../../asset-categories.js';
 import {
     normalizeKrakenLiveSymbol,
     normalizeKrakenTickerSymbol,
@@ -28,25 +27,24 @@ export async function loadKrakenSpotPairs() {
     return cloneKrakenSpotPairs(await cachedKrakenSpotPairsPromise);
 }
 
-/* Kraken instrument metadata becomes the runtime crypto catalog through this normalizer. */
+/* Kraken instrument metadata becomes the shared catalog shape with its centralized session default here. */
 export function createKrakenCatalogEntry(pair) {
     const liveSymbol = normalizeKrakenLiveSymbol(pair?.symbol ?? '');
     const base = `${pair?.base ?? ''}`.trim().toUpperCase();
     const quote = `${pair?.quote ?? ''}`.trim().toUpperCase();
     const normalizedSymbol = normalizeKrakenTickerSymbol(liveSymbol);
 
-    return {
+    return withDefaultMarketSession({
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         label: liveSymbol || `${base}/${quote}`,
         symbol: normalizedSymbol,
         priceDecimals: clampDecimals(pair?.price_precision),
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         liveSymbol,
         keywords: [base, quote, normalizedSymbol],
         base,
         quote,
-    };
+    });
 }
 
 /* Cached Kraken pair lists are cloned to keep callers from mutating shared provider state. */

@@ -93,7 +93,7 @@ function hasReachedCadence(lastRefreshUsec, refreshIntervalSeconds, nowUsec) {
     return elapsedSeconds >= refreshIntervalSeconds;
 }
 
-/* Each ticker resolves to one session profile so scheduling policy stays data-driven. */
+/* Effective ticker policy becomes the canonical profile used by cadence and phase checks here. */
 function getTickerMarketSessionProfile(ticker) {
     return getMarketSessionProfile(getTickerMarketSessionPolicy(ticker).marketSessionId);
 }

@@ -11,7 +11,8 @@ import {
     normalizeTickerConfig,
     serializeTickerConfig,
 } from '../utils/ticker-config.js';
-import {loadTickerConfigs} from '../utils/settings.js';
+import {DEFAULT_TICKERS, loadTickerConfigs} from '../utils/settings.js';
+import {getCuratedTickersForCategory} from '../utils/ticker-catalog.js';
 import {assertDeepEqual, assertEqual} from './support/assert.js';
 
 export function runTests() {
@@ -27,27 +28,25 @@ export function runTests() {
     assertEqual(inferAssetCategory({marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED, symbol: 'uso.us'}), ASSET_CATEGORIES.ETF,
     'Known ETF symbols should infer as ETFs');
 
-    assertDeepEqual(
-        getTickerMarketSessionOptions({assetCategory: ASSET_CATEGORIES.CRYPTO}).map(option => option.value),
-        [MARKET_SESSION_IDS.ALWAYS_OPEN],
-        'Crypto category options should stay limited to the always-open profile'
-    );
-    assertDeepEqual(
-        getTickerMarketSessionOptions({assetCategory: ASSET_CATEGORIES.FX}).map(option => option.value),
-        [MARKET_SESSION_IDS.WEEKDAY_24H],
-        'FX category options should stay limited to the weekday profile'
-    );
+    assertDeepEqual(getTickerMarketSessionOptions({assetCategory: ASSET_CATEGORIES.CRYPTO}).map(option => option.value),
+        [MARKET_SESSION_IDS.ALWAYS_OPEN], 'Crypto options should stay limited to the always-open profile');
+    assertDeepEqual(getTickerMarketSessionOptions({assetCategory: ASSET_CATEGORIES.FX}).map(option => option.value),
+        [MARKET_SESSION_IDS.WEEKDAY_24H], 'FX options should stay limited to the weekday profile');
 
     const listedCommodityPolicy = getTickerMarketSessionPolicy({assetCategory: ASSET_CATEGORIES.COMMODITY, symbol: 'gld.us'});
-    assertDeepEqual({
-        defaultMarketSessionId: listedCommodityPolicy.defaultMarketSessionId,
-        missingMarketSessionId: listedCommodityPolicy.missingMarketSessionId,
-        allowedMarketSessionIds: listedCommodityPolicy.allowedMarketSessionIds,
-    }, {
-        defaultMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
-        missingMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
-        allowedMarketSessionIds: [MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
-    }, 'Listed commodities should separate their venue default from the saved-data fallback');
+    assertEqual(listedCommodityPolicy.defaultMarketSessionId, MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        'Listed commodities should use their venue for new ticker defaults');
+    assertDeepEqual(listedCommodityPolicy.allowedMarketSessionIds, [MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        'Listed commodities should expose only their venue session for new tickers');
+
+    const curatedTickers = Object.values(ASSET_CATEGORIES).flatMap(getCuratedTickersForCategory);
+    curatedTickers.forEach(ticker => assertDeepEqual([ticker.marketSessionId, normalizeTickerConfig(ticker).marketSessionId],
+        [getTickerMarketSessionPolicy(ticker).defaultMarketSessionId, ticker.marketSessionId], `${ticker.symbol} catalog session should be materialized and round-trip`));
+    getCuratedTickersForCategory(ASSET_CATEGORIES.COMMODITY).forEach(ticker => assertEqual(ticker.marketSessionId,
+        ticker.symbol.endsWith('.us') ? MARKET_SESSION_IDS.US_EQUITY_EXTENDED : MARKET_SESSION_IDS.WEEKDAY_24H,
+        `${ticker.symbol} should follow the listed-versus-global commodity split`));
+    DEFAULT_TICKERS.forEach(ticker => assertEqual(ticker.marketSessionId, getTickerMarketSessionPolicy(ticker).defaultMarketSessionId,
+        `${ticker.symbol} shipped defaults should use the shared session default`));
 
     const legacyKrakenTicker = normalizeTickerConfig({label: 'BTC', symbol: 'btc.v', marketType: 'always-open', liveSymbol: 'BTC/USD'});
     assertDeepEqual(legacyKrakenTicker, {
@@ -72,8 +71,8 @@ export function runTests() {
         ['fieldless crypto', {symbol: 'btcusd', assetCategory: ASSET_CATEGORIES.CRYPTO}, ASSET_CATEGORIES.CRYPTO, MARKET_SESSION_IDS.ALWAYS_OPEN],
         ['fieldless equity', {symbol: 'aapl.us', assetCategory: ASSET_CATEGORIES.EQUITY}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
         ['fieldless ETF', {symbol: 'spy.us', assetCategory: ASSET_CATEGORIES.ETF}, ASSET_CATEGORIES.ETF, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
-        ['category-free GLD', {symbol: 'gld.us'}, ASSET_CATEGORIES.ETF, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
-        ['category-free spot gold', {symbol: 'xauusd'}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['legacy us_equity alias with Europe session', {symbol: 'legacy.us', assetCategory: 'us_equity', marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.EUROPE_EQUITY_CASH],
+        ['legacy us-etf alias', {symbol: 'legacy.us', assetCategory: 'us-etf'}, ASSET_CATEGORIES.ETF, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
         ['legacy always_open', {symbol: 'btcusd', marketType: 'always_open'}, ASSET_CATEGORIES.CRYPTO, MARKET_SESSION_IDS.ALWAYS_OPEN],
         ['legacy weekday-session', {symbol: 'eurusd', marketType: 'weekday-session'}, ASSET_CATEGORIES.FX, MARKET_SESSION_IDS.WEEKDAY_24H],
         ['legacy weekday_session', {symbol: 'eurusd', marketType: 'weekday_session'}, ASSET_CATEGORIES.FX, MARKET_SESSION_IDS.WEEKDAY_24H],
@@ -83,12 +82,11 @@ export function runTests() {
         ['legacy us_etf alias with Europe session', {symbol: 'legacy.us', assetCategory: 'us_etf', marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH}, ASSET_CATEGORIES.ETF, MARKET_SESSION_IDS.EUROPE_EQUITY_CASH],
         ['invalid equity session', {symbol: 'aapl.us', marketSessionId: 'invalid-session'}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
     ].forEach(([description, rawTicker, expectedAssetCategory, expectedMarketSessionId]) => {
-        const ticker = normalizeTickerConfig({label: 'Saved', ...rawTicker});
+        const ticker = loadTickerConfigs(new FakeSettings(JSON.stringify([{label: 'Saved', ...rawTicker}])))[0];
         assertEqual(ticker.assetCategory, expectedAssetCategory, `${description} should preserve its category meaning`);
         assertEqual(ticker.marketSessionId, expectedMarketSessionId, `${description} should resolve to the expected session`);
         assertEqual(serializeTickerConfig(ticker).marketSessionId, expectedMarketSessionId, `${description} should serialize unchanged`);
-        assertEqual(getTickerMarketSessionOptions(ticker).some(option => option.value === expectedMarketSessionId), true,
-            `${description} prefs should include the effective session`);
+        assertEqual(getTickerMarketSessionOptions(ticker).some(option => option.value === expectedMarketSessionId), true, `${description} prefs should include the effective session`);
     });
 
     const hyperliquidTicker = normalizeTickerConfig({

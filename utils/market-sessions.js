@@ -35,7 +35,7 @@ const MARKET_SESSION_PROFILES = {
     },
     [MARKET_SESSION_IDS.WEEKDAY_24H]: {
         title: 'Weekday global market',
-        description: 'Forex and commodities. Refreshes on weekdays and skips weekends.',
+        description: 'Forex, spot commodities, and futures. Refreshes on weekdays and skips weekends.',
         kind: 'weekday-24h',
         timeZone: 'America/New_York',
         weekendDays: ['Sat', 'Sun'],

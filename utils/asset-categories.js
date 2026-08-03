@@ -59,7 +59,7 @@ const ASSET_CATEGORY_METADATA = {
     },
     [ASSET_CATEGORIES.COMMODITY]: {
         title: 'Commodity',
-        description: 'Metals and energy markets that refresh on weekdays.',
+        description: 'Commodity markets and exchange-listed funds with instrument-specific sessions.',
         missingMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         searchKeywords: ['commodity', 'commodities', 'metals', 'energy'],
     },
@@ -120,17 +120,11 @@ export function getTickerMarketSessionPolicy(ticker = {}) {
             ? marketSessionOptions.filter(option => isEquityMarketSessionId(option.value)).map(option => option.value)
             : [defaultMarketSessionId];
     const hasExplicitMarketSessionId = hasMarketSessionId(ticker.marketSessionId);
-    const configuredMarketSessionId = hasExplicitMarketSessionId
-        ? ticker.marketSessionId
-        : getMarketSessionIdFromLegacyMarketType(ticker.marketType);
-    const compatibleMarketSessionIds = hasExplicitMarketSessionId || !categoryMetadata
-        ? allowedMarketSessionIds
-        : [missingMarketSessionId];
-    const marketSessionId = compatibleMarketSessionIds.includes(configuredMarketSessionId)
-        ? configuredMarketSessionId
-        : missingMarketSessionId;
+    const configuredMarketSessionId = hasExplicitMarketSessionId ? ticker.marketSessionId : getMarketSessionIdFromLegacyMarketType(ticker.marketType);
+    const compatibleMarketSessionIds = hasExplicitMarketSessionId || !categoryMetadata ? allowedMarketSessionIds : [missingMarketSessionId];
+    const marketSessionId = compatibleMarketSessionIds.includes(configuredMarketSessionId) ? configuredMarketSessionId : missingMarketSessionId;
 
-    return {defaultMarketSessionId, missingMarketSessionId, allowedMarketSessionIds, marketSessionId};
+    return {defaultMarketSessionId, allowedMarketSessionIds, marketSessionId};
 }
 
 /* Catalogs and shipped defaults materialize the policy default before they enter saved-config normalization. */

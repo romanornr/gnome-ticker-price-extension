@@ -267,7 +267,7 @@ class TickerDialogController {
             : curatedTicker.symbol);
         this.decimalsRow.value = curatedTicker.priceDecimals;
         this.activeAssetCategory = curatedTicker.assetCategory;
-        this.activeMarketSessionId = curatedTicker.marketSessionId ?? getTickerMarketSessionPolicy(curatedTicker).defaultMarketSessionId;
+        this.activeMarketSessionId = getTickerMarketSessionPolicy(curatedTicker).marketSessionId;
         this.activeCryptoProvider = curatedTicker.assetCategory === 'crypto'
             ? (curatedTicker.cryptoProvider ?? getDefaultCryptoProvider())
             : '';
