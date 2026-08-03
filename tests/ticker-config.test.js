@@ -10,6 +10,7 @@ import {
     normalizeTickerConfig,
     serializeTickerConfig,
 } from '../utils/ticker-config.js';
+import {loadTickerConfigs} from '../utils/settings.js';
 import {assertDeepEqual, assertEqual} from './support/assert.js';
 
 export function runTests() {
@@ -135,4 +136,25 @@ export function runTests() {
         symbol: '^spx',
         keywords: ['index'],
     }, 'Cloned tickers should not share nested object references');
+
+    /* Deleting the last ticker used to bring the defaults back on the next load. */
+    assertDeepEqual(loadTickerConfigs(new FakeSettings('[]')), [],
+        'An explicitly empty saved list should load as no tickers');
+    assertEqual(loadTickerConfigs(new FakeSettings('')).length > 0, true,
+        'A blank ticker setting should still load the shipped defaults');
+    assertEqual(loadTickerConfigs(new FakeSettings('not json')).length > 0, true,
+        'An unparsable ticker setting should fall back to the shipped defaults');
+    assertEqual(loadTickerConfigs(new FakeSettings('[{"label":""}]')).length > 0, true,
+        'A saved list whose entries are all unusable should fall back to the shipped defaults');
+}
+
+/* loadTickerConfigs only needs get_string, so the suite avoids depending on real GSettings. */
+class FakeSettings {
+    constructor(serialized) {
+        this.serialized = serialized;
+    }
+
+    get_string(_key) {
+        return this.serialized;
+    }
 }
