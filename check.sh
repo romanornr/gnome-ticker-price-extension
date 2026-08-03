@@ -25,6 +25,9 @@ gjs -m services/providers/kraken-live.js
 gjs -m services/providers/hyperliquid-live.js
 gjs -m services/providers/runtime-provider-registry.js
 gjs -m services/providers/cnbc.js
+gjs -m services/providers/nasdaq.js
+gjs -m services/providers/open-er-api.js
+gjs -m services/providers/rest-quotes.js
 gjs -m services/entry-model.js
 gjs -m services/quote-store.js
 gjs -m utils/display-settings.js

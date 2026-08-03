@@ -11,6 +11,7 @@ import {runTests as runQuotesTests} from './quotes.test.js';
 import {runTests as runQuotesCoordinatorTests} from './quotes-coordinator.test.js';
 import {runTests as runRuntimeProviderRegistryTests} from './runtime-provider-registry.test.js';
 import {runTests as runCnbcTests} from './cnbc.test.js';
+import {runTests as runRestQuotesTests} from './rest-quotes.test.js';
 import {runTests as runTickerConfigTests} from './ticker-config.test.js';
 import {runTests as runTickerDialogStateTests} from './ticker-dialog-state.test.js';
 
@@ -26,6 +27,7 @@ const suites = [
     ['hyperliquid-adapter', runHyperliquidAdapterTests],
     ['runtime-provider-registry', runRuntimeProviderRegistryTests],
     ['cnbc', runCnbcTests],
+    ['rest-quotes', runRestQuotesTests],
     ['quotes', runQuotesTests],
     ['quotes-coordinator', runQuotesCoordinatorTests],
     ['ticker-config', runTickerConfigTests],

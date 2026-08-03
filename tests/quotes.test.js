@@ -37,10 +37,10 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
     };
     service._runtimeProviders = [
         {
-            id: 'cnbc',
+            id: 'rest',
             ownsTicker: ticker => !ticker.liveSymbol,
             refreshFallback: async tickers => {
-                refreshCalls.push(['cnbc', tickers.map(ticker => ticker.symbol)]);
+                refreshCalls.push(['rest', tickers.map(ticker => ticker.symbol)]);
                 return new Map([['AAPL.US', {
                     price: 210,
                     quoteDate: '20260322',
@@ -75,7 +75,7 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
     await service._refreshQuotes(false);
 
     assertDeepEqual(refreshCalls, [
-        ['cnbc', ['aapl.us']],
+        ['rest', ['aapl.us']],
         ['hyperliquid', ['purrusdc']],
     ], 'QuotesService should refresh only the provider plans returned for due tickers');
     assertEqual(entryUpdateRequests, 1,
@@ -128,7 +128,7 @@ async function testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh() {
         },
     };
     service._runtimeProviders = [{
-        id: 'cnbc',
+        id: 'rest',
         ownsTicker: () => true,
         hasPollingFallback: () => false,
         refreshFallback: async () => new Map(),
@@ -180,7 +180,7 @@ async function testRefreshQuotesContinuesAfterProviderError() {
     };
     service._runtimeProviders = [
         {
-            id: 'cnbc',
+            id: 'rest',
             ownsTicker: ticker => ticker.assetCategory === ASSET_CATEGORIES.EQUITY,
             refreshFallback: async () => {
                 throw new Error('broken cnbc');
@@ -290,7 +290,7 @@ async function testStartSkipsRegistryEntriesWithoutLiveProviders() {
 
     service._runtimeProviders = [
         {
-            id: 'cnbc',
+            id: 'rest',
             refreshFallback: async () => new Map(),
         },
         {

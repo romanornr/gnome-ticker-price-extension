@@ -14,8 +14,11 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `services/quote-store.js`: in-memory quote cache and refresh-cadence timestamps for normalized symbols
 - `services/entry-model.js`: panel entry/view-model building, including loading/error states and price-flash decoration
 - `services/quotes-coordinator.js`: refresh timer, throttled entry rebuild scheduling, and price-flash reset coordination for `QuotesService`
+- `services/providers/rest-quotes.js`: REST refresh orchestrator — CNBC primary with narrow Nasdaq/FX-rate-table fallbacks for missed symbols
 - `services/providers/cnbc.js`: batched CNBC quote fetching/parsing, FX derivation from USD spot rates, and symbol verification helpers
 - `services/providers/cnbc-symbols.js`: catalog-symbol-to-CNBC-grammar mapping (suffix rules, futures/index overrides, FX pair parsing)
+- `services/providers/nasdaq.js`: per-symbol Nasdaq fallback for US listings only (foreign symbols would resolve to differently-priced ADRs)
+- `services/providers/open-er-api.js`: daily USD rate table fallback deriving FX pairs when CNBC's spot vector is unavailable
 - `services/providers/live-quote-provider.js`: shared live-provider contract notes and helper utilities for symbol subscription/state parity
 - `services/providers/live-websocket-provider.js`: shared websocket lifecycle base for connect/disconnect/reconnect mechanics across live crypto providers
 - `services/providers/kraken-live.js`: Kraken live quote adapter, subscription management, and reconnect handling

@@ -15,7 +15,7 @@ export function runTests() {
 
     const providerEntries = [
         {
-            id: 'cnbc',
+            id: 'rest',
             ownsTicker: ticker => ticker?.assetCategory !== ASSET_CATEGORIES.CRYPTO ||
                 typeof ticker.liveSymbol !== 'string' ||
                 ticker.liveSymbol === '',
@@ -54,7 +54,7 @@ export function runTests() {
         id: plan.providerEntry.id,
         symbols: plan.tickers.map(ticker => ticker.symbol),
     })), [{
-        id: 'cnbc',
+        id: 'rest',
         symbols: ['aapl.us'],
     }, {
         id: CRYPTO_PROVIDERS.HYPERLIQUID,
@@ -66,7 +66,7 @@ export function runTests() {
         id: plan.providerEntry.id,
         symbols: plan.tickers.map(ticker => ticker.symbol),
     })), [{
-        id: 'cnbc',
+        id: 'rest',
         symbols: ['aapl.us'],
     }],
         'Connected live providers should not schedule a polling fallback refresh');
@@ -82,7 +82,7 @@ function testCreateRuntimeProviderRegistry() {
     });
 
     assertDeepEqual(registry.map(entry => entry.id), [
-        'cnbc',
+        'rest',
         CRYPTO_PROVIDERS.KRAKEN,
         CRYPTO_PROVIDERS.HYPERLIQUID,
     ], 'Runtime provider registry construction should expose CNBC, Kraken, and Hyperliquid entries in orchestration order');
