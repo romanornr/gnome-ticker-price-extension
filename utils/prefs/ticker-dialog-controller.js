@@ -381,7 +381,7 @@ class TickerDialogController {
         this.suggestionsGroup.description = getSuggestionsDescription(this.activeAssetCategory, this.activeCryptoProvider);
     }
 
-    /* Save/verify logic asks this resolver for the currently selected or confidently inferred crypto market. */
+    /* Crypto validation and save logic share this resolver for the selected or confidently inferred market. */
     _getResolvedCryptoTicker() {
         return resolveSelectedCryptoTicker({
             assetCategory: this.activeAssetCategory,

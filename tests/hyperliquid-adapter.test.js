@@ -1,3 +1,9 @@
+import {CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
+import {getCryptoProviderAdapter, hyperliquidAdapter} from '../utils/crypto-providers/index.js';
+import {
+    HYPERLIQUID_WEBSOCKET_URL,
+    loadHyperliquidMarkets,
+} from '../utils/crypto-providers/hyperliquid/catalog.js';
 import {
     createHyperliquidQuote,
 } from '../utils/crypto-providers/hyperliquid/quotes.js';
@@ -10,6 +16,13 @@ import {
 import {assertDeepEqual, assertEqual, assertTruthy} from './support/assert.js';
 
 export function runTests() {
+    assertEqual(getCryptoProviderAdapter(CRYPTO_PROVIDERS.HYPERLIQUID), hyperliquidAdapter,
+        'The crypto registry should route Hyperliquid ids to the Hyperliquid adapter');
+    assertEqual(hyperliquidAdapter.websocketUrl, HYPERLIQUID_WEBSOCKET_URL,
+        'The Hyperliquid adapter should expose the catalog transport URL');
+    assertEqual(hyperliquidAdapter.loadCatalog, loadHyperliquidMarkets,
+        'The Hyperliquid adapter should expose the Hyperliquid catalog loader');
+
     assertEqual(normalizeHyperliquidLiveSymbol(' purr / usdc '), 'PURR/USDC',
         'Hyperliquid live symbols should normalize spot pair formatting');
     assertEqual(normalizeHyperliquidLiveSymbol(' btc '), 'BTC',

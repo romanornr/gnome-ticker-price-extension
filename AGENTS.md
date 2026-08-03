@@ -29,7 +29,7 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/market-sessions.js`: shared market-session profile registry, including behavior-based session ids, legacy market-type migration helpers, and prefs session option metadata
 - `utils/crypto-providers/index.js`: crypto provider composition and switchboard that exposes the shared adapter seam to prefs, ticker normalization, and runtime layers
 - `utils/crypto-providers/kraken/catalog.js`: Kraken catalog discovery, cached instrument snapshot loading, and runtime catalog entry normalization
-- `utils/crypto-providers/kraken/quotes.js`: Kraken quote normalization helpers for websocket ticker payloads
+- `utils/crypto-providers/kraken/quotes.js`: Kraken WebSocket quote normalization plus REST ticker request construction, fetching, and parsing
 - `utils/crypto-providers/kraken/symbols.js`: Kraken live symbol normalization, saved ticker id derivation, and catalog search scoring
 - `utils/crypto-providers/hyperliquid/catalog.js`: Hyperliquid REST discovery, snapshot loading, and catalog entry normalization for perp and spot markets
 - `utils/crypto-providers/hyperliquid/quotes.js`: Hyperliquid quote normalization helpers shared by REST fallback and live websocket paths

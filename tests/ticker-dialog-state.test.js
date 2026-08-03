@@ -72,6 +72,13 @@ export function runTests() {
         resolvedCryptoTicker,
         hasCryptoCatalogMatches: true,
     }), '', 'Resolved crypto tickers should validate');
+    assertEqual(validateTickerDraft('', 'unknown/usd', {
+        assetCategory: ASSET_CATEGORIES.CRYPTO,
+        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
+        resolvedCryptoTicker: null,
+        hasCryptoCatalogMatches: false,
+    }), 'Choose a Kraken-supported crypto pair.',
+        'Crypto Save should reject symbols that are absent from the loaded provider catalog');
 
     const nextTicker = buildTickerConfig({
         initialTicker: {},

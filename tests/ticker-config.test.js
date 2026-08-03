@@ -48,6 +48,29 @@ export function runTests() {
         liveSymbol: 'BTC/USD',
     }, 'Legacy Kraken ticker shapes should normalize to current crypto config');
 
+    [
+        ['always_open', 'btcusd', MARKET_SESSION_IDS.ALWAYS_OPEN],
+        ['weekday-session', 'eurusd', MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['weekday_session', 'eurusd', MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['us-session', 'aapl.us', MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['us_session', 'aapl.us', MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+    ].forEach(([marketType, symbol, expectedSessionId]) => {
+        const ticker = normalizeTickerConfig({label: 'Legacy', symbol, marketType});
+        assertEqual(ticker.marketSessionId, expectedSessionId,
+            `Legacy marketType ${marketType} should remain readable`);
+    });
+
+    [
+        ['us-equity', ASSET_CATEGORIES.EQUITY],
+        ['us_equity', ASSET_CATEGORIES.EQUITY],
+        ['us-etf', ASSET_CATEGORIES.ETF],
+        ['us_etf', ASSET_CATEGORIES.ETF],
+    ].forEach(([assetCategory, expectedAssetCategory]) => {
+        const ticker = normalizeTickerConfig({label: 'Legacy', symbol: 'legacy.us', assetCategory});
+        assertEqual(ticker.assetCategory, expectedAssetCategory,
+            `Legacy asset category ${assetCategory} should remain readable`);
+    });
+
     const internationalTicker = normalizeTickerConfig({
         label: 'ASML',
         symbol: 'asml.nl',

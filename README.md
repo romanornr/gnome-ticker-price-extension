@@ -46,7 +46,7 @@ Open the extension preferences and use `+ Add ticker`. You can search the built-
 - Kraken suggestions are loaded dynamically from Kraken WebSocket instrument metadata, so you can search pairs like `SOL`, `SOLUSD`, or `SOL/USD`.
 - Hyperliquid suggestions are loaded dynamically from the official spot/perp metadata endpoints, so you can search perps like `BTC`.
 
-For non-crypto matches, `Verify` checks whether the selected provider currently returns data before saving. Crypto markets are validated against the selected provider's loaded live catalog as part of the Save path.
+For non-crypto matches, `Verify` checks whether the runtime REST quote chain currently returns data before saving. Crypto markets are validated against the selected provider's loaded live catalog as part of the Save path.
 
 Examples: `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD`, `USO`.
 
