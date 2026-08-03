@@ -186,7 +186,7 @@ export function getMarketSessionOptions() {
         .map(([sessionId, profile]) => ({value: sessionId, title: profile.title, description: profile.description}));
 }
 
-/* Legacy saved ticker configs still persist marketType, so normalization resolves that seam here. */
+/* Recognized legacy marketType values resolve here; unknown values defer to ticker policy's single default. */
 export function getMarketSessionIdFromLegacyMarketType(marketType) {
-    return LEGACY_MARKET_TYPE_TO_SESSION_ID[marketType] ?? MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
+    return LEGACY_MARKET_TYPE_TO_SESSION_ID[marketType] ?? null;
 }

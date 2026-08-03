@@ -48,31 +48,31 @@ const ASSET_CATEGORY_METADATA = {
     [ASSET_CATEGORIES.EQUITY]: {
         title: 'Equity',
         description: 'Individual stocks and major equity indexes.',
-        missingMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        defaultMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         searchKeywords: ['equity', 'stock', 'stocks', 'index', 'indexes'],
     },
     [ASSET_CATEGORIES.ETF]: {
         title: 'ETF',
         description: 'Exchange-traded funds that follow an equity market session.',
-        missingMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        defaultMarketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         searchKeywords: ['etf', 'etfs', 'fund', 'funds'],
     },
     [ASSET_CATEGORIES.COMMODITY]: {
         title: 'Commodity',
         description: 'Commodity markets and exchange-listed funds with instrument-specific sessions.',
-        missingMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
+        defaultMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         searchKeywords: ['commodity', 'commodities', 'metals', 'energy'],
     },
     [ASSET_CATEGORIES.FX]: {
         title: 'FX',
         description: 'Forex pairs and DXY-style currency products.',
-        missingMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
+        defaultMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         searchKeywords: ['forex', 'currency', 'currencies'],
     },
     [ASSET_CATEGORIES.CRYPTO]: {
         title: 'Crypto',
         description: 'Always-open crypto markets. Kraken is available now, with more providers planned.',
-        missingMarketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
+        defaultMarketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         searchKeywords: ['crypto', 'cryptocurrency', 'cryptocurrencies'],
     },
 };
@@ -105,14 +105,13 @@ export function getAssetCategoryOptions() {
 
 /*
  * This is the single policy seam between instrument identity and exchange schedule.
- * Listing metadata supplies new defaults while category fallbacks preserve fieldless saved data.
+ * Listing metadata supplies venue defaults while category covers instruments without a known venue.
  */
 export function getTickerMarketSessionPolicy(ticker = {}) {
     const assetCategory = ticker.assetCategory;
     const categoryMetadata = ASSET_CATEGORY_METADATA[assetCategory];
     const metadata = categoryMetadata ?? ASSET_CATEGORY_METADATA[ASSET_CATEGORIES.EQUITY];
-    const missingMarketSessionId = metadata.missingMarketSessionId;
-    const defaultMarketSessionId = getListingMarketSessionId(assetCategory, ticker.symbol) ?? missingMarketSessionId;
+    const defaultMarketSessionId = getListingMarketSessionId(assetCategory, ticker.symbol) ?? metadata.defaultMarketSessionId;
     const marketSessionOptions = getMarketSessionOptions();
     const allowedMarketSessionIds = !categoryMetadata
         ? marketSessionOptions.map(option => option.value)
@@ -121,8 +120,8 @@ export function getTickerMarketSessionPolicy(ticker = {}) {
             : [defaultMarketSessionId];
     const hasExplicitMarketSessionId = hasMarketSessionId(ticker.marketSessionId);
     const configuredMarketSessionId = hasExplicitMarketSessionId ? ticker.marketSessionId : getMarketSessionIdFromLegacyMarketType(ticker.marketType);
-    const compatibleMarketSessionIds = hasExplicitMarketSessionId || !categoryMetadata ? allowedMarketSessionIds : [missingMarketSessionId];
-    const marketSessionId = compatibleMarketSessionIds.includes(configuredMarketSessionId) ? configuredMarketSessionId : missingMarketSessionId;
+    /* Pre-catalog configs could select any session; disallowed values now deliberately follow the listing venue when known. */
+    const marketSessionId = allowedMarketSessionIds.includes(configuredMarketSessionId) ? configuredMarketSessionId : defaultMarketSessionId;
 
     return {defaultMarketSessionId, allowedMarketSessionIds, marketSessionId};
 }
@@ -132,11 +131,10 @@ export function withDefaultMarketSession(ticker) {
     return {...ticker, marketSessionId: getTickerMarketSessionPolicy(ticker).defaultMarketSessionId};
 }
 
-/* prefs includes the effective compatibility value so editing can never conceal the session actually in use. */
+/* prefs includes the effective value so editing can never conceal the session actually in use. */
 export function getTickerMarketSessionOptions(ticker) {
     const policy = getTickerMarketSessionPolicy(ticker);
-    const visibleMarketSessionIds = new Set([...policy.allowedMarketSessionIds, policy.marketSessionId]);
-    return getMarketSessionOptions().filter(option => visibleMarketSessionIds.has(option.value));
+    return getMarketSessionOptions().filter(option => policy.allowedMarketSessionIds.includes(option.value));
 }
 
 /* Known provider suffixes identify listing schedules without pretending every dotted symbol is a venue. */

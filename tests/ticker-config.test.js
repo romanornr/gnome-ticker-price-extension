@@ -15,6 +15,7 @@ import {DEFAULT_TICKERS, loadTickerConfigs} from '../utils/settings.js';
 import {getCuratedTickersForCategory} from '../utils/ticker-catalog.js';
 import {assertDeepEqual, assertEqual} from './support/assert.js';
 
+/* This suite runs the ticker-config contract across catalogs, persistence, and prefs-visible session policy. */
 export function runTests() {
     assertEqual(normalizeTickerConfig(null), null,
         'Invalid ticker configs should be rejected');
@@ -61,15 +62,20 @@ export function runTests() {
     }, 'Legacy Kraken ticker shapes should normalize to current crypto config');
 
     [
-        ['fieldless listed commodity', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
-        ['listed commodity with weekday session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['fieldless listed commodity', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['listed commodity with weekday session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
         ['listed commodity with modern US session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
-        ['listed commodity with legacy US session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketType: 'us_session'}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
-        ['listed commodity with disallowed Europe session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['listed commodity with legacy US session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketType: 'us_session'}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['v1 listed commodity with legacy weekday session', {symbol: 'gld.us', marketType: 'weekday-session'}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['listed commodity with disallowed Europe session', {symbol: 'gld.us', assetCategory: ASSET_CATEGORIES.COMMODITY, marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
         ['fieldless spot commodity', {symbol: 'xauusd', assetCategory: ASSET_CATEGORIES.COMMODITY}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['fieldless commodity future', {symbol: 'gc.f', assetCategory: ASSET_CATEGORIES.COMMODITY}, ASSET_CATEGORIES.COMMODITY, MARKET_SESSION_IDS.WEEKDAY_24H],
         ['fieldless FX', {symbol: 'eurusd', assetCategory: ASSET_CATEGORIES.FX}, ASSET_CATEGORIES.FX, MARKET_SESSION_IDS.WEEKDAY_24H],
         ['fieldless crypto', {symbol: 'btcusd', assetCategory: ASSET_CATEGORIES.CRYPTO}, ASSET_CATEGORIES.CRYPTO, MARKET_SESSION_IDS.ALWAYS_OPEN],
         ['fieldless equity', {symbol: 'aapl.us', assetCategory: ASSET_CATEGORIES.EQUITY}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['fieldless Netherlands equity', {symbol: 'asml.nl', assetCategory: ASSET_CATEGORIES.EQUITY}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.EUROPE_EQUITY_CASH],
+        ['fieldless UK equity', {symbol: 'azn.uk', assetCategory: ASSET_CATEGORIES.EQUITY}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.UK_EQUITY_CASH],
+        ['Netherlands equity with legacy US session', {symbol: 'asml.nl', assetCategory: ASSET_CATEGORIES.EQUITY, marketType: 'us_session'}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
         ['fieldless ETF', {symbol: 'spy.us', assetCategory: ASSET_CATEGORIES.ETF}, ASSET_CATEGORIES.ETF, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
         ['legacy us_equity alias with Europe session', {symbol: 'legacy.us', assetCategory: 'us_equity', marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH}, ASSET_CATEGORIES.EQUITY, MARKET_SESSION_IDS.EUROPE_EQUITY_CASH],
         ['legacy us-etf alias', {symbol: 'legacy.us', assetCategory: 'us-etf'}, ASSET_CATEGORIES.ETF, MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
