@@ -1,4 +1,5 @@
-import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
+import {ASSET_CATEGORIES} from '../asset-categories.js';
+import {MARKET_SESSION_IDS} from '../market-sessions.js';
 
 /* Curated FX suggestions give prefs a searchable baseline for weekday currency markets derived from provider spot rates. */
 const FX_CURRENCY_DEFINITIONS = [
@@ -67,6 +68,6 @@ export const FX_TICKERS = FX_TICKER_DEFINITIONS.map(entry => ({
     label: entry.label,
     symbol: entry.symbol,
     priceDecimals: entry.priceDecimals,
-    marketType: MARKET_TYPES.WEEKDAY_SESSION,
+    marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
     keywords: [...entry.keywords],
 }));

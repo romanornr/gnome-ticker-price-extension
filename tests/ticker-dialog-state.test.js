@@ -61,6 +61,10 @@ export function runTests() {
     );
     assertEqual(curatedFallbackMatches.length, 1,
         'Missing runtime crypto catalogs should fall back to curated seed entries');
+    assertEqual(curatedFallbackMatches[0].marketSessionId, MARKET_SESSION_IDS.ALWAYS_OPEN,
+        'Curated catalog entries should expose the current market-session vocabulary');
+    assertEqual(Object.prototype.hasOwnProperty.call(curatedFallbackMatches[0], 'marketType'), false,
+        'Curated catalog entries should not leak the legacy marketType field');
 
     assertEqual(validateTickerDraft('Label', 'btc/usd', {
         assetCategory: ASSET_CATEGORIES.CRYPTO,

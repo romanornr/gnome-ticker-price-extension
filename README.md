@@ -143,7 +143,7 @@ Shared category labels, descriptions, default market sessions, and category sear
 When adding a curated ticker:
 
 - put it in the file for its asset category
-- keep `assetCategory`, `marketType`, and `priceDecimals` aligned with similar entries
+- keep `assetCategory`, `marketSessionId`, and `priceDecimals` aligned with similar entries
 - add a few helpful `keywords` so catalog search is forgiving
 - verify the provider symbol first for non-crypto instruments
 - crypto suggestions come from the selected live provider at runtime rather than a manually maintained static catalog

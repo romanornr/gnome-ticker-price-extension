@@ -1,4 +1,5 @@
-import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
+import {ASSET_CATEGORIES} from '../asset-categories.js';
+import {MARKET_SESSION_IDS} from '../market-sessions.js';
 
 /* Curated commodity suggestions feed prefs search and sensible default metadata for weekday-session commodities. */
 export const COMMODITY_TICKERS = [
@@ -96,6 +97,6 @@ export const COMMODITY_TICKERS = [
     label: entry.label,
     symbol: entry.symbol,
     priceDecimals: entry.priceDecimals ?? 2,
-    marketType: MARKET_TYPES.WEEKDAY_SESSION,
+    marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
     keywords: [...entry.keywords],
 }));

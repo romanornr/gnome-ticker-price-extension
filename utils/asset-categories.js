@@ -10,12 +10,6 @@ import {
  * These constants and metadata tables keep prefs, scheduling, search, and
  * default ticker setup aligned on the same domain language.
  */
-export const MARKET_TYPES = {
-    ALWAYS_OPEN: 'always-open',
-    WEEKDAY_SESSION: 'weekday-session',
-    US_SESSION: 'us-session',
-};
-
 export const ASSET_CATEGORIES = {
     EQUITY: 'equity',
     ETF: 'etf',

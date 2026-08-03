@@ -1,4 +1,5 @@
-import {ASSET_CATEGORIES, MARKET_TYPES} from '../asset-categories.js';
+import {ASSET_CATEGORIES} from '../asset-categories.js';
+import {MARKET_SESSION_IDS} from '../market-sessions.js';
 
 /* This file is the curated U.S. ETF suggestion source used by prefs search and U.S.-session defaults. */
 export const US_ETF_TICKERS = [
@@ -173,6 +174,6 @@ export const US_ETF_TICKERS = [
     label: entry.label,
     symbol: `${entry.label.toLowerCase()}.us`,
     priceDecimals: 2,
-    marketType: MARKET_TYPES.US_SESSION,
+    marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
     keywords: [...entry.keywords],
 }));
