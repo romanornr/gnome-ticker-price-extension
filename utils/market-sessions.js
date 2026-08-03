@@ -51,11 +51,6 @@ const MARKET_SESSION_PROFILES = {
             {name: SESSION_PHASES.OPEN, startMinutes: 9 * 60 + 30, endMinutes: 16 * 60},
             {name: SESSION_PHASES.EXTENDED, startMinutes: 16 * 60, endMinutes: 20 * 60},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.EXTENDED]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
     [MARKET_SESSION_IDS.EUROPE_EQUITY_CASH]: {
         title: 'Europe equity market',
@@ -66,10 +61,6 @@ const MARKET_SESSION_PROFILES = {
         phases: [
             {name: SESSION_PHASES.OPEN, startMinutes: 9 * 60, endMinutes: 17 * 60 + 30},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
     [MARKET_SESSION_IDS.UK_EQUITY_CASH]: {
         title: 'U.K. equity market',
@@ -80,10 +71,6 @@ const MARKET_SESSION_PROFILES = {
         phases: [
             {name: SESSION_PHASES.OPEN, startMinutes: 8 * 60, endMinutes: 16 * 60 + 30},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
     [MARKET_SESSION_IDS.JAPAN_EQUITY_CASH]: {
         title: 'Japan equity market',
@@ -95,10 +82,6 @@ const MARKET_SESSION_PROFILES = {
             {name: SESSION_PHASES.OPEN, startMinutes: 9 * 60, endMinutes: 11 * 60 + 30},
             {name: SESSION_PHASES.OPEN, startMinutes: 12 * 60 + 30, endMinutes: 15 * 60 + 30},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
     [MARKET_SESSION_IDS.CHINA_EQUITY_CASH]: {
         title: 'China equity market',
@@ -110,10 +93,6 @@ const MARKET_SESSION_PROFILES = {
             {name: SESSION_PHASES.OPEN, startMinutes: 9 * 60 + 30, endMinutes: 11 * 60 + 30},
             {name: SESSION_PHASES.OPEN, startMinutes: 13 * 60, endMinutes: 15 * 60},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
     [MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH]: {
         title: 'Hong Kong equity market',
@@ -125,10 +104,6 @@ const MARKET_SESSION_PROFILES = {
             {name: SESSION_PHASES.OPEN, startMinutes: 9 * 60 + 30, endMinutes: 12 * 60},
             {name: SESSION_PHASES.OPEN, startMinutes: 13 * 60, endMinutes: 16 * 60},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
     [MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH]: {
         title: 'Taiwan equity market',
@@ -139,10 +114,6 @@ const MARKET_SESSION_PROFILES = {
         phases: [
             {name: SESSION_PHASES.OPEN, startMinutes: 9 * 60, endMinutes: 13 * 60 + 30},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
     [MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH]: {
         title: 'South Korea equity market',
@@ -153,10 +124,6 @@ const MARKET_SESSION_PROFILES = {
         phases: [
             {name: SESSION_PHASES.OPEN, startMinutes: 9 * 60, endMinutes: 15 * 60 + 30},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
     [MARKET_SESSION_IDS.INDIA_EQUITY_CASH]: {
         title: 'India equity market',
@@ -167,10 +134,6 @@ const MARKET_SESSION_PROFILES = {
         phases: [
             {name: SESSION_PHASES.OPEN, startMinutes: 9 * 60 + 15, endMinutes: 15 * 60 + 30},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
     [MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH]: {
         title: 'Australia equity market',
@@ -181,10 +144,6 @@ const MARKET_SESSION_PROFILES = {
         phases: [
             {name: SESSION_PHASES.OPEN, startMinutes: 10 * 60, endMinutes: 16 * 60},
         ],
-        refreshPolicy: {
-            [SESSION_PHASES.OPEN]: 'base',
-            [SESSION_PHASES.CLOSED]: 1800,
-        },
     },
 };
 
@@ -217,7 +176,6 @@ export function getMarketSessionProfile(sessionId) {
         id: sessionId,
         ...profile,
         phases: Array.isArray(profile.phases) ? profile.phases.map(phase => ({...phase})) : [],
-        refreshPolicy: profile.refreshPolicy ? {...profile.refreshPolicy} : null,
         weekendDays: Array.isArray(profile.weekendDays) ? [...profile.weekendDays] : [],
     };
 }
