@@ -237,6 +237,7 @@ function testHandleLiveQuotesMergesQuotesAndRequestsThrottledUpdate() {
 async function testStartBootsProvidersAndSchedulesRefresh() {
     const service = createQuotesService();
     const providerStarts = [];
+    let initialEntries = null;
     let refreshRequested = false;
     let scheduledRefreshInterval = 0;
     let subscriptionsUpdated = 0;
@@ -261,8 +262,15 @@ async function testStartBootsProvidersAndSchedulesRefresh() {
     service._refreshQuotes = async forceRefreshAll => {
         refreshRequested = forceRefreshAll;
     };
+    service.connect('entries-changed', () => {
+        initialEntries = service.getEntries();
+    });
 
     service.start();
+    assertEqual(initialEntries?.length, service._tickers.length,
+        'QuotesService.start() should synchronously emit one entry per configured ticker');
+    assertEqual(initialEntries?.every(entry => entry.priceText === '...'), true,
+        'QuotesService.start() should emit loading entries before provider work begins');
     await Promise.resolve();
 
     assertEqual(service._running, true,
@@ -376,6 +384,7 @@ function testStopTearsDownProvidersAndClearsState() {
 async function testTickerSettingsChangeReloadsConfigurationAndRefreshes() {
     const settings = createObservableFakeSettings();
     const service = new QuotesService('test-uuid', settings);
+    let changedEntries = null;
     let refreshRequested = false;
     let subscriptionsUpdated = 0;
     let scheduledRefreshInterval = 0;
@@ -400,6 +409,9 @@ async function testTickerSettingsChangeReloadsConfigurationAndRefreshes() {
     service._refreshQuotes = async forceRefreshAll => {
         refreshRequested = forceRefreshAll;
     };
+    service.connect('entries-changed', () => {
+        changedEntries = service.getEntries();
+    });
 
     service._connectSettingsSignals();
     settings.values[SETTINGS_KEYS.TICKERS_JSON] = JSON.stringify([{
@@ -411,6 +423,8 @@ async function testTickerSettingsChangeReloadsConfigurationAndRefreshes() {
         panelSide: 'right',
     }]);
     settings.trigger(`changed::${SETTINGS_KEYS.TICKERS_JSON}`);
+    assertDeepEqual(changedEntries?.map(entry => [entry.symbol, entry.priceText]), [['aapl.us', '...']],
+        'Ticker setting changes should synchronously emit loading entries for the new configuration');
     await Promise.resolve();
 
     assertEqual(service._tickers[0].symbol, 'aapl.us',
