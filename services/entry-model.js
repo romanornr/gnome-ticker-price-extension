@@ -8,13 +8,13 @@ import {
     STALE_TEXT_COLOR,
 } from '../utils/format.js';
 import {isLiveCryptoTicker} from '../utils/asset-categories.js';
-import {createMarketScheduleNow, getTickerSessionPhase} from '../utils/market-schedule.js';
 
 /*
  * This module translates QuoteStore state into loading, error, and display entries.
- * It decorates price changes while provider and schedule concerns remain upstream.
+ * It decorates price changes; staleness is whatever the store recorded, so market
+ * hours are never consulted here.
  */
-export function buildEntries(tickers, quoteStore, displaySettings, previousEntries = [], now = createMarketScheduleNow()) {
+export function buildEntries(tickers, quoteStore, displaySettings, previousEntries = []) {
     const baseEntries = tickers.map((ticker, index) => {
         const quote = quoteStore.getQuote(ticker.symbol);
 
@@ -25,7 +25,7 @@ export function buildEntries(tickers, quoteStore, displaySettings, previousEntri
             return createErrorEntry(ticker, index, displaySettings);
 
         return createDisplayEntry(ticker, quote, quote.previousClose, index, displaySettings, {
-            isStale: shouldRenderStaleQuote(ticker, quoteStore, now),
+            isStale: quoteStore.isStale(ticker.symbol),
         });
     });
 
@@ -68,10 +68,3 @@ function decorateEntriesWithPriceFlash(entries, previousEntries) {
     });
 }
 
-/* Non-regular-session cached quotes are expected, so only regular-session stale quotes get muted. */
-function shouldRenderStaleQuote(ticker, quoteStore, now) {
-    if (!quoteStore.isStale(ticker.symbol))
-        return false;
-
-    return getTickerSessionPhase(ticker, now) === 'open';
-}
