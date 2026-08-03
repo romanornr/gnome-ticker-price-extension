@@ -4,7 +4,7 @@ import {DEFAULT_DISPLAY_SETTINGS} from '../utils/display-settings.js';
 import {DEFAULT_TEXT_COLOR, NEGATIVE_COLOR, POSITIVE_COLOR, STALE_TEXT_COLOR} from '../utils/format.js';
 import {createMarketScheduleNow} from '../utils/market-schedule.js';
 import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../utils/asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
 import {assertDeepEqual, assertEqual, assertFalse, assertTruthy} from './support/assert.js';
 
 export function runTests() {
@@ -14,7 +14,6 @@ export function runTests() {
         label: 'SPX',
         symbol: '^spx',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.US_SESSION,
         marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         assetCategory: ASSET_CATEGORIES.EQUITY,
     };
@@ -22,7 +21,7 @@ export function runTests() {
         label: 'BTC',
         symbol: 'btcusd',
         priceDecimals: 0,
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         liveSymbol: 'BTC/USD',

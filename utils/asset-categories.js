@@ -1,6 +1,7 @@
 import {
     MARKET_SESSION_IDS,
-    getLegacyMarketTypeForSessionId,
+    getMarketSessionOptions,
+    isEquityMarketSessionId,
 } from './market-sessions.js';
 
 /*
@@ -9,20 +10,12 @@ import {
  * These constants and metadata tables keep prefs, scheduling, search, and
  * default ticker setup aligned on the same domain language.
  */
-export const MARKET_TYPES = {
-    ALWAYS_OPEN: 'always-open',
-    WEEKDAY_SESSION: 'weekday-session',
-    US_SESSION: 'us-session',
-};
-
 export const ASSET_CATEGORIES = {
     EQUITY: 'equity',
     ETF: 'etf',
     COMMODITY: 'commodity',
     FX: 'fx',
     CRYPTO: 'crypto',
-    US_EQUITY: 'equity',
-    US_ETF: 'etf',
 };
 
 export const CRYPTO_PROVIDERS = {
@@ -79,7 +72,7 @@ const CRYPTO_PROVIDER_ORDER = [
 const CRYPTO_PROVIDER_METADATA = {
     [CRYPTO_PROVIDERS.KRAKEN]: {
         title: 'Kraken',
-        description: 'Available now with pair search, verification, and live websocket quotes.',
+        description: 'Available now with pair search, catalog validation, and live websocket quotes.',
         available: true,
     },
     [CRYPTO_PROVIDERS.HYPERLIQUID]: {
@@ -88,15 +81,6 @@ const CRYPTO_PROVIDER_METADATA = {
         available: true,
     },
 };
-
-/* Callers read one normalized category descriptor here instead of touching the internal metadata tables directly. */
-export function getAssetCategoryMetadata(assetCategory) {
-    const metadata = ASSET_CATEGORY_METADATA[assetCategory];
-    if (!metadata)
-        return null;
-
-    return {value: assetCategory, ...metadata, searchKeywords: [...metadata.searchKeywords]};
-}
 
 /* prefs uses these options to keep UI labels and descriptions in sync with the shared metadata tables. */
 export function getAssetCategoryOptions() {
@@ -111,9 +95,13 @@ export function getAssetCategoryDefaultMarketSessionId(assetCategory) {
     return ASSET_CATEGORY_METADATA[assetCategory]?.defaultMarketSessionId ?? MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
 }
 
-/* Legacy callers can still derive marketType while the rest of the codebase migrates to marketSessionId. */
-export function getAssetCategoryDefaultMarketType(assetCategory) {
-    return getLegacyMarketTypeForSessionId(getAssetCategoryDefaultMarketSessionId(assetCategory));
+/* Category policy narrows the shared session registry to the choices valid for one ticker type. */
+export function getMarketSessionOptionsForAssetCategory(assetCategory) {
+    const defaultSessionId = getAssetCategoryDefaultMarketSessionId(assetCategory);
+    if ([ASSET_CATEGORIES.CRYPTO, ASSET_CATEGORIES.COMMODITY, ASSET_CATEGORIES.FX].includes(assetCategory))
+        return getMarketSessionOptions().filter(option => option.value === defaultSessionId);
+
+    return getMarketSessionOptions().filter(option => isEquityMarketSessionId(option.value));
 }
 
 /* A single default crypto provider keeps new ticker flows deterministic when the user has not chosen one yet. */
@@ -133,15 +121,6 @@ export function isLiveCryptoTicker(ticker, cryptoProvider = null) {
 
     return cryptoProvider === null ||
         (ticker.cryptoProvider ?? getDefaultCryptoProvider()) === cryptoProvider;
-}
-
-/* Provider metadata is exposed through one helper so prefs and runtime can share labels and availability. */
-export function getCryptoProviderMetadata(provider) {
-    const metadata = CRYPTO_PROVIDER_METADATA[provider];
-    if (!metadata)
-        return null;
-
-    return {value: provider, ...metadata};
 }
 
 /* prefs uses provider options from here so the UI and runtime provider vocabulary never drift apart. */

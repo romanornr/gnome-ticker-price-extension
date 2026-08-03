@@ -12,7 +12,6 @@ import {US_ETF_TICKERS} from './catalog/us-etf.js';
 import {US_EQUITY_TICKERS} from './catalog/us-equity.js';
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from './asset-categories.js';
 import {getCryptoProviderAdapter} from './crypto-providers/index.js';
-import {getMarketSessionIdFromLegacyMarketType} from './market-sessions.js';
 
 /*
  * The ticker catalog is the search/lookup layer used by prefs.
@@ -21,6 +20,7 @@ import {getMarketSessionIdFromLegacyMarketType} from './market-sessions.js';
  * runtime, then exposes one search/match API so the dialog controller does not
  * need to know where each candidate came from.
  */
+/* Preserve block and entry order: equal-score duplicate labels use stable source order to break suggestion ties. */
 const CATALOG = [
     ...MAINLAND_CHINA_EQUITY_TICKERS,
     ...GERMANY_EQUITY_TICKERS,
@@ -40,11 +40,6 @@ export function getCuratedTickersForCategory(assetCategory) {
     return CATALOG
         .filter(entry => entry.assetCategory === assetCategory)
         .map(cloneCatalogEntry);
-}
-
-/* Some prefs flows need the available top-level categories without loading provider-specific detail. */
-export function getCuratedTickerCategories() {
-    return Array.from(new Set(CATALOG.map(entry => entry.assetCategory)));
 }
 
 /* Exact catalog resolution converts dialog text back into a known ticker definition when possible. */
@@ -155,7 +150,6 @@ function getCatalogForCategory(assetCategory, options = {}) {
 function cloneCatalogEntry(entry) {
     return {
         ...entry,
-        marketSessionId: entry.marketSessionId ?? getMarketSessionIdFromLegacyMarketType(entry.marketType),
         keywords: [...(entry.keywords ?? [])],
     };
 }

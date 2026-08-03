@@ -5,22 +5,22 @@ import Gtk from 'gi://Gtk';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 import {
+    getAssetCategoryDefaultMarketSessionId,
     getAssetCategoryOptions,
-    cloneTicker,
     getCryptoProviderOptions,
-    getMarketSessionForAssetCategory,
-    getMarketSessionOptions,
+} from './utils/asset-categories.js';
+import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './utils/panel-sides.js';
+import {
     getTickersForSide,
     hasSettingsKey,
-    LEFT_PANEL_SIDE,
     loadDisplaySettings,
     loadRefreshIntervalSeconds,
     loadTickerConfigs,
     resetTickerConfigs,
-    RIGHT_PANEL_SIDE,
     saveTickerConfigs,
     SETTINGS_KEYS,
 } from './utils/settings.js';
+import {cloneTicker} from './utils/ticker-config.js';
 import {
     formatRefreshIntervalLabel,
     getFontPresetOptions,
@@ -39,7 +39,7 @@ import {presentTickerDialog} from './utils/prefs/ticker-dialog-controller.js';
  * - delegating complex dialog behavior to the ticker dialog controller
  *
  * That separation keeps this file focused on page structure while the dialog
- * controller owns the denser search/verification/save state machine.
+ * controller owns the denser search/validation/save state machine.
  */
 class TickerPreferencesPage extends Adw.PreferencesPage {
     static {
@@ -59,7 +59,6 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
         this._refreshOptions = getRefreshIntervalOptions();
         this._assetCategoryOptions = getAssetCategoryOptions();
         this._cryptoProviderOptions = getCryptoProviderOptions();
-        this._marketSessionOptions = getMarketSessionOptions();
 
         this._build();
         this._rebuildTickerRows();
@@ -196,7 +195,6 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                     createComboRow: options => this._createComboRow(options),
                     createTextButton: (label, onClicked) => this._createTextButton(label, onClicked),
                     findOptionIndex: (options, value) => this._findOptionIndex(options, value),
-                    getMarketSessionTitle: marketSessionId => this._getMarketSessionTitle(marketSessionId),
                     onSave: updatedTicker => {
                         const nextTickers = [...tickers];
                         nextTickers[index] = updatedTicker;
@@ -230,14 +228,13 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
                                 priceDecimals: 2,
                                 panelSide: addSide,
                                 assetCategory,
-                                marketSessionId: getMarketSessionForAssetCategory(assetCategory),
+                                marketSessionId: getAssetCategoryDefaultMarketSessionId(assetCategory),
                             },
                             assetCategoryOptions: this._assetCategoryOptions,
                             cryptoProviderOptions: this._cryptoProviderOptions,
                             createComboRow: options => this._createComboRow(options),
                             createTextButton: (label, onClicked) => this._createTextButton(label, onClicked),
                             findOptionIndex: (options, value) => this._findOptionIndex(options, value),
-                            getMarketSessionTitle: marketSessionId => this._getMarketSessionTitle(marketSessionId),
                             onSave: newTicker => {
                                 saveTickerConfigs(this._settings, [...tickers, newTicker]);
                                 this._rebuildTickerRows();
@@ -338,12 +335,6 @@ class TickerPreferencesPage extends Adw.PreferencesPage {
     /* Option lookup is factored out so controller code can reuse the same selection convention. */
     _findOptionIndex(options, value) {
         return Math.max(0, options.findIndex(option => option.value === value));
-    }
-
-    /* Market-session titles are resolved here so page and dialog surfaces share the same wording. */
-    _getMarketSessionTitle(marketSessionId) {
-        const option = this._marketSessionOptions.find(candidate => candidate.value === marketSessionId);
-        return option?.title ?? 'Unknown market session';
     }
 
     /* Icon buttons centralize the small row-action styling used by reorder controls. */

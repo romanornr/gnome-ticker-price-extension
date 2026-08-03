@@ -46,7 +46,7 @@ Open the extension preferences and use `+ Add ticker`. You can search the built-
 - Kraken suggestions are loaded dynamically from Kraken WebSocket instrument metadata, so you can search pairs like `SOL`, `SOLUSD`, or `SOL/USD`.
 - Hyperliquid suggestions are loaded dynamically from the official spot/perp metadata endpoints, so you can search perps like `BTC`.
 
-After choosing a match, `Verify` checks whether the selected provider currently returns data for that market before saving.
+For non-crypto matches, `Verify` checks whether the runtime REST quote chain currently returns data before saving. Crypto markets are validated against the selected provider's loaded live catalog as part of the Save path.
 
 Examples: `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD`, `USO`.
 
@@ -69,12 +69,12 @@ Non-crypto tickers are polled on a configurable refresh interval with market-awa
 |---|---|---|
 | **Markets** | Spot pairs | Perps + Spot pairs |
 | **Live transport** | WebSocket v2 | WebSocket |
-| **REST fallback** | — | (when WebSocket disconnects) |
+| **REST fallback** | Ticker endpoint | Market snapshots |
 | **Catalog discovery** | Dynamic from instrument metadata | Dynamic from spot/perp metadata endpoints |
 | **Search examples** | `SOL`, `SOLUSD`, `SOL/USD` | `BTC`, `ETH`, `ETH/USDC` |
 | **Connection model** | Single socket, batch subscribe | Single socket, per-symbol subscribe |
 
-Both providers maintain one persistent WebSocket connection for all saved crypto pairs rather than opening one socket per ticker. If Hyperliquid's WebSocket disconnects, it falls back to REST polling on the normal refresh cadence. Kraken quotes wait for reconnect.
+Both providers maintain one persistent WebSocket connection for all saved crypto pairs rather than opening one socket per ticker. If either WebSocket disconnects, its provider falls back to REST polling on the normal refresh cadence while reconnecting conservatively.
 
 ## Display Settings
 
@@ -116,12 +116,8 @@ The crypto provider code is split into two layers:
 - `utils/crypto-providers/` for provider semantics such as symbol normalization, catalog loading, scoring, and quote normalization
 - `services/providers/` for runtime transport, provider ownership, and refresh orchestration
 
-The stable adapter entrypoints remain:
-
-- `utils/crypto-providers/kraken-adapter.js`
-- `utils/crypto-providers/hyperliquid-adapter.js`
-
-Their internals are now split by concern under:
+`utils/crypto-providers/index.js` composes the shared adapter objects used by
+prefs and runtime routing. Provider internals stay split by concern under:
 
 - `utils/crypto-providers/kraken/`
 - `utils/crypto-providers/hyperliquid/`
@@ -142,8 +138,10 @@ Shared category labels, descriptions, default market sessions, and category sear
 
 When adding a curated ticker:
 
-- put it in the file for its asset category
-- keep `assetCategory`, `marketType`, and `priceDecimals` aligned with similar entries
+- put one compact source record in the file for its asset category and preserve the file's label order
+- let the file-local mapper supply its shared `assetCategory`, `marketSessionId`, regional keywords, and precision policy
+- equity and ETF symbols normally derive from the lowercase label plus the file's market suffix; keep verified exceptions explicit, as `us-equity.js` does for `BRK.B`, `NDX`, and `SPX`
+- keep commodity symbols explicit, and add `priceDecimals` only in files whose mapper supports a row-level override
 - add a few helpful `keywords` so catalog search is forgiving
 - verify the provider symbol first for non-crypto instruments
 - crypto suggestions come from the selected live provider at runtime rather than a manually maintained static catalog
@@ -199,7 +197,7 @@ journalctl --user -f /usr/bin/gnome-shell
    confirm startup shows loading placeholders before live data arrives;
    confirm non-crypto `Verify` still works for selected catalog entries;
    confirm add, edit, remove, reorder, and reset-to-defaults still persist correctly;
-   confirm switching `Crypto API` changes the searchable markets and verification behavior;
+   confirm switching `Crypto API` changes the searchable markets and Save validation;
    confirm Kraken and Hyperliquid crypto entries receive live updates;
    confirm price changes still flash briefly and then settle back to the default text color.
 6. If a runtime issue appears, add targeted `log()` or `logError()` statements near the relevant provider, orchestrator, or prefs path before doing more refactoring.

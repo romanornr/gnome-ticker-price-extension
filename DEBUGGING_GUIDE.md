@@ -246,7 +246,7 @@ journalctl --user -f /usr/bin/gnome-shell
    loading and error states still render sensibly;
    CNBC verification for non-crypto symbols still works;
    prefs add/edit/remove/reorder/reset flows still persist;
-   Kraken and Hyperliquid provider selection still changes search and verification behavior;
+   Kraken and Hyperliquid provider selection still changes search and Save validation;
    live crypto updates continue arriving without shell warnings or reconnect loops;
    price flash behavior still highlights a move and then resets.
 

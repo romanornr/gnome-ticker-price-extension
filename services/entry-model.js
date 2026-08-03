@@ -2,8 +2,6 @@ import {
     createDisplayEntry,
     createErrorEntry,
     createLoadingEntry,
-} from '../utils/format.js';
-import {
     DEFAULT_TEXT_COLOR,
     NEGATIVE_COLOR,
     POSITIVE_COLOR,

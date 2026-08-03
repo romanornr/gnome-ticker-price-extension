@@ -1,14 +1,28 @@
+import {CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
+import {getCryptoProviderAdapter, krakenAdapter} from '../utils/crypto-providers/index.js';
+import {KRAKEN_WEBSOCKET_URL, loadKrakenSpotPairs} from '../utils/crypto-providers/kraken/catalog.js';
 import {
     buildKrakenTickerUrl,
     createKrakenQuote,
+    parseKrakenTickerQuotes,
+} from '../utils/crypto-providers/kraken/quotes.js';
+import {
     normalizeKrakenLiveSymbol,
     normalizeKrakenTickerSymbol,
-    parseKrakenTickerQuotes,
     scoreKrakenCatalogEntry,
-} from '../utils/crypto-providers/kraken-adapter.js';
+} from '../utils/crypto-providers/kraken/symbols.js';
 import {assertDeepEqual, assertEqual, assertTruthy} from './support/assert.js';
 
 export function runTests() {
+    assertEqual(getCryptoProviderAdapter(CRYPTO_PROVIDERS.KRAKEN), krakenAdapter,
+        'The crypto registry should route Kraken ids to the Kraken adapter');
+    assertEqual(getCryptoProviderAdapter('unknown-provider'), krakenAdapter,
+        'The crypto registry should retain Kraken as its default adapter');
+    assertEqual(krakenAdapter.websocketUrl, KRAKEN_WEBSOCKET_URL,
+        'The Kraken adapter should expose the catalog transport URL');
+    assertEqual(krakenAdapter.loadCatalog, loadKrakenSpotPairs,
+        'The Kraken adapter should expose the Kraken catalog loader');
+
     assertEqual(normalizeKrakenLiveSymbol(' btc / usd '), 'BTC/USD',
         'Kraken live symbols should normalize whitespace and casing');
     assertEqual(normalizeKrakenLiveSymbol('btc-usd'), '',
