@@ -7,6 +7,7 @@ export async function runTests() {
     await testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh();
     await testRefreshProviderFallbackPreservesPreviousClose();
     await testRefreshProviderFallbackSwallowsProviderErrors();
+    await testRefreshQuotesContinuesAfterProviderError();
     testHandleLiveQuotesMergesQuotesAndRequestsThrottledUpdate();
     await testStartBootsProvidersAndSchedulesRefresh();
     await testStartSkipsRegistryEntriesWithoutLiveProviders();
@@ -36,10 +37,10 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
     };
     service._runtimeProviders = [
         {
-            id: 'stooq',
+            id: 'rest',
             ownsTicker: ticker => !ticker.liveSymbol,
             refreshFallback: async tickers => {
-                refreshCalls.push(['stooq', tickers.map(ticker => ticker.symbol)]);
+                refreshCalls.push(['rest', tickers.map(ticker => ticker.symbol)]);
                 return new Map([['AAPL.US', {
                     price: 210,
                     quoteDate: '20260322',
@@ -74,13 +75,13 @@ async function testRefreshQuotesUsesProviderPlanAndMarksRefreshed() {
     await service._refreshQuotes(false);
 
     assertDeepEqual(refreshCalls, [
-        ['stooq', ['aapl.us']],
+        ['rest', ['aapl.us']],
         ['hyperliquid', ['purrusdc']],
     ], 'QuotesService should refresh only the provider plans returned for due tickers');
     assertEqual(entryUpdateRequests, 1,
         'QuotesService should request one immediate entry rebuild after polling refreshes');
     assertEqual(service._quoteStore.getQuote('aapl.us').price, 210,
-        'QuotesService should merge Stooq refresh results into the quote store');
+        'QuotesService should merge CNBC refresh results into the quote store');
     assertEqual(service._quoteStore.getQuote('purrusdc').price, 0.42,
         'QuotesService should merge provider fallback refresh results into the quote store');
     assertEqual(service._quoteStore.getLastRefreshUsec('aapl.us') > 0, true,
@@ -127,7 +128,7 @@ async function testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh() {
         },
     };
     service._runtimeProviders = [{
-        id: 'stooq',
+        id: 'rest',
         ownsTicker: () => true,
         hasPollingFallback: () => false,
         refreshFallback: async () => new Map(),
@@ -157,6 +158,55 @@ async function testRefreshProviderFallbackSwallowsProviderErrors() {
     } finally {
         globalThis.logError = originalLogError;
     }
+}
+
+async function testRefreshQuotesContinuesAfterProviderError() {
+    const service = createQuotesService();
+    const originalLogError = globalThis.logError;
+    let entryUpdateRequests = 0;
+    globalThis.logError = () => {};
+
+    service._running = true;
+    service._session = {};
+    service._tickers = [
+        {assetCategory: ASSET_CATEGORIES.EQUITY, symbol: 'bad.us'},
+        {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID, liveSymbol: 'PURR/USDC', symbol: 'purrusdc'},
+    ];
+    service._coordinator = {
+        requestEntriesUpdate(immediate) {
+            if (immediate)
+                entryUpdateRequests += 1;
+        },
+    };
+    service._runtimeProviders = [
+        {
+            id: 'rest',
+            ownsTicker: ticker => ticker.assetCategory === ASSET_CATEGORIES.EQUITY,
+            refreshFallback: async () => {
+                throw new Error('broken cnbc');
+            },
+        },
+        {
+            id: CRYPTO_PROVIDERS.HYPERLIQUID,
+            ownsTicker: ticker => ticker.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID,
+            refreshFallback: async () => new Map([['PURRUSDC', {
+                price: 0.42,
+                quoteDate: '20260322',
+                previousClose: 0.4,
+            }]]),
+        },
+    ];
+
+    try {
+        await service._refreshQuotes(true);
+    } finally {
+        globalThis.logError = originalLogError;
+    }
+
+    assertEqual(service._quoteStore.getQuote('purrusdc').price, 0.42,
+        'QuotesService should continue refreshing later providers after one provider fails');
+    assertEqual(entryUpdateRequests, 1,
+        'QuotesService should still request an entry rebuild when a later provider succeeds');
 }
 
 function testHandleLiveQuotesMergesQuotesAndRequestsThrottledUpdate() {
@@ -240,7 +290,7 @@ async function testStartSkipsRegistryEntriesWithoutLiveProviders() {
 
     service._runtimeProviders = [
         {
-            id: 'stooq',
+            id: 'rest',
             refreshFallback: async () => new Map(),
         },
         {
@@ -384,6 +434,11 @@ async function testTickerSettingsChangeReloadsConfigurationAndRefreshes() {
 
 function testDisplaySettingsChangeRequestsImmediateRebuild() {
     const settings = createObservableFakeSettings();
+    settings.settings_schema = {
+        has_key(key) {
+            return key === SETTINGS_KEYS.FONT_PRESET;
+        },
+    };
     const service = new QuotesService('test-uuid', settings);
     let immediateRebuildRequests = 0;
 
@@ -397,9 +452,11 @@ function testDisplaySettingsChangeRequestsImmediateRebuild() {
     service._connectSettingsSignals();
     settings.values[SETTINGS_KEYS.SHOW_PRICE] = true;
     settings.trigger(`changed::${SETTINGS_KEYS.SHOW_PRICE}`);
+    settings.values[SETTINGS_KEYS.FONT_PRESET] = 'monospace';
+    settings.trigger(`changed::${SETTINGS_KEYS.FONT_PRESET}`);
 
-    assertEqual(immediateRebuildRequests, 1,
-        'Display-only setting changes should request an immediate entry rebuild');
+    assertEqual(immediateRebuildRequests, 2,
+        'Display-only setting changes including font preset should request an immediate entry rebuild');
 }
 
 function testRefreshIntervalSettingChangeReschedulesCoordinator() {

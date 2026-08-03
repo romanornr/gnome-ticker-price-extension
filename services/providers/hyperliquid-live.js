@@ -43,8 +43,8 @@ export async function refresh(tickers, {session, quoteStore}) {
  */
 export class HyperliquidLiveProvider extends LiveWebsocketProvider {
     /* Hyperliquid adds quoteStore access because live updates may need previous-close fallback context. */
-    constructor({uuid, onQuotes, quoteStore}) {
-        super({uuid, onQuotes, filterTicker: isHyperliquidTicker});
+    constructor({uuid, onQuotes, onStale, quoteStore}) {
+        super({uuid, onQuotes, onStale, filterTicker: isHyperliquidTicker});
         this._quoteStore = quoteStore;
     }
 

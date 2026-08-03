@@ -1,10 +1,37 @@
 import {CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
 import {krakenAdapter} from '../../utils/crypto-providers/kraken-adapter.js';
-import {isLiveCryptoTickerForProvider} from './live-quote-provider.js';
+import {
+    getDesiredLiveSymbols,
+    isLiveCryptoTickerForProvider,
+} from './live-quote-provider.js';
 import {
     LiveWebsocketProvider,
     openWebsocketConnection,
 } from './live-websocket-provider.js';
+
+/*
+ * Kraken uses both a REST fallback and a live websocket in the same provider
+ * area, mirroring Hyperliquid:
+ * - refresh() handles the REST polling path used when live data is unavailable
+ * - KrakenLiveProvider handles the persistent websocket path
+ *
+ * Both paths normalize into the same quote shape so QuotesService can treat
+ * Kraken as one provider regardless of where the latest quote came from.
+ */
+export async function refresh(tickers, {session}) {
+    if (!session || tickers.length === 0) return new Map();
+
+    const quotesByPair = await krakenAdapter.fetchTickerQuotes(session, getDesiredLiveSymbols(tickers));
+    const quotesBySymbol = new Map();
+
+    tickers.forEach(ticker => {
+        const quote = quotesByPair.get(ticker.liveSymbol);
+        if (quote)
+            quotesBySymbol.set(ticker.symbol.toUpperCase(), quote);
+    });
+
+    return quotesBySymbol;
+}
 
 /*
  * KrakenLiveProvider plugs Kraken-specific transport details into the shared
@@ -18,8 +45,8 @@ import {
  */
 export class KrakenLiveProvider extends LiveWebsocketProvider {
     /* Kraken only needs to supply its provider-specific hooks because lifecycle behavior comes from the base class. */
-    constructor({uuid, onQuotes}) {
-        super({uuid, onQuotes, filterTicker: isKrakenTicker});
+    constructor({uuid, onQuotes, onStale}) {
+        super({uuid, onQuotes, onStale, filterTicker: isKrakenTicker});
     }
 
     /* Shared websocket logging uses this provider name so errors stay distinguishable at runtime. */

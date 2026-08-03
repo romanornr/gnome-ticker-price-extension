@@ -253,7 +253,7 @@ export function getMarketSessionProfile(sessionId) {
     };
 }
 
-/* prefs uses these options to expose explicit session choices for manual ticker entry. */
+/* prefs uses these options to expose explicit session choices for ticker entries. */
 export function getMarketSessionOptions() {
     return MARKET_SESSION_ORDER.map(sessionId => {
         const profile = MARKET_SESSION_PROFILES[sessionId];

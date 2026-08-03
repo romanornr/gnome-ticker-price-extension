@@ -11,11 +11,11 @@ export function runTests() {
     const krakenTicker = {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.KRAKEN, liveSymbol: 'BTC/USD', symbol: 'btcusd'};
     const defaultKrakenTicker = {assetCategory: ASSET_CATEGORIES.CRYPTO, liveSymbol: 'ETH/USD', symbol: 'ethusd'};
     const hyperliquidTicker = {assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID, liveSymbol: 'PURR/USDC', symbol: 'purrusdc'};
-    const stooqTicker = {assetCategory: ASSET_CATEGORIES.EQUITY, symbol: 'aapl.us'};
+    const restTicker = {assetCategory: ASSET_CATEGORIES.EQUITY, symbol: 'aapl.us'};
 
     const providerEntries = [
         {
-            id: 'stooq',
+            id: 'rest',
             ownsTicker: ticker => ticker?.assetCategory !== ASSET_CATEGORIES.CRYPTO ||
                 typeof ticker.liveSymbol !== 'string' ||
                 ticker.liveSymbol === '',
@@ -48,13 +48,13 @@ export function runTests() {
         krakenTicker,
         defaultKrakenTicker,
         hyperliquidTicker,
-        stooqTicker,
+        restTicker,
     ], providerEntries);
     assertDeepEqual(refreshPlan.map(plan => ({
         id: plan.providerEntry.id,
         symbols: plan.tickers.map(ticker => ticker.symbol),
     })), [{
-        id: 'stooq',
+        id: 'rest',
         symbols: ['aapl.us'],
     }, {
         id: CRYPTO_PROVIDERS.HYPERLIQUID,
@@ -62,11 +62,11 @@ export function runTests() {
     }], 'Refresh planning should include normal polling providers and disconnected live-provider fallbacks');
 
     providerEntries[2].provider.isConnected = () => true;
-    assertDeepEqual(getProviderRefreshPlan([hyperliquidTicker, stooqTicker], providerEntries).map(plan => ({
+    assertDeepEqual(getProviderRefreshPlan([hyperliquidTicker, restTicker], providerEntries).map(plan => ({
         id: plan.providerEntry.id,
         symbols: plan.tickers.map(ticker => ticker.symbol),
     })), [{
-        id: 'stooq',
+        id: 'rest',
         symbols: ['aapl.us'],
     }],
         'Connected live providers should not schedule a polling fallback refresh');
@@ -82,12 +82,18 @@ function testCreateRuntimeProviderRegistry() {
     });
 
     assertDeepEqual(registry.map(entry => entry.id), [
-        'stooq',
+        'rest',
         CRYPTO_PROVIDERS.KRAKEN,
         CRYPTO_PROVIDERS.HYPERLIQUID,
-    ], 'Runtime provider registry construction should expose Stooq, Kraken, and Hyperliquid entries in orchestration order');
+    ], 'Runtime provider registry construction should expose CNBC, Kraken, and Hyperliquid entries in orchestration order');
     assertEqual(typeof registry[1].provider.start, 'function',
         'Runtime provider registry entries should expose live provider lifecycle objects where expected');
+    assertEqual(typeof registry[1].refreshFallback, 'function',
+        'The Kraken registry entry should expose a REST polling fallback');
+    assertEqual(registry[1].hasPollingFallback(registry[1]), true,
+        'Disconnected Kraken live transport should request the polling fallback');
+    assertEqual(registry[2].hasPollingFallback(registry[2]), true,
+        'Disconnected Hyperliquid live transport should request the polling fallback');
 }
 
 function testRefreshPlanSkipsProvidersWithoutRefreshFallback() {

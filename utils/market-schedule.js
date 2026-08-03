@@ -62,6 +62,24 @@ export function getRefreshIntervalSecondsForTicker(
     return Math.max(intervalSeconds, phaseRefreshPolicy);
 }
 
+/* UI layers use this to distinguish expected closed-market cache reuse from data failures. */
+export function getTickerSessionPhase(ticker, now = createMarketScheduleNow()) {
+    const profile = getTickerMarketSessionProfile(ticker);
+    if (!profile)
+        return 'open';
+
+    if (profile.id === MARKET_SESSION_IDS.ALWAYS_OPEN)
+        return 'open';
+
+    if (isProfileWeekend(profile, now.date))
+        return 'closed';
+
+    if (profile.kind === 'weekday-24h')
+        return 'open';
+
+    return getProfileSessionPhase(profile, now.date);
+}
+
 /* Refresh cadence is evaluated against monotonic time so local clock changes do not distort polling behavior. */
 function hasReachedCadence(lastRefreshUsec, refreshIntervalSeconds, nowUsec) {
     if (!lastRefreshUsec) return true;

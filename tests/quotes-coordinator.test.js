@@ -1,6 +1,7 @@
 import GLib from 'gi://GLib';
 
 import {QuotesCoordinator} from '../services/quotes-coordinator.js';
+import {STALE_TEXT_COLOR} from '../utils/format.js';
 import {assertEqual} from './support/assert.js';
 
 export async function runTests() {
@@ -27,9 +28,18 @@ export async function runTests() {
     coordinator.schedulePriceFlashReset([{
         label: 'BTC',
         priceColor: '#3FB950',
+        priceFlash: true,
     }]);
     await waitFor(800);
     assertEqual(flashResetCalls, 1, 'Price flash reset should fire once after the timeout');
+
+    coordinator.schedulePriceFlashReset([{
+        label: 'SPX',
+        priceColor: STALE_TEXT_COLOR,
+        priceFlash: false,
+    }]);
+    await waitFor(800);
+    assertEqual(flashResetCalls, 1, 'Stale quote color should not be treated as a price flash');
 
     coordinator.stop();
     assertEqual(refreshCalls, 0, 'Coordinator should not trigger refresh without a scheduled timer');

@@ -1,5 +1,6 @@
 import Adw from 'gi://Adw';
 import Gtk from 'gi://Gtk';
+import Pango from 'gi://Pango';
 import Soup from 'gi://Soup?version=3.0';
 
 import {
@@ -9,7 +10,7 @@ import {
 import {
     buildTickerConfig,
     getCatalogMatches,
-    getCryptoSearchQuery,
+    getCatalogSearchQuery,
     getCryptoVerificationFailureMessage,
     getCryptoVerificationSuccessMessage,
     getSuggestionsDescription,
@@ -17,7 +18,7 @@ import {
     validateTickerDraft,
     validateTickerSymbol,
 } from './ticker-dialog-state.js';
-import {verifyTickerSymbol} from './stooq-verifier.js';
+import {verifyTickerSymbol} from './quote-verifier.js';
 import {
     getDefaultCryptoProvider,
     getMarketSessionForAssetCategory,
@@ -145,15 +146,22 @@ class TickerDialogController {
         this.cryptoProviderRow.visible = this.activeAssetCategory === 'crypto';
         formGroup.add(this.cryptoProviderRow);
 
-        this.labelRow = new Adw.EntryRow({title: 'Label', text: this.initialTicker.label ?? ''});
+        this.searchRow = new Adw.EntryRow({title: 'Search catalog'});
+        formGroup.add(this.searchRow);
+
+        const labelField = this._createReadOnlyTextRow('Name', this.initialTicker.label ?? '');
+        this.labelRow = labelField.row;
+        this.labelValueLabel = labelField.valueLabel;
         formGroup.add(this.labelRow);
 
-        this.symbolRow = new Adw.EntryRow({
-            title: 'Symbol',
-            text: this.activeAssetCategory === 'crypto'
+        const symbolField = this._createReadOnlyTextRow(
+            'Symbol',
+            this.activeAssetCategory === 'crypto'
                 ? (this.initialTicker.liveSymbol ?? this.initialTicker.symbol ?? '')
-                : (this.initialTicker.symbol ?? ''),
-        });
+                : (this.initialTicker.symbol ?? '')
+        );
+        this.symbolRow = symbolField.row;
+        this.symbolValueLabel = symbolField.valueLabel;
         formGroup.add(this.symbolRow);
 
         this.verifyButton = this.createTextButton('Verify', () => {
@@ -185,7 +193,7 @@ class TickerDialogController {
 
         this.suggestionsGroup = new Adw.PreferencesGroup({
             title: 'Catalog matches',
-            description: 'Type a label or symbol above to search the built-in catalog. You can still save any custom Stooq symbol.',
+            description: 'Search the catalog above, then choose a match to fill the ticker fields.',
         });
         content.append(this.suggestionsGroup);
 
@@ -246,32 +254,8 @@ class TickerDialogController {
             this._updateSaveSensitivity();
         });
 
-        this.labelRow.connect('notify::text', () => {
+        this.searchRow.connect('notify::text', () => {
             this._renderCuratedSuggestions();
-            this._updateSaveSensitivity();
-        });
-
-        this.symbolRow.connect('notify::text', () => {
-            const normalizedSymbolText = this.activeAssetCategory === 'crypto'
-                ? this.symbolRow.text.trim()
-                : this.symbolRow.text.trim().toLowerCase();
-
-            if (this.lastVerifiedSymbol !== '' && normalizedSymbolText !== this.lastVerifiedSymbol)
-                this._clearVerificationState();
-
-            if (this.activeAssetCategory === 'crypto') {
-                const resolvedCryptoTicker = this._getResolvedCryptoTicker();
-                if (this.labelRow.text.trim() === '' || this.labelRow.text.trim() === this.autoFilledCryptoLabel) {
-                    if (resolvedCryptoTicker) {
-                        this.autoFilledCryptoLabel = resolvedCryptoTicker.label;
-                        this.labelRow.text = resolvedCryptoTicker.label;
-                        this.decimalsRow.value = resolvedCryptoTicker.priceDecimals;
-                    }
-                }
-            }
-
-            this._renderCuratedSuggestions();
-            this._updateSaveSensitivity();
         });
 
         this.dialog.connect('destroy', () => {
@@ -290,10 +274,10 @@ class TickerDialogController {
 
     /* Choosing a suggestion updates both the visible form fields and the controller's hidden runtime state. */
     _applyCuratedTicker(curatedTicker) {
-        this.labelRow.text = curatedTicker.label;
-        this.symbolRow.text = curatedTicker.assetCategory === 'crypto'
+        this._setLabelText(curatedTicker.label);
+        this._setSymbolText(curatedTicker.assetCategory === 'crypto'
             ? (curatedTicker.liveSymbol ?? curatedTicker.symbol)
-            : curatedTicker.symbol;
+            : curatedTicker.symbol);
         this.decimalsRow.value = curatedTicker.priceDecimals;
         this.activeAssetCategory = curatedTicker.assetCategory;
         this.activeMarketSessionId = curatedTicker.marketSessionId ?? getMarketSessionForAssetCategory(curatedTicker.assetCategory);
@@ -309,7 +293,67 @@ class TickerDialogController {
         this._updateSaveSensitivity();
     }
 
-    /* Market-session selection stays editable for manual non-crypto tickers and follows the current asset type. */
+    /* Read-only text rows avoid editable affordances while keeping selected catalog values visible. */
+    _createReadOnlyTextRow(title, text) {
+        const row = new Adw.ActionRow({title, activatable: false});
+        const valueLabel = new Gtk.Label({
+            ellipsize: Pango.EllipsizeMode.END,
+            halign: Gtk.Align.END,
+            hexpand: true,
+            label: text,
+            selectable: true,
+            single_line_mode: true,
+            xalign: 1,
+        });
+        valueLabel.add_css_class('dim-label');
+        row.add_suffix(valueLabel);
+
+        return {row, valueLabel};
+    }
+
+    _getLabelText() {
+        return this.labelValueLabel.label;
+    }
+
+    _setLabelText(text) {
+        this.labelValueLabel.label = text;
+        this._updateSaveSensitivity();
+    }
+
+    _getSymbolText() {
+        return this.symbolValueLabel.label;
+    }
+
+    _setSymbolText(text) {
+        this.symbolValueLabel.label = text;
+        this._handleSymbolTextChanged();
+    }
+
+    _handleSymbolTextChanged() {
+        const symbolText = this._getSymbolText();
+        const normalizedSymbolText = this.activeAssetCategory === 'crypto'
+            ? symbolText.trim()
+            : symbolText.trim().toLowerCase();
+
+        if (this.lastVerifiedSymbol !== '' && normalizedSymbolText !== this.lastVerifiedSymbol)
+            this._clearVerificationState();
+
+        if (this.activeAssetCategory === 'crypto') {
+            const resolvedCryptoTicker = this._getResolvedCryptoTicker();
+            const labelText = this._getLabelText();
+            if (labelText.trim() === '' || labelText.trim() === this.autoFilledCryptoLabel) {
+                if (resolvedCryptoTicker) {
+                    this.autoFilledCryptoLabel = resolvedCryptoTicker.label;
+                    this._setLabelText(resolvedCryptoTicker.label);
+                    this.decimalsRow.value = resolvedCryptoTicker.priceDecimals;
+                }
+            }
+        }
+
+        this._updateSaveSensitivity();
+    }
+
+    /* Market-session selection stays editable and follows the current asset type. */
     _syncMarketSessionRow() {
         this.marketSessionOptions = getMarketSessionOptionsForAssetCategory(this.activeAssetCategory);
         this.marketSessionModel.splice(0, this.marketSessionModel.get_n_items(), this.marketSessionOptions.map(option => option.title));
@@ -358,8 +402,8 @@ class TickerDialogController {
             assetCategory: this.activeAssetCategory,
             cryptoCatalog: this.cryptoCatalog,
             cryptoProvider: this.activeCryptoProvider,
-            labelText: this.labelRow.text,
-            symbolText: this.symbolRow.text,
+            labelText: this._getLabelText(),
+            symbolText: this._getSymbolText(),
         });
     }
 
@@ -425,8 +469,7 @@ class TickerDialogController {
             cryptoCatalog: this.cryptoCatalog,
             cryptoCatalogLoading: this.cryptoCatalogLoading,
             cryptoCatalogError: this.cryptoCatalogError,
-            labelText: this.labelRow.text,
-            symbolText: this.symbolRow.text,
+            searchText: this.searchRow.text,
             maxSuggestions: MAX_CURATED_SUGGESTIONS,
         }).forEach(rowModel => {
             const row = new Adw.ActionRow({title: rowModel.title, subtitle: rowModel.subtitle, sensitive: rowModel.kind === 'match'});
@@ -445,7 +488,7 @@ class TickerDialogController {
     /* Verify availability follows dialog validity/loading state so users only trigger meaningful checks. */
     _updateVerifyButtonSensitivity() {
         this.verifyButton.set_sensitive(
-            this.symbolRow.text.trim() !== '' &&
+            this._getSymbolText().trim() !== '' &&
             !this.verifyInProgress &&
             !(this.activeAssetCategory === 'crypto' && this.cryptoCatalogLoading)
         );
@@ -454,7 +497,7 @@ class TickerDialogController {
     /*
      * Verification bridges dialog state to provider checks: crypto validates
      * against the loaded runtime catalog, while non-crypto symbols round-trip
-     * through Stooq.
+     * through the same REST provider chain the runtime refresh uses.
      */
     async _runSymbolVerification() {
         if (this.activeAssetCategory === 'crypto') {
@@ -485,7 +528,7 @@ class TickerDialogController {
             return;
         }
 
-        const symbol = this.symbolRow.text.trim().toLowerCase();
+        const symbol = this._getSymbolText().trim().toLowerCase();
         const symbolValidationMessage = validateTickerSymbol(symbol);
 
         if (symbolValidationMessage !== '') {
@@ -498,16 +541,16 @@ class TickerDialogController {
         const requestId = this.verificationRequestId;
         this.verifyInProgress = true;
         this._updateVerifyButtonSensitivity();
-        this._setVerificationMessage(`Checking ${symbol} on Stooq...`);
+        this._setVerificationMessage(`Checking ${symbol}...`);
 
         try {
-            const result = await verifyTickerSymbol(this.verificationSession, symbol);
+            const result = await verifyTickerSymbol(this.verificationSession, symbol, this.activeAssetCategory);
             if (requestId !== this.verificationRequestId)
                 return;
 
             this.lastVerifiedSymbol = symbol;
             this._setVerificationMessage(
-                `Verified ${result.symbol}. Stooq returned quote data dated ${result.quoteDate}.`
+                `Verified ${result.symbol}. Quote data dated ${result.quoteDate}.`
             );
         } catch (error) {
             if (requestId !== this.verificationRequestId)
@@ -528,11 +571,11 @@ class TickerDialogController {
         const hasCryptoCatalogMatches = this.activeAssetCategory === 'crypto' &&
             getCatalogMatches(
                 this.activeAssetCategory,
-                getCryptoSearchQuery(this.labelRow.text, this.symbolRow.text),
+                getCatalogSearchQuery(this.searchRow.text),
                 this.cryptoCatalog,
                 this.activeCryptoProvider
             ).length > 0;
-        const validationMessage = validateTickerDraft(this.labelRow.text, this.symbolRow.text, {
+        const validationMessage = validateTickerDraft(this._getLabelText(), this._getSymbolText(), {
             assetCategory: this.activeAssetCategory,
             cryptoProvider: this.activeCryptoProvider,
             cryptoCatalogLoading: this.cryptoCatalogLoading,
@@ -551,8 +594,8 @@ class TickerDialogController {
     _buildNextTicker() {
         return buildTickerConfig({
             initialTicker: this.initialTicker,
-            labelText: this.labelRow.text,
-            symbolText: this.symbolRow.text,
+            labelText: this._getLabelText(),
+            symbolText: this._getSymbolText(),
             priceDecimals: this.decimalsRow.value,
             panelSide: this.sideOptions[this.sideRow.selected].value,
             assetCategory: this.activeAssetCategory,

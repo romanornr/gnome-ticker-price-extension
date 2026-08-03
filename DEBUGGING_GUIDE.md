@@ -74,13 +74,13 @@ If you need to confirm whether the shell currently sees the extension at all,
 start with:
 
 ```bash
-gnome-extensions info ticker-price-extension@romano
+gnome-extensions info ticker-price-extension@romanornr
 ```
 
 or:
 
 ```bash
-gnome-extensions show ticker-price-extension@romano
+gnome-extensions show ticker-price-extension@romanornr
 ```
 
 If those commands return no information, the extension is either not installed
@@ -244,7 +244,7 @@ journalctl --user -f /usr/bin/gnome-shell
    the indicator appears and updates in the panel;
    left and right panel tickers preserve their configured side and order;
    loading and error states still render sensibly;
-   Stooq verification for non-crypto symbols still works;
+   CNBC verification for non-crypto symbols still works;
    prefs add/edit/remove/reorder/reset flows still persist;
    Kraken and Hyperliquid provider selection still changes search and verification behavior;
    live crypto updates continue arriving without shell warnings or reconnect loops;

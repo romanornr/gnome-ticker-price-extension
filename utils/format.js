@@ -9,7 +9,10 @@ import {
  * visibility flags. It is intentionally dumb about where data came from and is
  * reused by both loading/error states and the normal render path.
  */
-export const DEFAULT_TEXT_COLOR = '#ffffff';
+export const PRIMARY_TEXT_COLOR = '#e8e8e8';
+export const SECONDARY_TEXT_COLOR = '#a7adb4';
+export const DEFAULT_TEXT_COLOR = PRIMARY_TEXT_COLOR;
+export const STALE_TEXT_COLOR = SECONDARY_TEXT_COLOR;
 export const POSITIVE_COLOR = '#3FB950';
 export const NEGATIVE_COLOR = '#F85149';
 
@@ -28,8 +31,9 @@ export function createLoadingEntry(ticker, index, displaySettings = DEFAULT_DISP
         displayPrice: null,
         arrow: '',
         percentText: '',
-        priceColor: DEFAULT_TEXT_COLOR,
-        changeColor: DEFAULT_TEXT_COLOR,
+        priceColor: STALE_TEXT_COLOR,
+        changeColor: STALE_TEXT_COLOR,
+        isStale: true,
     });
 }
 
@@ -43,14 +47,16 @@ export function createErrorEntry(ticker, index, displaySettings = DEFAULT_DISPLA
         displayPrice: null,
         arrow: '',
         percentText: '',
-        priceColor: DEFAULT_TEXT_COLOR,
-        changeColor: DEFAULT_TEXT_COLOR,
+        priceColor: STALE_TEXT_COLOR,
+        changeColor: STALE_TEXT_COLOR,
+        isStale: true,
     });
 }
 
 /* Display entries are the normal success path from normalized quotes into panel-facing text fragments. */
-export function createDisplayEntry(ticker, quote, previousClose, index, displaySettings = DEFAULT_DISPLAY_SETTINGS) {
+export function createDisplayEntry(ticker, quote, previousClose, index, displaySettings = DEFAULT_DISPLAY_SETTINGS, {isStale = false} = {}) {
     const priceText = formatPrice(quote.price, ticker.priceDecimals);
+    const neutralTextColor = isStale ? STALE_TEXT_COLOR : DEFAULT_TEXT_COLOR;
 
     if (!Number.isFinite(previousClose)) {
         return createBaseEntry({
@@ -61,8 +67,9 @@ export function createDisplayEntry(ticker, quote, previousClose, index, displayS
             displayPrice: quote.price,
             arrow: '',
             percentText: '',
-            priceColor: DEFAULT_TEXT_COLOR,
-            changeColor: DEFAULT_TEXT_COLOR,
+            priceColor: neutralTextColor,
+            changeColor: neutralTextColor,
+            isStale,
         });
     }
 
@@ -76,8 +83,9 @@ export function createDisplayEntry(ticker, quote, previousClose, index, displayS
         displayPrice: quote.price,
         arrow: getArrow(percentChange),
         percentText: `${Math.abs(percentChange).toFixed(1)}%`,
-        priceColor: DEFAULT_TEXT_COLOR,
-        changeColor: getChangeColor(percentChange),
+        priceColor: neutralTextColor,
+        changeColor: isStale ? STALE_TEXT_COLOR : getChangeColor(percentChange),
+        isStale,
     });
 }
 
@@ -92,6 +100,7 @@ function createBaseEntry({
     percentText,
     priceColor,
     changeColor,
+    isStale = false,
 }) {
     const visibility = resolveVisibility(displaySettings);
 
@@ -110,6 +119,8 @@ function createBaseEntry({
         showPercent: visibility.showPercent && percentText !== '',
         priceColor,
         changeColor,
+        isStale,
+        priceFlash: false,
     };
 }
 

@@ -1,7 +1,7 @@
-import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../../asset-categories.js';
+import {httpPostJson} from '../../http.js';
 import {
     isHyperliquidSpotSymbol,
     normalizeHyperliquidLiveSymbol,
@@ -39,25 +39,8 @@ export async function fetchHyperliquidMarketSnapshots(session) {
 }
 
 /* All Hyperliquid REST calls use the same POST helper so transport details stay out of callers. */
-export async function postHyperliquidInfo(session, body) {
-    const requestSession = session ?? new Soup.Session();
-    const message = Soup.Message.new('POST', HYPERLIQUID_API_URL);
-    message.get_request_headers().append('Content-Type', 'application/json');
-    message.set_request_body_from_bytes(
-        'application/json',
-        new GLib.Bytes(new TextEncoder().encode(JSON.stringify(body)))
-    );
-
-    const bytes = await new Promise((resolve, reject) => {
-        requestSession.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (_session, result) => {
-                try {
-                    resolve(requestSession.send_and_read_finish(result));
-                } catch (error) {
-                    reject(error);
-                }
-            });
-    });
-    return JSON.parse(new TextDecoder().decode(bytes.get_data()));
+export function postHyperliquidInfo(session, body) {
+    return httpPostJson(session ?? new Soup.Session(), HYPERLIQUID_API_URL, body);
 }
 
 /* Cached market lists are cloned before returning so callers cannot mutate shared provider state. */

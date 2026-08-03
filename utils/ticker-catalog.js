@@ -1,8 +1,11 @@
 import {getAssetCategorySearchTerms} from './asset-categories.js';
+import {MAINLAND_CHINA_EQUITY_TICKERS} from './catalog/mainland-china-equity.js';
 import {COMMODITY_TICKERS} from './catalog/commodity.js';
 import {CRYPTO_TICKERS} from './catalog/crypto.js';
 import {FX_TICKERS} from './catalog/fx.js';
 import {GERMANY_EQUITY_TICKERS} from './catalog/germany-equity.js';
+import {HONG_KONG_EQUITY_TICKERS} from './catalog/hong-kong-equity.js';
+import {JAPAN_EQUITY_TICKERS} from './catalog/japan-equity.js';
 import {NETHERLANDS_EQUITY_TICKERS} from './catalog/netherlands-equity.js';
 import {UK_EQUITY_TICKERS} from './catalog/uk-equity.js';
 import {US_ETF_TICKERS} from './catalog/us-etf.js';
@@ -19,7 +22,10 @@ import {getMarketSessionIdFromLegacyMarketType} from './market-sessions.js';
  * need to know where each candidate came from.
  */
 const CATALOG = [
+    ...MAINLAND_CHINA_EQUITY_TICKERS,
     ...GERMANY_EQUITY_TICKERS,
+    ...HONG_KONG_EQUITY_TICKERS,
+    ...JAPAN_EQUITY_TICKERS,
     ...NETHERLANDS_EQUITY_TICKERS,
     ...UK_EQUITY_TICKERS,
     ...US_EQUITY_TICKERS,

@@ -1,6 +1,7 @@
 import {
     buildTickerConfig,
     getCatalogMatches,
+    getCatalogSearchQuery,
     getCryptoVerificationFailureMessage,
     getCryptoVerificationSuccessMessage,
     getSuggestionsDescription,
@@ -26,11 +27,18 @@ export function runTests() {
         },
     ];
 
-    assertEqual(validateTickerSymbol('abc def'), 'Symbol cannot contain spaces.',
+    assertEqual(validateTickerSymbol('abc def'), 'Symbols cannot contain spaces.',
         'Ticker symbols should reject whitespace');
+    assertEqual(getCatalogSearchQuery('  Apple  '), 'Apple',
+        'Catalog search should trim the dedicated search field');
+    assertEqual(getSuggestionsDescription(ASSET_CATEGORIES.EQUITY, CRYPTO_PROVIDERS.KRAKEN),
+        'Search the built-in catalog above, then choose a match to fill the ticker fields.',
+        'Non-crypto suggestion copy should point to the dedicated catalog search field');
     assertEqual(getSuggestionsDescription(ASSET_CATEGORIES.CRYPTO, CRYPTO_PROVIDERS.KRAKEN),
         'Search live Kraken WebSocket pairs. Non-crypto assets still use the built-in catalog.',
         'Crypto suggestion copy should reflect provider');
+    assertEqual(validateTickerDraft('', 'aapl.us', {assetCategory: ASSET_CATEGORIES.EQUITY}), 'Enter a name.',
+        'Non-crypto validation should refer to the visible name field');
 
     const resolvedCryptoTicker = resolveSelectedCryptoTicker({assetCategory: ASSET_CATEGORIES.CRYPTO, cryptoCatalog, cryptoProvider: CRYPTO_PROVIDERS.KRAKEN, labelText: '', symbolText: 'BTC/USD'});
     assertTruthy(resolvedCryptoTicker, 'Exact crypto symbol matches should resolve');

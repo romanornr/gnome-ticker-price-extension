@@ -13,15 +13,15 @@ import {findCuratedTicker, matchCuratedTickers, resolveCryptoCatalogTicker} from
  * deterministic decisions such as matching, validation text, and turning the
  * final dialog state back into a saved ticker config.
  */
-/* Crypto search uses one normalized query source so suggestions and verification reason about the same text. */
-export function getCryptoSearchQuery(labelText, symbolText) {
-    return symbolText.trim() || labelText.trim();
+/* Catalog search has one visible query source so label and symbol fields keep their saved-config meaning. */
+export function getCatalogSearchQuery(searchText) {
+    return searchText.trim();
 }
 
 /* The controller reads this copy helper so provider-specific suggestion language lives with dialog state policy. */
 export function getSuggestionsDescription(assetCategory, cryptoProvider) {
     if (assetCategory !== ASSET_CATEGORIES.CRYPTO)
-        return 'Type a label or symbol above to search the built-in catalog. You can still save any custom Stooq symbol.';
+        return 'Search the built-in catalog above, then choose a match to fill the ticker fields.';
 
     return cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
         ? 'Search live Hyperliquid spot symbols and perps. Non-crypto assets still use the built-in catalog.'
@@ -41,7 +41,7 @@ export function resolveSelectedCryptoTicker({assetCategory, cryptoCatalog, crypt
     if (assetCategory !== ASSET_CATEGORIES.CRYPTO)
         return null;
 
-    const query = getCryptoSearchQuery(labelText, symbolText);
+    const query = symbolText.trim();
     if (query === '')
         return null;
 
@@ -58,7 +58,7 @@ export function resolveSelectedCryptoTicker({assetCategory, cryptoCatalog, crypt
 export function validateTickerDraft(label, symbol, options = {}) {
     if (options.assetCategory === ASSET_CATEGORIES.CRYPTO) {
         if (symbol.trim() === '')
-            return 'Symbol is required.';
+            return 'Enter a symbol.';
 
         if (options.cryptoCatalogLoading) {
             return options.cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
@@ -88,18 +88,18 @@ export function validateTickerDraft(label, symbol, options = {}) {
     }
 
     if (label.trim() === '')
-        return 'Label is required.';
+        return 'Enter a name.';
 
     return validateTickerSymbol(symbol);
 }
 
-/* Non-crypto manual symbols still use this lightweight syntactic gate before network verification. */
+/* Non-crypto symbols still use this lightweight syntactic gate before network verification. */
 export function validateTickerSymbol(symbol) {
     if (symbol.trim() === '')
-        return 'Symbol is required.';
+        return 'Enter a symbol.';
 
     if (/\s/.test(symbol))
-        return 'Symbol cannot contain spaces.';
+        return 'Symbols cannot contain spaces.';
 
     return '';
 }

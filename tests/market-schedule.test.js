@@ -1,6 +1,7 @@
 import {
     createMarketScheduleNow,
     getRefreshIntervalSecondsForTicker,
+    getTickerSessionPhase,
     shouldRefreshTicker,
 } from '../utils/market-schedule.js';
 import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
@@ -17,6 +18,7 @@ export function runTests() {
     const australiaTicker = {marketSessionId: MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH};
 
     const saturdayMorningNy = createMarketScheduleNow(new Date('2026-03-21T14:00:00Z'), 10_000_000);
+    const fridayAfterCloseNy = createMarketScheduleNow(new Date('2026-03-20T22:00:00Z'), 10_000_000);
     const mondayRegularHoursNy = createMarketScheduleNow(new Date('2026-03-23T15:00:00Z'), 10_000_000);
     const mondayOvernightNy = createMarketScheduleNow(new Date('2026-03-23T01:30:00Z'), 10_000_000);
 
@@ -38,6 +40,10 @@ export function runTests() {
         'U.S. session tickers should respect cadence when recently refreshed');
     assertEqual(shouldRefreshTicker(usTicker, mondayRegularHoursNy, 0, 300), true,
         'U.S. session tickers should refresh when no prior refresh exists');
+    assertEqual(getTickerSessionPhase(usTicker, fridayAfterCloseNy), 'extended',
+        'U.S. session tickers should report after-hours as extended');
+    assertEqual(getTickerSessionPhase(usTicker, saturdayMorningNy), 'closed',
+        'U.S. session tickers should report weekends as closed');
     assertEqual(getRefreshIntervalSecondsForTicker(europeTicker, mondayOvernightNy, 300), 1800,
         'European equity profiles should be able to slow down outside their cash session');
     assertEqual(getRefreshIntervalSecondsForTicker(ukTicker, mondayOvernightNy, 300), 1800,

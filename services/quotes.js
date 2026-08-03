@@ -9,11 +9,12 @@ import {
     getProviderRefreshPlan,
 } from './providers/runtime-provider-registry.js';
 import {createLoadingEntries} from '../utils/format.js';
-import {SETTINGS_KEYS} from '../utils/settings.js';
 import {
+    hasSettingsKey,
     loadDisplaySettings,
     loadRefreshIntervalSeconds,
     loadTickerConfigs,
+    SETTINGS_KEYS,
 } from '../utils/settings.js';
 import {createMarketScheduleNow, shouldRefreshTicker} from '../utils/market-schedule.js';
 
@@ -82,7 +83,12 @@ export const QuotesService = GObject.registerClass({
                 this.emit('entries-changed');
             },
         });
-        this._runtimeProviders = createRuntimeProviderRegistry({uuid, onQuotes: quotesBySymbol => this._handleLiveQuotes(quotesBySymbol), quoteStore: this._quoteStore});
+        this._runtimeProviders = createRuntimeProviderRegistry({
+            uuid,
+            onQuotes: quotesBySymbol => this._handleLiveQuotes(quotesBySymbol),
+            onStale: tickers => this._handleStaleTickers(tickers),
+            quoteStore: this._quoteStore,
+        });
     }
 
     /* start() boots the full quote pipeline: settings, providers, initial loading state, and timers. */
@@ -130,7 +136,7 @@ export const QuotesService = GObject.registerClass({
     /*
      * A refresh pass first decides what needs data right now, then delegates to
      * the right provider layer. The provider registry owns refresh entrypoints
-     * for both normal polling providers such as Stooq and live providers that
+     * for both normal polling providers such as CNBC and live providers that
      * expose a fallback REST path when their socket is unavailable.
      */
     async _refreshQuotes(forceRefreshAll = false) {
@@ -178,6 +184,12 @@ export const QuotesService = GObject.registerClass({
             this._settings.connect(`changed::${SETTINGS_KEYS.SHOW_PERCENT}`, () => this._handleDisplaySettingsChanged()),
             this._settings.connect(`changed::${SETTINGS_KEYS.SEPARATOR_STYLE}`, () => this._handleDisplaySettingsChanged()),
         ];
+
+        if (hasSettingsKey(this._settings, SETTINGS_KEYS.FONT_PRESET)) {
+            this._settingsSignalIds.push(
+                this._settings.connect(`changed::${SETTINGS_KEYS.FONT_PRESET}`, () => this._handleDisplaySettingsChanged())
+            );
+        }
     }
 
     /* Signal teardown is centralized so startup/shutdown and hot reconfiguration use the same cleanup path. */
@@ -214,8 +226,12 @@ export const QuotesService = GObject.registerClass({
                 return;
 
             this._mergeQuotes(quotesBySymbol);
-            this._quoteStore.markRefreshed(tickers);
+            const refreshedTickers = tickers.filter(ticker => quotesBySymbol.has(ticker.symbol.toUpperCase()));
+            const staleTickers = tickers.filter(ticker => !quotesBySymbol.has(ticker.symbol.toUpperCase()));
+            this._quoteStore.markRefreshed(refreshedTickers);
+            this._quoteStore.markStale(staleTickers);
         } catch (error) {
+            this._quoteStore.markStale(tickers);
             if (this._running)
                 logError(error, `${this._uuid}: failed to refresh ${providerEntry.id} fallback quotes`);
         }
@@ -228,6 +244,15 @@ export const QuotesService = GObject.registerClass({
 
         this._mergeQuotes(quotesBySymbol);
         this._coordinator.requestEntriesUpdate(false);
+    }
+
+    /* Live transport failures preserve cached quotes but mark them stale until fresh provider data arrives. */
+    _handleStaleTickers(tickers) {
+        if (!this._running || !tickers || tickers.length === 0)
+            return;
+
+        this._quoteStore.markStale(tickers);
+        this._coordinator.requestEntriesUpdate(true);
     }
 
     /*

@@ -8,6 +8,8 @@ import {
 } from './live-quote-provider.js';
 
 const LIVE_CRYPTO_RECONNECT_DELAYS_SECONDS = [2, 5, 10, 20, 30, 60];
+const LIVE_SILENCE_TIMEOUT_SECONDS = 60;
+const LIVE_WATCHDOG_INTERVAL_SECONDS = 15;
 
 /* Concrete live providers share one websocket-connect helper because only the URL differs. */
 export function openWebsocketConnection(session, websocketUrl) {
@@ -32,6 +34,8 @@ export function openWebsocketConnection(session, websocketUrl) {
  * - reconnect backoff
  * - subscription reconciliation when saved tickers change
  * - socket signal cleanup
+ * - stale quote notification when live transport drops
+ * - a liveness watchdog that treats prolonged socket silence as a disconnect
  *
  * Subclasses supply only the provider-specific pieces:
  * endpoint connection, subscribe payloads, and payload-to-quote parsing.
@@ -40,9 +44,10 @@ export function openWebsocketConnection(session, websocketUrl) {
  */
 export class LiveWebsocketProvider {
     /* Each subclass inherits one shared websocket state machine and only supplies provider-specific hooks. */
-    constructor({uuid, onQuotes, filterTicker}) {
+    constructor({uuid, onQuotes, onStale, filterTicker}) {
         this._uuid = uuid;
         this._onQuotes = onQuotes;
+        this._onStale = onStale;
         this._filterTicker = filterTicker;
         this._session = null;
         this._running = false;
@@ -52,6 +57,8 @@ export class LiveWebsocketProvider {
         this._reconnectTimeoutId = 0;
         this._reconnectAttempt = 0;
         this._subscribedSymbols = [];
+        this._watchdogTimeoutId = 0;
+        this._lastMessageUsec = 0;
     }
 
     /* start() attaches the shared Soup session and begins connection attempts for the current saved symbols. */
@@ -146,17 +153,22 @@ export class LiveWebsocketProvider {
 
             this._subscribedSymbols = liveSymbols;
             this._subscribe(websocket, liveSymbols);
+            this._markLiveTraffic();
+            this._startWatchdog();
         } catch (error) {
             if (!this._running)
                 return;
 
             logError(error, `${this._uuid}: failed to connect ${this.logPrefix} websocket`);
+            this._notifyStaleTickers();
             this._scheduleReconnect();
         }
     }
 
     /* All socket cleanup funnels through one helper so stop(), reconnect, and resubscribe behave the same way. */
     _disconnectWebsocket() {
+        this._watchdogTimeoutId = removeTimeout(this._watchdogTimeoutId);
+
         const websocket = this._websocket;
         this._websocket = null;
 
@@ -180,7 +192,14 @@ export class LiveWebsocketProvider {
         if (!this._running || this._getDesiredSymbols().length === 0)
             return;
 
+        this._notifyStaleTickers();
         this._scheduleReconnect();
+    }
+
+    /* Transport failures tell QuotesService that cached live quotes should render as stale. */
+    _notifyStaleTickers() {
+        if (this._tickers.length > 0)
+            this._onStale?.(this._tickers);
     }
 
     /* All live providers share the same conservative reconnect policy so runtime behavior stays predictable. */
@@ -203,8 +222,55 @@ export class LiveWebsocketProvider {
         );
     }
 
+    /*
+     * A half-open TCP connection (suspend/resume, network switch, NAT timeout)
+     * never emits a closed signal, so without a watchdog the socket looks
+     * healthy forever while the panel silently freezes on the last quote. The
+     * watchdog treats prolonged silence as a disconnect: both providers
+     * subscribe to channels that push messages at least every few seconds, so
+     * a silent window this long always means dead transport.
+     */
+    _startWatchdog() {
+        this._watchdogTimeoutId = removeTimeout(this._watchdogTimeoutId);
+        this._watchdogTimeoutId = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            LIVE_WATCHDOG_INTERVAL_SECONDS,
+            () => {
+                if (!this._running || !this._websocket) {
+                    this._watchdogTimeoutId = 0;
+                    return GLib.SOURCE_REMOVE;
+                }
+
+                if (!this._hasLiveTrafficTimedOut())
+                    return GLib.SOURCE_CONTINUE;
+
+                this._watchdogTimeoutId = 0;
+                this._handleSilentConnection();
+                return GLib.SOURCE_REMOVE;
+            }
+        );
+    }
+
+    /* Any inbound frame counts as proof of a live transport, including provider heartbeats. */
+    _markLiveTraffic() {
+        this._lastMessageUsec = GLib.get_monotonic_time();
+    }
+
+    _hasLiveTrafficTimedOut(nowUsec = GLib.get_monotonic_time()) {
+        return (nowUsec - this._lastMessageUsec) / 1_000_000 >= LIVE_SILENCE_TIMEOUT_SECONDS;
+    }
+
+    /* Silent sockets follow the same recovery path as closed sockets: drop, mark stale, reconnect. */
+    _handleSilentConnection() {
+        log(`${this._uuid}: ${this.logPrefix} websocket silent for ${LIVE_SILENCE_TIMEOUT_SECONDS}s; reconnecting`);
+        this._disconnectWebsocket();
+        this._handleDisconnect();
+    }
+
     /* The base class handles decode/error/reconnect flow; subclasses only decide what a payload means. */
     _handleSocketMessage(type, messageBytes) {
+        this._markLiveTraffic();
+
         if (type !== Soup.WebsocketDataType.TEXT)
             return;
 
