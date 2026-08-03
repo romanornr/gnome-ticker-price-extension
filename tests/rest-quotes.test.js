@@ -101,22 +101,27 @@ export async function runTests() {
         ['api.nasdaq.com', {data: {primaryData: {lastSalePrice: '$750', netChange: '+10', lastTradeTimestamp: 'Aug 3, 2026 12:27 PM ET'}}}],
         ['open.er-api.com', rateTable],
     ]);
+    /* Fallbacks resolve concurrently, so quote map insertion order is not part of the contract. */
     const mixedQuotes = await refreshRestQuotes(mixedTickers, {session: mixedSession});
-    assertDeepEqual(Array.from(mixedQuotes.entries()), [
+    assertDeepEqual(Array.from(mixedQuotes.entries()).sort(), [
         ['AAPL.US', {price: 100.5, quoteDate: '20260803', previousClose: null}],
-        ['SPY.US', {price: 750, quoteDate: '20260803', previousClose: 740}],
         ['EURUSD', {price: 1.25, quoteDate: '20260803', previousClose: null}],
+        ['SPY.US', {price: 750, quoteDate: '20260803', previousClose: 740}],
     ], 'CNBC misses should recover through the Nasdaq and rate table fallbacks');
 
     /* Orchestrator: total CNBC failure with working fallbacks returns partial results. */
     const partialSession = new RoutingFakeSession([
         ['quote.cnbc.com', new Error('cnbc down')],
-        ['api.nasdaq.com', {data: {primaryData: {lastSalePrice: '$750', netChange: '+10', lastTradeTimestamp: 'Aug 3, 2026 12:27 PM ET'}}}],
+        ['api.nasdaq.com/api/quote/AAPL/', {data: {primaryData: {lastSalePrice: '$300', netChange: '+1', lastTradeTimestamp: 'Aug 3, 2026 12:27 PM ET'}}}],
+        ['api.nasdaq.com/api/quote/SPY/', {data: {primaryData: {lastSalePrice: '$750', netChange: '+10', lastTradeTimestamp: 'Aug 3, 2026 12:27 PM ET'}}}],
         ['open.er-api.com', rateTable],
     ]);
     const partialQuotes = await refreshRestQuotes(mixedTickers, {session: partialSession});
-    assertDeepEqual([...partialQuotes.keys()], ['AAPL.US', 'SPY.US', 'EURUSD'],
-        'A dead CNBC endpoint should still yield every fallback-covered quote');
+    assertDeepEqual(Array.from(partialQuotes.entries()).sort(), [
+        ['AAPL.US', {price: 300, quoteDate: '20260803', previousClose: 299}],
+        ['EURUSD', {price: 1.25, quoteDate: '20260803', previousClose: null}],
+        ['SPY.US', {price: 750, quoteDate: '20260803', previousClose: 740}],
+    ], 'A dead CNBC endpoint should still yield every fallback-covered quote with its own symbol values');
 
     /* Orchestrator: nothing recoverable rethrows the primary error. */
     let thrownMessage = '';

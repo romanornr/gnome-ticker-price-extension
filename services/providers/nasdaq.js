@@ -41,25 +41,36 @@ export async function refresh(tickers, {session}) {
     if (fallbackTickers.length > NASDAQ_MAX_SYMBOLS_PER_PASS)
         logNasdaqWarning(`Nasdaq fallback capped at ${NASDAQ_MAX_SYMBOLS_PER_PASS} of ${fallbackTickers.length} symbol(s).`);
 
-    for (const ticker of fallbackTickers.slice(0, NASDAQ_MAX_SYMBOLS_PER_PASS)) {
-        const nasdaqSymbol = mapSymbolToNasdaq(ticker.symbol);
-        const assetClass = NASDAQ_ASSET_CLASSES.get(ticker.assetCategory);
+    /* One request per symbol runs concurrently: serialized, a capped pass could stall a refresh for minutes on timeouts. */
+    const results = await Promise.all(fallbackTickers
+        .slice(0, NASDAQ_MAX_SYMBOLS_PER_PASS)
+        .map(ticker => fetchQuote(session, ticker)));
 
-        try {
-            const payload = await httpGetJson(session, buildQuoteUrl(nasdaqSymbol, assetClass), {
-                timeoutSeconds: NASDAQ_REQUEST_TIMEOUT_SECONDS,
-                timeoutMessage: `Timed out after ${NASDAQ_REQUEST_TIMEOUT_SECONDS}s while loading Nasdaq quotes.`,
-                headers: {'User-Agent': NASDAQ_USER_AGENT},
-            });
-            const quote = parseQuoteResponse(payload);
-            if (quote)
-                quotesBySymbol.set(ticker.symbol.toUpperCase(), quote);
-        } catch (error) {
-            logNasdaqWarning(`Nasdaq fallback failed for ${ticker.symbol}: ${error.message}`);
-        }
-    }
+    results.forEach(result => {
+        if (result)
+            quotesBySymbol.set(result.storeKey, result.quote);
+    });
 
     return quotesBySymbol;
+}
+
+/* A single symbol's failure is contained here so it cannot reject the whole concurrent batch. */
+async function fetchQuote(session, ticker) {
+    const nasdaqSymbol = mapSymbolToNasdaq(ticker.symbol);
+    const assetClass = NASDAQ_ASSET_CLASSES.get(ticker.assetCategory);
+
+    try {
+        const payload = await httpGetJson(session, buildQuoteUrl(nasdaqSymbol, assetClass), {
+            timeoutSeconds: NASDAQ_REQUEST_TIMEOUT_SECONDS,
+            timeoutMessage: `Timed out after ${NASDAQ_REQUEST_TIMEOUT_SECONDS}s while loading Nasdaq quotes.`,
+            headers: {'User-Agent': NASDAQ_USER_AGENT},
+        });
+        const quote = parseQuoteResponse(payload);
+        return quote ? {storeKey: ticker.symbol.toUpperCase(), quote} : null;
+    } catch (error) {
+        logNasdaqError(error, `Nasdaq fallback failed for ${ticker.symbol}`);
+        return null;
+    }
 }
 
 export function buildQuoteUrl(nasdaqSymbol, assetClass) {
@@ -115,4 +126,12 @@ export function normalizeTradeTimestamp(timestampText) {
 function logNasdaqWarning(message) {
     if (typeof log === 'function')
         log(`Ticker Price Extension: ${message}`);
+}
+
+/* Fallback failures never reach QuotesService, so the stack trace has to be logged here or it is lost. */
+function logNasdaqError(error, message) {
+    if (typeof logError === 'function')
+        logError(error, `Ticker Price Extension: ${message}`);
+    else
+        logNasdaqWarning(`${message}: ${error.message}`);
 }

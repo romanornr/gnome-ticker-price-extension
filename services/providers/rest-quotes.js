@@ -39,17 +39,20 @@ export async function refresh(tickers, context) {
 
 /* Each fallback failure is contained so one broken fallback cannot cost the other's recoveries. */
 async function runFallbacks(missingTickers, context, quotesBySymbol) {
-    let recoveredCount = 0;
-
     const nasdaqTickers = missingTickers.filter(isNasdaqFallbackTicker);
-    if (nasdaqTickers.length > 0)
-        recoveredCount += await mergeFallbackQuotes('Nasdaq', () => refreshNasdaqQuotes(nasdaqTickers, context), quotesBySymbol);
-
     const fxTickers = missingTickers.filter(ticker => parseFxPairSymbol(ticker?.symbol) !== null);
-    if (fxTickers.length > 0)
-        recoveredCount += await mergeFallbackQuotes('FX rate table', () => refreshFallbackFxQuotes(fxTickers, context), quotesBySymbol);
 
-    return recoveredCount;
+    /* The two fallbacks hit unrelated hosts, so a slow one must not delay the other. */
+    const recoveredCounts = await Promise.all([
+        nasdaqTickers.length > 0
+            ? mergeFallbackQuotes('Nasdaq', () => refreshNasdaqQuotes(nasdaqTickers, context), quotesBySymbol)
+            : 0,
+        fxTickers.length > 0
+            ? mergeFallbackQuotes('FX rate table', () => refreshFallbackFxQuotes(fxTickers, context), quotesBySymbol)
+            : 0,
+    ]);
+
+    return recoveredCounts.reduce((total, count) => total + count, 0);
 }
 
 async function mergeFallbackQuotes(fallbackName, refreshFallback, quotesBySymbol) {
@@ -58,7 +61,7 @@ async function mergeFallbackQuotes(fallbackName, refreshFallback, quotesBySymbol
         fallbackQuotes.forEach((quote, storeKey) => quotesBySymbol.set(storeKey, quote));
         return fallbackQuotes.size;
     } catch (error) {
-        logRestWarning(`${fallbackName} fallback refresh failed: ${error.message}`);
+        logRestError(error, `${fallbackName} fallback refresh failed`);
         return 0;
     }
 }
@@ -67,4 +70,12 @@ async function mergeFallbackQuotes(fallbackName, refreshFallback, quotesBySymbol
 function logRestWarning(message) {
     if (typeof log === 'function')
         log(`Ticker Price Extension: ${message}`);
+}
+
+/* Swallowed fallback failures never reach QuotesService, so the stack trace has to be logged here or it is lost. */
+function logRestError(error, message) {
+    if (typeof logError === 'function')
+        logError(error, `Ticker Price Extension: ${message}`);
+    else
+        logRestWarning(`${message}: ${error.message}`);
 }

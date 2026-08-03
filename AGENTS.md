@@ -69,7 +69,7 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 
 ## Data And API Conventions
 
-- Non-crypto market data is fetched from CNBC's batch quote webservice, with Kraken WebSocket v2 and Hyperliquid REST/WebSocket APIs used for crypto market discovery and live crypto updates.
+- Non-crypto market data is fetched from CNBC's batch quote webservice, with Nasdaq as a narrow fallback for missed U.S. listings and open.er-api.com as a fallback for the USD FX vector. Kraken WebSocket v2 and Hyperliquid REST/WebSocket APIs are used for crypto market discovery and live crypto updates.
 - Catalog symbols keep their historical Stooq-style form (`aapl.us`, `700.hk`) because saved user settings contain them; `services/providers/cnbc-symbols.js` owns the translation to CNBC grammar.
 - CNBC rejects well-known tool user agents, so a `curl` check needs a custom UA, e.g. `curl -A 'test/1.0' 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=AAPL&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json&events=1'`.
 - FX pairs have no direct CNBC symbol; the provider derives every pair from the per-currency USD spot vector (`EUR=`, `JPY=`, ...).

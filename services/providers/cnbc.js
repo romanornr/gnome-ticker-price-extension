@@ -133,9 +133,11 @@ export function deriveFxQuote({baseCurrency, quoteCurrency}, quotesByCnbcSymbol)
     if (!Number.isFinite(price))
         return null;
 
-    const previousClose = baseLeg.previousUsdPerUnit !== null && quoteLeg.previousUsdPerUnit !== null
+    const previousCloseRatio = baseLeg.previousUsdPerUnit !== null && quoteLeg.previousUsdPerUnit !== null
         ? baseLeg.previousUsdPerUnit / quoteLeg.previousUsdPerUnit
         : null;
+    /* Validated like price, so a degenerate leg cannot leak a non-finite previous close downstream. */
+    const previousClose = Number.isFinite(previousCloseRatio) ? previousCloseRatio : null;
     const quoteDate = [baseLeg.quoteDate, quoteLeg.quoteDate]
         .filter(date => date !== null)
         .sort()
