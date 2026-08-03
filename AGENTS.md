@@ -49,6 +49,8 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/prefs/catalog-suggestions.js`: prefs-side crypto catalog loading and suggestion row model generation
 - `utils/prefs/ticker-dialog-controller.js`: ticker dialog orchestration, state transitions, verification flow, and suggestion wiring for prefs
 - `utils/prefs/quote-verifier.js`: prefs-side quote provider verification wrapper
+- `utils/http.js`: shared Soup transport with one timeout policy and request headers, used by every REST provider
+- `utils/display-density.js`: density estimation and mono-font scaling policy for crowded indicators
 - `utils/ticker-catalog.js`: curated ticker aggregation and search helpers for guided prefs selection
 - `utils/catalog/*.js`: curated ticker data split by asset category for contributor-friendly maintenance
 - `utils/catalog/mainland-china-equity.js`, `utils/catalog/germany-equity.js`, `utils/catalog/hong-kong-equity.js`, `utils/catalog/japan-equity.js`, `utils/catalog/netherlands-equity.js`, and `utils/catalog/uk-equity.js`: alphabetized curated country-level equity catalogs using provider-verified symbols and region-appropriate market-session ids; mainland China and Hong Kong stay separate

@@ -69,11 +69,6 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         keywords: ['tritax big box'],
     },
     {
-        label: 'BTRW',
-        symbol: 'btrw.uk',
-        keywords: ['barratt redrow', 'barratt developments'],
-    },
-    {
         label: 'BEZ',
         symbol: 'bez.uk',
         keywords: ['beazley'],
@@ -102,6 +97,11 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         label: 'BRBY',
         symbol: 'brby.uk',
         keywords: ['burberry'],
+    },
+    {
+        label: 'BTRW',
+        symbol: 'btrw.uk',
+        keywords: ['barratt redrow', 'barratt developments'],
     },
     {
         label: 'CCH',
@@ -349,11 +349,6 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         keywords: ['polar capital technology trust'],
     },
     {
-        label: 'SDLF',
-        symbol: 'sdlf.uk',
-        keywords: ['standard life', 'phoenix group'],
-    },
-    {
         label: 'PRU',
         symbol: 'pru.uk',
         keywords: ['prudential'],
@@ -402,6 +397,11 @@ const UK_EQUITY_TICKER_DEFINITIONS = [
         label: 'SCT',
         symbol: 'sct.uk',
         keywords: ['softcat'],
+    },
+    {
+        label: 'SDLF',
+        symbol: 'sdlf.uk',
+        keywords: ['standard life', 'phoenix group'],
     },
     {
         label: 'SDR',

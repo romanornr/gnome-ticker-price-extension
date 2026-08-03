@@ -223,19 +223,35 @@ function assembleQuotes({directRequests, fxRequests}, quotesByCnbcSymbol) {
     return quotesBySymbol;
 }
 
-/* Larger watchlists split into fixed-size batches so no single URL grows unbounded. */
+/*
+ * Larger watchlists split into fixed-size batches so no single URL grows
+ * unbounded. One failing batch keeps the quotes the others already returned;
+ * only a pass where every batch failed rethrows, so the caller can still fall
+ * back or mark stale.
+ */
 async function fetchQuotes(session, cnbcSymbols) {
     const quotesByCnbcSymbol = new Map();
+    let lastError = null;
+    let succeededCount = 0;
 
     for (let index = 0; index < cnbcSymbols.length; index += CNBC_BATCH_SIZE) {
         const batch = cnbcSymbols.slice(index, index + CNBC_BATCH_SIZE);
-        const payload = await httpGetJson(session, buildQuoteUrl(batch), {
-            timeoutSeconds: CNBC_REQUEST_TIMEOUT_SECONDS,
-            timeoutMessage: `Timed out after ${CNBC_REQUEST_TIMEOUT_SECONDS}s while loading CNBC quotes.`,
-            headers: {'User-Agent': CNBC_USER_AGENT},
-        });
-        parseRestQuoteResponse(payload).forEach((quote, cnbcSymbol) => quotesByCnbcSymbol.set(cnbcSymbol, quote));
+        try {
+            const payload = await httpGetJson(session, buildQuoteUrl(batch), {
+                timeoutSeconds: CNBC_REQUEST_TIMEOUT_SECONDS,
+                timeoutMessage: `Timed out after ${CNBC_REQUEST_TIMEOUT_SECONDS}s while loading CNBC quotes.`,
+                headers: {'User-Agent': CNBC_USER_AGENT},
+            });
+            parseRestQuoteResponse(payload).forEach((quote, cnbcSymbol) => quotesByCnbcSymbol.set(cnbcSymbol, quote));
+            succeededCount += 1;
+        } catch (error) {
+            lastError = error;
+            logCnbcWarning(`CNBC batch of ${batch.length} symbol(s) failed: ${error.message}`);
+        }
     }
+
+    if (succeededCount === 0 && lastError)
+        throw lastError;
 
     return quotesByCnbcSymbol;
 }
