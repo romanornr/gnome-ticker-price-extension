@@ -1,6 +1,5 @@
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
-import {hyperliquidAdapter} from '../utils/crypto-providers/hyperliquid-adapter.js';
-import {krakenAdapter} from '../utils/crypto-providers/kraken-adapter.js';
+import {hyperliquidAdapter, krakenAdapter} from '../utils/crypto-providers/index.js';
 import {KrakenProvider} from '../services/providers/kraken-live.js';
 import {HyperliquidProvider} from '../services/providers/hyperliquid-live.js';
 import {restProvider} from '../services/providers/rest-quotes.js';

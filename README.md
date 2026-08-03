@@ -116,12 +116,8 @@ The crypto provider code is split into two layers:
 - `utils/crypto-providers/` for provider semantics such as symbol normalization, catalog loading, scoring, and quote normalization
 - `services/providers/` for runtime transport, provider ownership, and refresh orchestration
 
-The stable adapter entrypoints remain:
-
-- `utils/crypto-providers/kraken-adapter.js`
-- `utils/crypto-providers/hyperliquid-adapter.js`
-
-Their internals are now split by concern under:
+`utils/crypto-providers/index.js` composes the shared adapter objects used by
+prefs and runtime routing. Provider internals stay split by concern under:
 
 - `utils/crypto-providers/kraken/`
 - `utils/crypto-providers/hyperliquid/`

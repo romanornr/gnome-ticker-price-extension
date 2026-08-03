@@ -1,10 +1,12 @@
 import {
     createHyperliquidQuote,
+} from '../utils/crypto-providers/hyperliquid/quotes.js';
+import {
     isHyperliquidSpotSymbol,
     normalizeHyperliquidLiveSymbol,
     normalizeHyperliquidTickerSymbol,
     scoreHyperliquidCatalogEntry,
-} from '../utils/crypto-providers/hyperliquid-adapter.js';
+} from '../utils/crypto-providers/hyperliquid/symbols.js';
 import {assertDeepEqual, assertEqual, assertTruthy} from './support/assert.js';
 
 export function runTests() {

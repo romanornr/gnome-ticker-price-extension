@@ -1,11 +1,13 @@
 import {
     buildKrakenTickerUrl,
     createKrakenQuote,
+    parseKrakenTickerQuotes,
+} from '../utils/crypto-providers/kraken/quotes.js';
+import {
     normalizeKrakenLiveSymbol,
     normalizeKrakenTickerSymbol,
-    parseKrakenTickerQuotes,
     scoreKrakenCatalogEntry,
-} from '../utils/crypto-providers/kraken-adapter.js';
+} from '../utils/crypto-providers/kraken/symbols.js';
 import {assertDeepEqual, assertEqual, assertTruthy} from './support/assert.js';
 
 export function runTests() {
