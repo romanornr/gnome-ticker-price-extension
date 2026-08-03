@@ -100,9 +100,9 @@ export const UK_EQUITY_TICKERS = [
     {label: 'UU', keywords: ['united utilities']},
     {label: 'VOD', keywords: ['vodafone']},
     {label: 'WEIR', keywords: ['weir group']},
+    {label: 'WIZZ', keywords: ['wizz air']},
     {label: 'WPP', keywords: ['wpp']},
     {label: 'WTB', keywords: ['whitbread']},
-    {label: 'WIZZ', keywords: ['wizz air']},
 ].map(entry => ({
     assetCategory: ASSET_CATEGORIES.EQUITY,
     label: entry.label,
