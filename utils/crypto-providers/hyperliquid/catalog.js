@@ -1,7 +1,8 @@
 import Soup from 'gi://Soup?version=3.0';
 
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../../asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../asset-categories.js';
 import {httpPostJson} from '../../http.js';
+import {MARKET_SESSION_IDS} from '../../market-sessions.js';
 import {
     isHyperliquidSpotSymbol,
     normalizeHyperliquidLiveSymbol,
@@ -99,7 +100,7 @@ function createHyperliquidPerpCatalogEntry(market, ctx) {
         label: `${liveSymbol} Perp`,
         symbol: normalizeHyperliquidTickerSymbol(liveSymbol),
         priceDecimals: deriveHyperliquidPriceDecimals(ctx),
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         liveSymbol,
         keywords: [liveSymbol, 'perp', 'perpetual'],
         base: liveSymbol,
@@ -121,7 +122,7 @@ function createHyperliquidSpotCatalogEntry(market, ctx) {
         label: liveSymbol,
         symbol: normalizeHyperliquidTickerSymbol(liveSymbol),
         priceDecimals: deriveHyperliquidPriceDecimals(ctx),
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         liveSymbol,
         keywords: [base, quote, 'spot'],
         base,

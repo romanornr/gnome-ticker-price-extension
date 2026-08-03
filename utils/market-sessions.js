@@ -29,13 +29,11 @@ const SESSION_PHASES = {
 
 const MARKET_SESSION_PROFILES = {
     [MARKET_SESSION_IDS.ALWAYS_OPEN]: {
-        id: MARKET_SESSION_IDS.ALWAYS_OPEN,
         title: 'Always open',
         description: 'Crypto and other 24/7 markets. Refreshes every day.',
         kind: 'always-open',
     },
     [MARKET_SESSION_IDS.WEEKDAY_24H]: {
-        id: MARKET_SESSION_IDS.WEEKDAY_24H,
         title: 'Weekday global market',
         description: 'Forex and commodities. Refreshes on weekdays and skips weekends.',
         kind: 'weekday-24h',
@@ -43,7 +41,6 @@ const MARKET_SESSION_PROFILES = {
         weekendDays: ['Sat', 'Sun'],
     },
     [MARKET_SESSION_IDS.US_EQUITY_EXTENDED]: {
-        id: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         title: 'U.S. equity market with extended hours',
         description: 'U.S. stocks and ETFs. Uses premarket, regular, and after-hours windows with slower overnight refreshes.',
         kind: 'session-window',
@@ -61,7 +58,6 @@ const MARKET_SESSION_PROFILES = {
         },
     },
     [MARKET_SESSION_IDS.EUROPE_EQUITY_CASH]: {
-        id: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
         title: 'Europe equity market',
         description: 'European cash equities following standard continental Europe trading hours.',
         kind: 'session-window',
@@ -76,7 +72,6 @@ const MARKET_SESSION_PROFILES = {
         },
     },
     [MARKET_SESSION_IDS.UK_EQUITY_CASH]: {
-        id: MARKET_SESSION_IDS.UK_EQUITY_CASH,
         title: 'U.K. equity market',
         description: 'U.K. cash equities following London market hours.',
         kind: 'session-window',
@@ -91,7 +86,6 @@ const MARKET_SESSION_PROFILES = {
         },
     },
     [MARKET_SESSION_IDS.JAPAN_EQUITY_CASH]: {
-        id: MARKET_SESSION_IDS.JAPAN_EQUITY_CASH,
         title: 'Japan equity market',
         description: 'Japanese cash equities with morning and afternoon sessions separated by a lunch break.',
         kind: 'session-window',
@@ -107,7 +101,6 @@ const MARKET_SESSION_PROFILES = {
         },
     },
     [MARKET_SESSION_IDS.CHINA_EQUITY_CASH]: {
-        id: MARKET_SESSION_IDS.CHINA_EQUITY_CASH,
         title: 'China equity market',
         description: 'Mainland China cash equities with a midday lunch break.',
         kind: 'session-window',
@@ -123,7 +116,6 @@ const MARKET_SESSION_PROFILES = {
         },
     },
     [MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH]: {
-        id: MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH,
         title: 'Hong Kong equity market',
         description: 'Hong Kong cash equities with separate morning and afternoon sessions.',
         kind: 'session-window',
@@ -139,7 +131,6 @@ const MARKET_SESSION_PROFILES = {
         },
     },
     [MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH]: {
-        id: MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH,
         title: 'Taiwan equity market',
         description: 'Taiwan cash equities following the TWSE daytime session.',
         kind: 'session-window',
@@ -154,7 +145,6 @@ const MARKET_SESSION_PROFILES = {
         },
     },
     [MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH]: {
-        id: MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH,
         title: 'South Korea equity market',
         description: 'South Korean cash equities following KRX daytime trading hours.',
         kind: 'session-window',
@@ -169,7 +159,6 @@ const MARKET_SESSION_PROFILES = {
         },
     },
     [MARKET_SESSION_IDS.INDIA_EQUITY_CASH]: {
-        id: MARKET_SESSION_IDS.INDIA_EQUITY_CASH,
         title: 'India equity market',
         description: 'Indian cash equities following NSE and BSE daytime trading hours.',
         kind: 'session-window',
@@ -184,7 +173,6 @@ const MARKET_SESSION_PROFILES = {
         },
     },
     [MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH]: {
-        id: MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH,
         title: 'Australia equity market',
         description: 'Australian cash equities following ASX daytime trading hours.',
         kind: 'session-window',
@@ -200,21 +188,6 @@ const MARKET_SESSION_PROFILES = {
     },
 };
 
-const MARKET_SESSION_ORDER = [
-    MARKET_SESSION_IDS.ALWAYS_OPEN,
-    MARKET_SESSION_IDS.WEEKDAY_24H,
-    MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
-    MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
-    MARKET_SESSION_IDS.UK_EQUITY_CASH,
-    MARKET_SESSION_IDS.JAPAN_EQUITY_CASH,
-    MARKET_SESSION_IDS.CHINA_EQUITY_CASH,
-    MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH,
-    MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH,
-    MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH,
-    MARKET_SESSION_IDS.INDIA_EQUITY_CASH,
-    MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH,
-];
-
 const LEGACY_MARKET_TYPE_TO_SESSION_ID = {
     'always-open': MARKET_SESSION_IDS.ALWAYS_OPEN,
     'always_open': MARKET_SESSION_IDS.ALWAYS_OPEN,
@@ -224,28 +197,24 @@ const LEGACY_MARKET_TYPE_TO_SESSION_ID = {
     'us_session': MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
 };
 
-const SESSION_ID_TO_LEGACY_MARKET_TYPE = {
-    [MARKET_SESSION_IDS.ALWAYS_OPEN]: 'always-open',
-    [MARKET_SESSION_IDS.WEEKDAY_24H]: 'weekday-session',
-    [MARKET_SESSION_IDS.US_EQUITY_EXTENDED]: 'us-session',
-    [MARKET_SESSION_IDS.EUROPE_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.UK_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.JAPAN_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.CHINA_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.INDIA_EQUITY_CASH]: 'us-session',
-    [MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH]: 'us-session',
-};
+/* Session membership is owned by this registry so config normalization never repeats the id list. */
+export function hasMarketSessionId(sessionId) {
+    return Object.prototype.hasOwnProperty.call(MARKET_SESSION_PROFILES, sessionId);
+}
+
+/* Equity eligibility follows profile behavior rather than another manually synchronized id set. */
+export function isEquityMarketSessionId(sessionId) {
+    return hasMarketSessionId(sessionId) && MARKET_SESSION_PROFILES[sessionId].kind === 'session-window';
+}
 
 /* Callers use one accessor so session-profile data stays immutable at the module boundary. */
 export function getMarketSessionProfile(sessionId) {
+    if (!hasMarketSessionId(sessionId)) return null;
+
     const profile = MARKET_SESSION_PROFILES[sessionId];
-    if (!profile)
-        return null;
 
     return {
+        id: sessionId,
         ...profile,
         phases: Array.isArray(profile.phases) ? profile.phases.map(phase => ({...phase})) : [],
         refreshPolicy: profile.refreshPolicy ? {...profile.refreshPolicy} : null,
@@ -255,18 +224,11 @@ export function getMarketSessionProfile(sessionId) {
 
 /* prefs uses these options to expose explicit session choices for ticker entries. */
 export function getMarketSessionOptions() {
-    return MARKET_SESSION_ORDER.map(sessionId => {
-        const profile = MARKET_SESSION_PROFILES[sessionId];
-        return {value: profile.id, title: profile.title, description: profile.description};
-    });
+    return Object.entries(MARKET_SESSION_PROFILES)
+        .map(([sessionId, profile]) => ({value: sessionId, title: profile.title, description: profile.description}));
 }
 
 /* Legacy saved ticker configs still persist marketType, so normalization resolves that seam here. */
 export function getMarketSessionIdFromLegacyMarketType(marketType) {
     return LEGACY_MARKET_TYPE_TO_SESSION_ID[marketType] ?? MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
-}
-
-/* Legacy helpers can still derive the old enum shape while the rest of the app migrates to marketSessionId. */
-export function getLegacyMarketTypeForSessionId(sessionId) {
-    return SESSION_ID_TO_LEGACY_MARKET_TYPE[sessionId] ?? 'us-session';
 }

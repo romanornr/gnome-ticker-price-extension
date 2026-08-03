@@ -1,5 +1,5 @@
 import {CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
-import {hyperliquidAdapter} from '../../utils/crypto-providers/hyperliquid-adapter.js';
+import {hyperliquidAdapter} from '../../utils/crypto-providers/index.js';
 import {LiveWebsocketProvider} from './live-websocket-provider.js';
 
 /*

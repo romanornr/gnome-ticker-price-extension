@@ -2,8 +2,6 @@ import {
     buildTickerConfig,
     getCatalogMatches,
     getCatalogSearchQuery,
-    getCryptoVerificationFailureMessage,
-    getCryptoVerificationSuccessMessage,
     getSuggestionsDescription,
     resolveSelectedCryptoTicker,
     validateTickerDraft,
@@ -61,6 +59,10 @@ export function runTests() {
     );
     assertEqual(curatedFallbackMatches.length, 1,
         'Missing runtime crypto catalogs should fall back to curated seed entries');
+    assertEqual(curatedFallbackMatches[0].marketSessionId, MARKET_SESSION_IDS.ALWAYS_OPEN,
+        'Curated catalog entries should expose the current market-session vocabulary');
+    assertEqual(Object.prototype.hasOwnProperty.call(curatedFallbackMatches[0], 'marketType'), false,
+        'Curated catalog entries should not leak the legacy marketType field');
 
     assertEqual(validateTickerDraft('Label', 'btc/usd', {
         assetCategory: ASSET_CATEGORIES.CRYPTO,
@@ -70,6 +72,13 @@ export function runTests() {
         resolvedCryptoTicker,
         hasCryptoCatalogMatches: true,
     }), '', 'Resolved crypto tickers should validate');
+    assertEqual(validateTickerDraft('', 'unknown/usd', {
+        assetCategory: ASSET_CATEGORIES.CRYPTO,
+        cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
+        resolvedCryptoTicker: null,
+        hasCryptoCatalogMatches: false,
+    }), 'Choose a Kraken-supported crypto pair.',
+        'Crypto Save should reject symbols that are absent from the loaded provider catalog');
 
     const nextTicker = buildTickerConfig({
         initialTicker: {},
@@ -88,11 +97,4 @@ export function runTests() {
     assertEqual(nextTicker.label, 'BTC/USD', 'Empty crypto labels should autofill from resolved ticker');
     assertEqual(nextTicker.marketSessionId, MARKET_SESSION_IDS.ALWAYS_OPEN,
         'Built crypto configs should persist the selected market session id');
-
-    assertEqual(getCryptoVerificationFailureMessage(CRYPTO_PROVIDERS.KRAKEN),
-        'Choose a Kraken-supported pair before saving.',
-        'Kraken verification failure copy should stay provider-specific');
-    assertEqual(getCryptoVerificationSuccessMessage(CRYPTO_PROVIDERS.KRAKEN, 'BTC/USD'),
-        'Verified BTC/USD. Kraken WebSocket supports this pair.',
-        'Kraken verification success copy should stay provider-specific');
 }

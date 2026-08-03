@@ -20,36 +20,6 @@ export function assertFalse(value, message = 'Expected value to be false') {
         throw new Error(`${message}. Expected false, got ${formatValue(value)}.`);
 }
 
-export function assertThrows(fn, expectedMessageFragment, message = 'Expected function to throw') {
-    let didThrow = false;
-
-    try {
-        fn();
-    } catch (error) {
-        didThrow = true;
-        if (expectedMessageFragment)
-            assertTruthy(error.message.includes(expectedMessageFragment), message);
-    }
-
-    if (!didThrow)
-        throw new Error(message);
-}
-
-export async function assertThrowsAsync(fn, expectedMessageFragment, message = 'Expected async function to throw') {
-    let didThrow = false;
-
-    try {
-        await fn();
-    } catch (error) {
-        didThrow = true;
-        if (expectedMessageFragment)
-            assertTruthy(error.message.includes(expectedMessageFragment), message);
-    }
-
-    if (!didThrow)
-        throw new Error(message);
-}
-
 function formatValue(value) {
     return typeof value === 'string' ? `"${value}"` : `${value}`;
 }

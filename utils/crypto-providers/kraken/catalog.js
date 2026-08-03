@@ -1,7 +1,8 @@
 import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, MARKET_TYPES} from '../../asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../asset-categories.js';
+import {MARKET_SESSION_IDS} from '../../market-sessions.js';
 import {
     normalizeKrakenLiveSymbol,
     normalizeKrakenTickerSymbol,
@@ -40,7 +41,7 @@ export function createKrakenCatalogEntry(pair) {
         label: liveSymbol || `${base}/${quote}`,
         symbol: normalizedSymbol,
         priceDecimals: clampDecimals(pair?.price_precision),
-        marketType: MARKET_TYPES.ALWAYS_OPEN,
+        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         liveSymbol,
         keywords: [base, quote, normalizedSymbol],
         base,

@@ -1,4 +1,8 @@
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
+import {
+    ASSET_CATEGORIES,
+    CRYPTO_PROVIDERS,
+    getMarketSessionOptionsForAssetCategory,
+} from '../utils/asset-categories.js';
 import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
 import {
     cloneTicker,
@@ -21,6 +25,17 @@ export function runTests() {
     assertEqual(inferAssetCategory({marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED, symbol: 'uso.us'}), ASSET_CATEGORIES.ETF,
     'Known ETF symbols should infer as ETFs');
 
+    assertDeepEqual(
+        getMarketSessionOptionsForAssetCategory(ASSET_CATEGORIES.CRYPTO).map(option => option.value),
+        [MARKET_SESSION_IDS.ALWAYS_OPEN],
+        'Crypto category options should stay limited to the always-open profile'
+    );
+    assertDeepEqual(
+        getMarketSessionOptionsForAssetCategory(ASSET_CATEGORIES.FX).map(option => option.value),
+        [MARKET_SESSION_IDS.WEEKDAY_24H],
+        'FX category options should stay limited to the weekday profile'
+    );
+
     const legacyKrakenTicker = normalizeTickerConfig({label: 'BTC', symbol: 'btc.v', marketType: 'always-open', liveSymbol: 'BTC/USD'});
     assertDeepEqual(legacyKrakenTicker, {
         label: 'BTC',
@@ -32,6 +47,43 @@ export function runTests() {
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         liveSymbol: 'BTC/USD',
     }, 'Legacy Kraken ticker shapes should normalize to current crypto config');
+
+    [
+        ['always_open', 'btcusd', MARKET_SESSION_IDS.ALWAYS_OPEN],
+        ['weekday-session', 'eurusd', MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['weekday_session', 'eurusd', MARKET_SESSION_IDS.WEEKDAY_24H],
+        ['us-session', 'aapl.us', MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+        ['us_session', 'aapl.us', MARKET_SESSION_IDS.US_EQUITY_EXTENDED],
+    ].forEach(([marketType, symbol, expectedSessionId]) => {
+        const ticker = normalizeTickerConfig({label: 'Legacy', symbol, marketType});
+        assertEqual(ticker.marketSessionId, expectedSessionId,
+            `Legacy marketType ${marketType} should remain readable`);
+    });
+
+    [
+        ['us-equity', ASSET_CATEGORIES.EQUITY],
+        ['us_equity', ASSET_CATEGORIES.EQUITY],
+        ['us-etf', ASSET_CATEGORIES.ETF],
+        ['us_etf', ASSET_CATEGORIES.ETF],
+    ].forEach(([assetCategory, expectedAssetCategory]) => {
+        const ticker = normalizeTickerConfig({label: 'Legacy', symbol: 'legacy.us', assetCategory});
+        assertEqual(ticker.assetCategory, expectedAssetCategory,
+            `Legacy asset category ${assetCategory} should remain readable`);
+    });
+
+    const internationalTicker = normalizeTickerConfig({
+        label: 'ASML',
+        symbol: 'asml.nl',
+        priceDecimals: 2,
+        marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
+        assetCategory: ASSET_CATEGORIES.EQUITY,
+    });
+    assertEqual(internationalTicker.marketSessionId, MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
+        'Registered international equity sessions should survive normalization');
+
+    const invalidSessionTicker = normalizeTickerConfig({label: 'AAPL', symbol: 'aapl.us', marketSessionId: 'invalid-session'});
+    assertEqual(invalidSessionTicker.marketSessionId, MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        'Unknown session ids should fall back through legacy-compatible normalization');
 
     const hyperliquidTicker = normalizeTickerConfig({
         label: 'PURR',

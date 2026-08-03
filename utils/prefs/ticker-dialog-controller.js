@@ -11,8 +11,6 @@ import {
     buildTickerConfig,
     getCatalogMatches,
     getCatalogSearchQuery,
-    getCryptoVerificationFailureMessage,
-    getCryptoVerificationSuccessMessage,
     getSuggestionsDescription,
     resolveSelectedCryptoTicker,
     validateTickerDraft,
@@ -20,18 +18,19 @@ import {
 } from './ticker-dialog-state.js';
 import {verifySymbol as verifyTickerSymbol} from '../../services/providers/rest-quotes.js';
 import {
+    getAssetCategoryDefaultMarketSessionId,
     getDefaultCryptoProvider,
-    getMarketSessionForAssetCategory,
     getMarketSessionOptionsForAssetCategory,
-    LEFT_PANEL_SIDE,
-    RIGHT_PANEL_SIDE,
-} from '../settings.js';
+} from '../asset-categories.js';
+import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from '../panel-sides.js';
 
 const MAX_CURATED_SUGGESTIONS = 8;
 
 /*
- * TickerDialogController owns mutable dialog state, catalog search, verification, and save wiring.
- * prefs.js retains page layout and row actions; this module exposes one small functional entrypoint.
+ * TickerDialogController owns mutable dialog state, catalog search, non-crypto verification, and save wiring.
+ * prefs.js retains page layout and row actions; this module exposes presentTickerDialog as its entrypoint.
+ * Dialog state leaves as a saved ticker config through buildTickerConfig().
+ * Provider wire formats and runtime refresh stay with services/providers and QuotesService.
  */
 class TickerDialogController {
     constructor({
@@ -44,7 +43,6 @@ class TickerDialogController {
         createComboRow,
         createTextButton,
         findOptionIndex,
-        getMarketSessionTitle,
     }) {
         this.window = window;
         this.title = title;
@@ -55,10 +53,9 @@ class TickerDialogController {
         this.createComboRow = createComboRow;
         this.createTextButton = createTextButton;
         this.findOptionIndex = findOptionIndex;
-        this.getMarketSessionTitle = getMarketSessionTitle;
 
         this.activeAssetCategory = initialTicker.assetCategory ?? assetCategoryOptions[0].value;
-        this.activeMarketSessionId = initialTicker.marketSessionId ?? getMarketSessionForAssetCategory(this.activeAssetCategory);
+        this.activeMarketSessionId = initialTicker.marketSessionId ?? getAssetCategoryDefaultMarketSessionId(this.activeAssetCategory);
         this.activeCryptoProvider = this.activeAssetCategory === 'crypto'
             ? (initialTicker.cryptoProvider ?? getDefaultCryptoProvider())
             : '';
@@ -200,11 +197,15 @@ class TickerDialogController {
                 return;
 
             this.activeAssetCategory = option.value;
-            this.activeMarketSessionId = getMarketSessionForAssetCategory(this.activeAssetCategory);
+            this.activeMarketSessionId = getAssetCategoryDefaultMarketSessionId(this.activeAssetCategory);
             this.activeCryptoProvider = this.activeAssetCategory === 'crypto'
                 ? (this.activeCryptoProvider || getDefaultCryptoProvider())
                 : '';
             this._resetCryptoCatalogState();
+            if (this.activeAssetCategory === 'crypto') {
+                this.verificationRequestId += 1;
+                this.verifyInProgress = false;
+            }
             this._clearVerificationState();
             this._syncMarketSessionRow();
             this.cryptoProviderRow.visible = this.activeAssetCategory === 'crypto';
@@ -266,7 +267,7 @@ class TickerDialogController {
             : curatedTicker.symbol);
         this.decimalsRow.value = curatedTicker.priceDecimals;
         this.activeAssetCategory = curatedTicker.assetCategory;
-        this.activeMarketSessionId = curatedTicker.marketSessionId ?? getMarketSessionForAssetCategory(curatedTicker.assetCategory);
+        this.activeMarketSessionId = curatedTicker.marketSessionId ?? getAssetCategoryDefaultMarketSessionId(curatedTicker.assetCategory);
         this.activeCryptoProvider = curatedTicker.assetCategory === 'crypto'
             ? (curatedTicker.cryptoProvider ?? getDefaultCryptoProvider())
             : '';
@@ -382,7 +383,7 @@ class TickerDialogController {
         this.suggestionsGroup.description = getSuggestionsDescription(this.activeAssetCategory, this.activeCryptoProvider);
     }
 
-    /* Save/verify logic asks this resolver for the currently selected or confidently inferred crypto market. */
+    /* Crypto validation and save logic share this resolver for the selected or confidently inferred market. */
     _getResolvedCryptoTicker() {
         return resolveSelectedCryptoTicker({
             assetCategory: this.activeAssetCategory,
@@ -471,48 +472,24 @@ class TickerDialogController {
         });
     }
 
-    /* Verify availability follows dialog validity/loading state so users only trigger meaningful checks. */
+    /* Verify is a live non-crypto quote check; crypto validity already comes from the loaded catalog. */
     _updateVerifyButtonSensitivity() {
+        const canVerify = this.activeAssetCategory !== 'crypto';
+        this.verifyButton.visible = canVerify;
         this.verifyButton.set_sensitive(
+            canVerify &&
             this._getSymbolText().trim() !== '' &&
-            !this.verifyInProgress &&
-            !(this.activeAssetCategory === 'crypto' && this.cryptoCatalogLoading)
+            !this.verifyInProgress
         );
     }
 
     /*
-     * Verification bridges dialog state to provider checks: crypto validates
-     * against the loaded runtime catalog, while non-crypto symbols round-trip
-     * through the same REST provider chain the runtime refresh uses.
+     * Non-crypto symbols round-trip through the same REST provider chain the
+     * runtime refresh uses. Crypto validity is enforced by Save instead.
      */
     async _runSymbolVerification() {
-        if (this.activeAssetCategory === 'crypto') {
-            await this._ensureCryptoCatalogLoaded();
-
-            if (this.cryptoCatalogLoading)
-                return;
-
-            if (this.cryptoCatalogError !== '') {
-                this._setVerificationMessage(this.cryptoCatalogError, true);
-                this._updateVerifyButtonSensitivity();
-                return;
-            }
-
-            const resolvedCryptoTicker = this._getResolvedCryptoTicker();
-            if (!resolvedCryptoTicker) {
-                this._setVerificationMessage(getCryptoVerificationFailureMessage(this.activeCryptoProvider), true);
-                this._updateVerifyButtonSensitivity();
-                return;
-            }
-
-            this.lastVerifiedSymbol = resolvedCryptoTicker.liveSymbol;
-            this._setVerificationMessage(getCryptoVerificationSuccessMessage(
-                this.activeCryptoProvider,
-                resolvedCryptoTicker.liveSymbol
-            ));
-            this._updateVerifyButtonSensitivity();
+        if (this.activeAssetCategory === 'crypto')
             return;
-        }
 
         const symbol = this._getSymbolText().trim().toLowerCase();
         const symbolValidationMessage = validateTickerSymbol(symbol);

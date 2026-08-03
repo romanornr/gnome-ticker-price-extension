@@ -36,7 +36,7 @@ export function getCatalogOptions(cryptoCatalog, cryptoProvider) {
     };
 }
 
-/* Exact-or-confident crypto resolution happens here before the controller attempts verification or save. */
+/* Exact-or-confident crypto resolution happens here before the controller validates or saves a draft. */
 export function resolveSelectedCryptoTicker({assetCategory, cryptoCatalog, cryptoProvider, labelText, symbolText}) {
     if (assetCategory !== ASSET_CATEGORIES.CRYPTO)
         return null;
@@ -155,25 +155,11 @@ export function buildTickerConfig({
     return nextTicker;
 }
 
-/* Verification failure copy lives with state policy so the controller stays focused on flow, not wording. */
-export function getCryptoVerificationFailureMessage(cryptoProvider) {
-    return cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-        ? 'Choose a Hyperliquid-supported spot symbol or perp before saving.'
-        : 'Choose a Kraken-supported pair before saving.';
-}
-
-/* Success copy is centralized for the same reason as failure copy. */
-export function getCryptoVerificationSuccessMessage(cryptoProvider, liveSymbol) {
-    return cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-        ? `Verified ${liveSymbol}. Hyperliquid supports this market.`
-        : `Verified ${liveSymbol}. Kraken WebSocket supports this pair.`;
-}
-
 /* Loading-state copy reflects the active provider so the dialog can stay transparent about runtime work. */
 export function getCryptoCatalogLoadingMessage(cryptoProvider) {
     return cryptoProvider === CRYPTO_PROVIDERS.HYPERLIQUID
-        ? 'Fetching live Hyperliquid spot symbols and perps for search and verification.'
-        : 'Fetching active Kraken WebSocket pairs for search and verification.';
+        ? 'Fetching live Hyperliquid spot symbols and perps for search and selection.'
+        : 'Fetching active Kraken WebSocket pairs for search and selection.';
 }
 
 /* Unavailable-state copy is provider-specific but still part of the pure dialog state model. */

@@ -8,6 +8,8 @@ import {getCryptoProviderAdapter} from './crypto-providers/index.js';
 import {
     MARKET_SESSION_IDS,
     getMarketSessionIdFromLegacyMarketType,
+    hasMarketSessionId,
+    isEquityMarketSessionId,
 } from './market-sessions.js';
 import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './panel-sides.js';
 
@@ -151,23 +153,9 @@ function normalizePanelSide(panelSide) {
 }
 
 function normalizeMarketSessionId(marketSessionId, legacyMarketType = '') {
-    switch (marketSessionId) {
-    case MARKET_SESSION_IDS.ALWAYS_OPEN:
-    case MARKET_SESSION_IDS.WEEKDAY_24H:
-    case MARKET_SESSION_IDS.US_EQUITY_EXTENDED:
-    case MARKET_SESSION_IDS.EUROPE_EQUITY_CASH:
-    case MARKET_SESSION_IDS.UK_EQUITY_CASH:
-    case MARKET_SESSION_IDS.JAPAN_EQUITY_CASH:
-    case MARKET_SESSION_IDS.CHINA_EQUITY_CASH:
-    case MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH:
-    case MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH:
-    case MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH:
-    case MARKET_SESSION_IDS.INDIA_EQUITY_CASH:
-    case MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH:
-        return marketSessionId;
-    default:
-        return getMarketSessionIdFromLegacyMarketType(legacyMarketType);
-    }
+    return hasMarketSessionId(marketSessionId)
+        ? marketSessionId
+        : getMarketSessionIdFromLegacyMarketType(legacyMarketType);
 }
 
 function normalizeTickerMarketSessionId(marketSessionId, assetCategory) {
@@ -177,62 +165,30 @@ function normalizeTickerMarketSessionId(marketSessionId, assetCategory) {
     if (assetCategory === ASSET_CATEGORIES.COMMODITY || assetCategory === ASSET_CATEGORIES.FX)
         return MARKET_SESSION_IDS.WEEKDAY_24H;
 
-    if (isSupportedEquityMarketSessionId(marketSessionId))
+    if (isEquityMarketSessionId(marketSessionId))
         return marketSessionId;
 
     return MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
 }
 
-function isSupportedEquityMarketSessionId(marketSessionId) {
-    switch (marketSessionId) {
-    case MARKET_SESSION_IDS.US_EQUITY_EXTENDED:
-    case MARKET_SESSION_IDS.EUROPE_EQUITY_CASH:
-    case MARKET_SESSION_IDS.UK_EQUITY_CASH:
-    case MARKET_SESSION_IDS.JAPAN_EQUITY_CASH:
-    case MARKET_SESSION_IDS.CHINA_EQUITY_CASH:
-    case MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH:
-    case MARKET_SESSION_IDS.TAIWAN_EQUITY_CASH:
-    case MARKET_SESSION_IDS.SOUTH_KOREA_EQUITY_CASH:
-    case MARKET_SESSION_IDS.INDIA_EQUITY_CASH:
-    case MARKET_SESSION_IDS.AUSTRALIA_EQUITY_CASH:
-        return true;
-    default:
-        return false;
-    }
-}
-
 function normalizeAssetCategory(assetCategory, ticker = null) {
-    switch (assetCategory) {
-    case ASSET_CATEGORIES.EQUITY:
-    case ASSET_CATEGORIES.ETF:
-    case ASSET_CATEGORIES.US_EQUITY:
-    case ASSET_CATEGORIES.US_ETF:
-    case ASSET_CATEGORIES.COMMODITY:
-    case ASSET_CATEGORIES.FX:
-    case ASSET_CATEGORIES.CRYPTO:
+    if (Object.values(ASSET_CATEGORIES).includes(assetCategory))
         return assetCategory;
-    case 'us-equity':
-    case 'us_equity':
+
+    if (['us-equity', 'us_equity'].includes(assetCategory))
         return ASSET_CATEGORIES.EQUITY;
-    case 'us-etf':
-    case 'us_etf':
+
+    if (['us-etf', 'us_etf'].includes(assetCategory))
         return ASSET_CATEGORIES.ETF;
-    default:
-        return inferAssetCategory(ticker);
-    }
+
+    return inferAssetCategory(ticker);
 }
 
 function normalizeCryptoProvider(cryptoProvider, assetCategory) {
     if (assetCategory !== ASSET_CATEGORIES.CRYPTO)
         return '';
 
-    switch (cryptoProvider) {
-    case CRYPTO_PROVIDERS.KRAKEN:
-    case CRYPTO_PROVIDERS.HYPERLIQUID:
-        return cryptoProvider;
-    default:
-        return getDefaultCryptoProvider();
-    }
+    return hasKnownCryptoProvider(cryptoProvider) ? cryptoProvider : getDefaultCryptoProvider();
 }
 
 function clampInteger(value, min, max, fallback) {
@@ -285,13 +241,7 @@ function getSupportedLiveSymbol(ticker, rawLiveSymbol) {
 }
 
 function hasKnownCryptoProvider(cryptoProvider) {
-    switch (cryptoProvider) {
-    case CRYPTO_PROVIDERS.KRAKEN:
-    case CRYPTO_PROVIDERS.HYPERLIQUID:
-        return true;
-    default:
-        return false;
-    }
+    return Object.values(CRYPTO_PROVIDERS).includes(cryptoProvider);
 }
 
 function normalizeCryptoLiveSymbol(rawLiveSymbol, cryptoProvider) {

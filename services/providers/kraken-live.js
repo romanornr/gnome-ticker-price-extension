@@ -1,5 +1,5 @@
 import {CRYPTO_PROVIDERS} from '../../utils/asset-categories.js';
-import {krakenAdapter} from '../../utils/crypto-providers/kraken-adapter.js';
+import {krakenAdapter} from '../../utils/crypto-providers/index.js';
 import {LiveWebsocketProvider} from './live-websocket-provider.js';
 
 /*
