@@ -28,7 +28,9 @@ const MAX_CURATED_SUGGESTIONS = 8;
 
 /*
  * TickerDialogController owns mutable dialog state, catalog search, non-crypto verification, and save wiring.
- * prefs.js retains page layout and row actions; this module exposes one small functional entrypoint.
+ * prefs.js retains page layout and row actions; this module exposes presentTickerDialog as its entrypoint.
+ * Dialog state leaves as a saved ticker config through buildTickerConfig().
+ * Provider wire formats and runtime refresh stay with services/providers and QuotesService.
  */
 class TickerDialogController {
     constructor({
