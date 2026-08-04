@@ -1,5 +1,4 @@
-import {ASSET_CATEGORIES} from '../asset-categories.js';
-import {MARKET_SESSION_IDS} from '../market-sessions.js';
+import {ASSET_CATEGORIES, withDefaultMarketSession} from '../asset-categories.js';
 
 /* This file is the curated mainland China equity suggestion source used by prefs search and mainland China cash-session defaults. */
 export const MAINLAND_CHINA_EQUITY_TICKERS = [
@@ -125,11 +124,10 @@ export const MAINLAND_CHINA_EQUITY_TICKERS = [
     {label: '601800', keywords: ['china communications construction']},
     {label: '601808', keywords: ['china oilfield services']},
     {label: '601818', keywords: ['china everbright bank']},
-].map(entry => ({
+].map(entry => withDefaultMarketSession({
     assetCategory: ASSET_CATEGORIES.EQUITY,
     label: entry.label,
     symbol: `${entry.label.toLowerCase()}.cn`,
     priceDecimals: 2,
-    marketSessionId: MARKET_SESSION_IDS.CHINA_EQUITY_CASH,
     keywords: [...entry.keywords, 'china', 'mainland china', 'a-share', entry.label],
 }));

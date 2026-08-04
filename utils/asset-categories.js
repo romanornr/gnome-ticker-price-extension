@@ -1,14 +1,16 @@
 import {
     MARKET_SESSION_IDS,
+    getMarketSessionIdFromLegacyMarketType,
     getMarketSessionOptions,
+    hasMarketSessionId,
     isEquityMarketSessionId,
 } from './market-sessions.js';
 
 /*
- * Asset/category metadata is the shared taxonomy for the entire extension.
- *
- * These constants and metadata tables keep prefs, scheduling, search, and
- * default ticker setup aligned on the same domain language.
+ * Asset/category metadata is the shared taxonomy for the entire extension, and
+ * this module also resolves which market session a ticker belongs to.
+ * Catalogs, saved-config normalization, prefs, and scheduling all read that one
+ * answer here rather than restating category or venue rules of their own.
  */
 export const ASSET_CATEGORIES = {
     EQUITY: 'equity',
@@ -31,6 +33,17 @@ const CATEGORY_ORDER = [
     ASSET_CATEGORIES.CRYPTO,
 ];
 
+const EQUITY_ASSET_CATEGORIES = [ASSET_CATEGORIES.EQUITY, ASSET_CATEGORIES.ETF];
+const LISTING_MARKET_SESSIONS = {
+    '.cn': {marketSessionId: MARKET_SESSION_IDS.CHINA_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.de': {marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.hk': {marketSessionId: MARKET_SESSION_IDS.HONG_KONG_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.jp': {marketSessionId: MARKET_SESSION_IDS.JAPAN_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.nl': {marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.uk': {marketSessionId: MARKET_SESSION_IDS.UK_EQUITY_CASH, assetCategories: EQUITY_ASSET_CATEGORIES},
+    '.us': {marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED, assetCategories: [...EQUITY_ASSET_CATEGORIES, ASSET_CATEGORIES.COMMODITY]},
+};
+
 const ASSET_CATEGORY_METADATA = {
     [ASSET_CATEGORIES.EQUITY]: {
         title: 'Equity',
@@ -46,7 +59,7 @@ const ASSET_CATEGORY_METADATA = {
     },
     [ASSET_CATEGORIES.COMMODITY]: {
         title: 'Commodity',
-        description: 'Metals and energy markets that refresh on weekdays.',
+        description: 'Commodity markets and exchange-listed funds with instrument-specific sessions.',
         defaultMarketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         searchKeywords: ['commodity', 'commodities', 'metals', 'energy'],
     },
@@ -90,18 +103,45 @@ export function getAssetCategoryOptions() {
     });
 }
 
-/* Market-session defaults come from the taxonomy so ticker creation and normalization agree on session policy. */
-export function getAssetCategoryDefaultMarketSessionId(assetCategory) {
-    return ASSET_CATEGORY_METADATA[assetCategory]?.defaultMarketSessionId ?? MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
+/*
+ * This is the single policy seam between instrument identity and exchange schedule.
+ * Listing metadata supplies venue defaults while category covers instruments without a known venue.
+ */
+export function getTickerMarketSessionPolicy(ticker = {}) {
+    const assetCategory = ticker.assetCategory;
+    const categoryMetadata = ASSET_CATEGORY_METADATA[assetCategory];
+    const metadata = categoryMetadata ?? ASSET_CATEGORY_METADATA[ASSET_CATEGORIES.EQUITY];
+    const defaultMarketSessionId = getListingMarketSessionId(assetCategory, ticker.symbol) ?? metadata.defaultMarketSessionId;
+    const marketSessionOptions = getMarketSessionOptions();
+    const allowedMarketSessionIds = !categoryMetadata
+        ? marketSessionOptions.map(option => option.value)
+        : EQUITY_ASSET_CATEGORIES.includes(assetCategory)
+            ? marketSessionOptions.filter(option => isEquityMarketSessionId(option.value)).map(option => option.value)
+            : [defaultMarketSessionId];
+    const hasExplicitMarketSessionId = hasMarketSessionId(ticker.marketSessionId);
+    const configuredMarketSessionId = hasExplicitMarketSessionId ? ticker.marketSessionId : getMarketSessionIdFromLegacyMarketType(ticker.marketType);
+    /* Pre-catalog configs could select any session; disallowed values now deliberately follow the listing venue when known. */
+    const marketSessionId = allowedMarketSessionIds.includes(configuredMarketSessionId) ? configuredMarketSessionId : defaultMarketSessionId;
+
+    return {defaultMarketSessionId, allowedMarketSessionIds, marketSessionId};
 }
 
-/* Category policy narrows the shared session registry to the choices valid for one ticker type. */
-export function getMarketSessionOptionsForAssetCategory(assetCategory) {
-    const defaultSessionId = getAssetCategoryDefaultMarketSessionId(assetCategory);
-    if ([ASSET_CATEGORIES.CRYPTO, ASSET_CATEGORIES.COMMODITY, ASSET_CATEGORIES.FX].includes(assetCategory))
-        return getMarketSessionOptions().filter(option => option.value === defaultSessionId);
+/* Catalogs and shipped defaults materialize the policy default before they enter saved-config normalization. */
+export function withDefaultMarketSession(ticker) {
+    return {...ticker, marketSessionId: getTickerMarketSessionPolicy(ticker).defaultMarketSessionId};
+}
 
-    return getMarketSessionOptions().filter(option => isEquityMarketSessionId(option.value));
+/* prefs includes the effective value so editing can never conceal the session actually in use. */
+export function getTickerMarketSessionOptions(ticker) {
+    const policy = getTickerMarketSessionPolicy(ticker);
+    return getMarketSessionOptions().filter(option => policy.allowedMarketSessionIds.includes(option.value));
+}
+
+/* Known provider suffixes identify listing schedules without pretending every dotted symbol is a venue. */
+function getListingMarketSessionId(assetCategory, symbol) {
+    const normalizedSymbol = `${symbol ?? ''}`.trim().toLowerCase();
+    const listing = LISTING_MARKET_SESSIONS[normalizedSymbol.slice(normalizedSymbol.lastIndexOf('.'))];
+    return listing?.assetCategories.includes(assetCategory) ? listing.marketSessionId : null;
 }
 
 /* A single default crypto provider keeps new ticker flows deterministic when the user has not chosen one yet. */

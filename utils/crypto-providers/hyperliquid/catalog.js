@@ -1,8 +1,7 @@
 import Soup from 'gi://Soup?version=3.0';
 
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../../asset-categories.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, withDefaultMarketSession} from '../../asset-categories.js';
 import {httpPostJson} from '../../http.js';
-import {MARKET_SESSION_IDS} from '../../market-sessions.js';
 import {
     isHyperliquidSpotSymbol,
     normalizeHyperliquidLiveSymbol,
@@ -94,20 +93,19 @@ function createHyperliquidPerpCatalogEntry(market, ctx) {
     const liveSymbol = normalizeHyperliquidLiveSymbol(market?.name);
     if (liveSymbol === '' || market?.isDelisted === true) return null;
 
-    return {
+    return withDefaultMarketSession({
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID,
         label: `${liveSymbol} Perp`,
         symbol: normalizeHyperliquidTickerSymbol(liveSymbol),
         priceDecimals: deriveHyperliquidPriceDecimals(ctx),
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         liveSymbol,
         keywords: [liveSymbol, 'perp', 'perpetual'],
         base: liveSymbol,
         quote: 'USD',
         hyperliquidMarketType: 'perp',
         ctx,
-    };
+    });
 }
 
 /* Spot catalog entries follow the same normalized shape as perps so prefs search can treat them uniformly. */
@@ -116,20 +114,19 @@ function createHyperliquidSpotCatalogEntry(market, ctx) {
     if (liveSymbol === '' || market?.isCanonical !== true || !isHyperliquidSpotSymbol(liveSymbol)) return null;
 
     const [base, quote] = liveSymbol.split('/');
-    return {
+    return withDefaultMarketSession({
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.HYPERLIQUID,
         label: liveSymbol,
         symbol: normalizeHyperliquidTickerSymbol(liveSymbol),
         priceDecimals: deriveHyperliquidPriceDecimals(ctx),
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         liveSymbol,
         keywords: [base, quote, 'spot'],
         base,
         quote,
         hyperliquidMarketType: 'spot',
         ctx,
-    };
+    });
 }
 
 /* Price precision is derived from provider text because Hyperliquid does not ship one fixed decimal field. */

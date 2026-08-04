@@ -1,5 +1,4 @@
-import {ASSET_CATEGORIES} from '../asset-categories.js';
-import {MARKET_SESSION_IDS} from '../market-sessions.js';
+import {ASSET_CATEGORIES, withDefaultMarketSession} from '../asset-categories.js';
 
 /* This file is the curated Germany equity suggestion source used by prefs search and Europe cash-session defaults. */
 export const GERMANY_EQUITY_TICKERS = [
@@ -103,11 +102,10 @@ export const GERMANY_EQUITY_TICKERS = [
     {label: 'WAF', keywords: ['siltronic']},
     {label: 'WCH', keywords: ['wacker chemie']},
     {label: 'ZAL', keywords: ['zalando']},
-].map(entry => ({
+].map(entry => withDefaultMarketSession({
     assetCategory: ASSET_CATEGORIES.EQUITY,
     label: entry.label,
     symbol: `${entry.label.toLowerCase()}.de`,
     priceDecimals: entry.priceDecimals ?? 2,
-    marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
     keywords: [...entry.keywords],
 }));

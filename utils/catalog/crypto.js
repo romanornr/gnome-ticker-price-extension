@@ -1,5 +1,4 @@
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../asset-categories.js';
-import {MARKET_SESSION_IDS} from '../market-sessions.js';
+import {ASSET_CATEGORIES, CRYPTO_PROVIDERS, withDefaultMarketSession} from '../asset-categories.js';
 
 /* Static crypto entries provide a minimal curated seed; broader crypto discovery comes from live providers at runtime. */
 export const CRYPTO_TICKERS = [
@@ -9,7 +8,6 @@ export const CRYPTO_TICKERS = [
         label: 'BTC',
         symbol: 'btcusd',
         priceDecimals: 0,
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         liveSymbol: 'BTC/USD',
         keywords: ['bitcoin', 'xbt'],
     },
@@ -19,8 +17,7 @@ export const CRYPTO_TICKERS = [
         label: 'ETH',
         symbol: 'ethusd',
         priceDecimals: 0,
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         liveSymbol: 'ETH/USD',
         keywords: ['ethereum', 'ether'],
     },
-];
+].map(withDefaultMarketSession);
