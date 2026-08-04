@@ -1,11 +1,12 @@
-# Ticker Price Extension
+# Ticker Tape
 
-GNOME Shell extension that shows market tickers in the top bar, with curated suggestions for common equities, ETFs, commodities, FX pairs, and crypto catalogs backed by Kraken and Hyperliquid.
+Stocks, ETFs, indices, forex, commodities and live crypto in your GNOME top bar.
+Ten exchanges across the US, Europe and Asia, with market-aware refresh. No API key required.
 
 ## Compatibility
 
 - Requires **GNOME Shell 49**, **49.5**, or **50**
-- UUID: `ticker-price-extension@romanornr`
+- UUID: `ticker-tape@romanornr`
 
 ## Local Install
 
@@ -13,13 +14,16 @@ GNOME Shell extension that shows market tickers in the top bar, with curated sug
 - `./install-dev.sh` for a symlinked development install
 - `./remove.sh` to uninstall the extension files when you still have this checkout available
 
-If you installed before the UUID settled on `ticker-price-extension@romanornr`, the
-old copy stays behind under its own directory and shows a second indicator in the
-panel. Remove it once:
+The extension was renamed to Ticker Tape before its first release. GNOME treats a
+different UUID as a different extension, so any earlier install stays on disk and
+draws its own panel indicator. Remove the old copies once:
 
 ```bash
+rm -rf ~/.local/share/gnome-shell/extensions/ticker-price-extension@romanornr
 rm -rf ~/.local/share/gnome-shell/extensions/ticker-price-extension@romano
 ```
+
+Saved tickers do not carry across, because the settings schema was renamed with it.
 
 ## Default Tickers
 
@@ -202,7 +206,7 @@ journalctl --user -f /usr/bin/gnome-shell
    confirm price changes still flash briefly and then settle back to the default text color.
 6. If a runtime issue appears, add targeted `log()` or `logError()` statements near the relevant provider, orchestrator, or prefs path before doing more refactoring.
 
-If `gnome-extensions info ticker-price-extension@romanornr` or `gnome-extensions show ticker-price-extension@romanornr` returns no data, the extension is not currently installed or not visible to the active session. In that case, install it first and repeat the checklist in the real GNOME session.
+If `gnome-extensions info ticker-tape@romanornr` or `gnome-extensions show ticker-tape@romanornr` returns no data, the extension is not currently installed or not visible to the active session. In that case, install it first and repeat the checklist in the real GNOME session.
 
 ## Developer Guides
 

@@ -74,13 +74,13 @@ If you need to confirm whether the shell currently sees the extension at all,
 start with:
 
 ```bash
-gnome-extensions info ticker-price-extension@romanornr
+gnome-extensions info ticker-tape@romanornr
 ```
 
 or:
 
 ```bash
-gnome-extensions show ticker-price-extension@romanornr
+gnome-extensions show ticker-tape@romanornr
 ```
 
 If those commands return no information, the extension is either not installed

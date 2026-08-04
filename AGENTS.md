@@ -51,7 +51,7 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/catalog/us-equity.js`: alphabetized curated U.S. equity catalog; keep symbols provider-verified and search keywords sensible
 - `utils/catalog/us-etf.js`: alphabetized curated U.S. ETF catalog; keep symbols provider-verified and search keywords sensible
 - `utils/catalog/commodity.js` and `utils/catalog/fx.js`: keep labels alphabetized and prefer verified symbols when adding or replacing entries
-- `schemas/org.gnome.shell.extensions.ticker-price-extension.gschema.xml`: extension settings schema
+- `schemas/org.gnome.shell.extensions.ticker-tape.gschema.xml`: extension settings schema
 - `metadata.json`: GNOME Shell extension metadata and compatibility
 - `install.sh`: copy-based local install, including runtime module directories
 - `install-dev.sh`: symlink-based development install

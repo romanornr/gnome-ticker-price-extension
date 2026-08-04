@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-UUID="ticker-price-extension@romanornr"
+UUID="ticker-tape@romanornr"
 TARGET_DIR="${HOME}/.local/share/gnome-shell/extensions/${UUID}"
 
 if [[ -L "${TARGET_DIR}" || -d "${TARGET_DIR}" ]]; then

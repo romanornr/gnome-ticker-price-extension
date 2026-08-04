@@ -1,7 +1,7 @@
 import {ASSET_CATEGORIES} from '../../utils/asset-categories.js';
 import {DEFAULT_HTTP_TIMEOUT_SECONDS, httpGetJson} from '../../utils/http.js';
 
-const NASDAQ_USER_AGENT = 'gnome-ticker-price-extension/1.0';
+const NASDAQ_USER_AGENT = 'ticker-tape-gnome-extension/1.0';
 /* Nasdaq has no batch endpoint, so fallback passes stay bounded to avoid request storms. */
 const NASDAQ_MAX_SYMBOLS_PER_PASS = 25;
 
@@ -123,13 +123,13 @@ export function normalizeTradeTimestamp(timestampText) {
 /* Tests run outside GNOME Shell's logging globals, so logging stays optional at the provider boundary. */
 function logNasdaqWarning(message) {
     if (typeof log === 'function')
-        log(`Ticker Price Extension: ${message}`);
+        log(`Ticker Tape: ${message}`);
 }
 
 /* Fallback failures never reach QuotesService, so the stack trace has to be logged here or it is lost. */
 function logNasdaqError(error, message) {
     if (typeof logError === 'function')
-        logError(error, `Ticker Price Extension: ${message}`);
+        logError(error, `Ticker Tape: ${message}`);
     else
         logNasdaqWarning(`${message}: ${error.message}`);
 }

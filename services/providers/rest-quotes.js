@@ -91,13 +91,13 @@ async function mergeFallbackQuotes(fallbackName, refreshFallback, quotesBySymbol
 /* Tests run outside GNOME Shell's logging globals, so logging stays optional at the provider boundary. */
 function logRestWarning(message) {
     if (typeof log === 'function')
-        log(`Ticker Price Extension: ${message}`);
+        log(`Ticker Tape: ${message}`);
 }
 
 /* Swallowed fallback failures never reach QuotesService, so the stack trace has to be logged here or it is lost. */
 function logRestError(error, message) {
     if (typeof logError === 'function')
-        logError(error, `Ticker Price Extension: ${message}`);
+        logError(error, `Ticker Tape: ${message}`);
     else
         logRestWarning(`${message}: ${error.message}`);
 }

@@ -1,8 +1,8 @@
 {
-  "uuid": "ticker-price-extension@romanornr",
-  "name": "Ticker Price Extension",
-  "description": "Shows market tickers in the GNOME Shell top bar with live crypto updates.",
-  "settings-schema": "org.gnome.shell.extensions.ticker-price-extension",
+  "uuid": "ticker-tape@romanornr",
+  "name": "Ticker Tape",
+  "description": "Stocks, ETFs, indices, forex, commodities and live crypto in your GNOME top bar. Ten exchanges across the US, Europe and Asia, with market-aware refresh. No API key required.",
+  "settings-schema": "org.gnome.shell.extensions.ticker-tape",
   "shell-version": [
     "49",
     "49.5",

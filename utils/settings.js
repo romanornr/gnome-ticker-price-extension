@@ -112,7 +112,7 @@ export function loadTickerConfigs(settings) {
 
         return tickers.length > 0 ? tickers : cloneTickers(DEFAULT_TICKERS);
     } catch (error) {
-        logError(error, 'ticker-price-extension: invalid ticker settings, using defaults');
+        logError(error, 'ticker-tape: invalid ticker settings, using defaults');
         return cloneTickers(DEFAULT_TICKERS);
     }
 }

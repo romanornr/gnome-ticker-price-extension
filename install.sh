@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-UUID="ticker-price-extension@romanornr"
+UUID="ticker-tape@romanornr"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="${HOME}/.local/share/gnome-shell/extensions/${UUID}"
 

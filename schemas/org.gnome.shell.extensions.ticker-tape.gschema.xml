@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.ticker-price-extension" path="/org/gnome/shell/extensions/ticker-price-extension/">
+  <schema id="org.gnome.shell.extensions.ticker-tape" path="/org/gnome/shell/extensions/ticker-tape/">
     <key name="tickers-json" type="s">
       <default>''</default>
       <summary>Serialized ticker configuration</summary>

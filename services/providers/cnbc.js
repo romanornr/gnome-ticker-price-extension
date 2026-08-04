@@ -8,7 +8,7 @@ import {
 
 const CNBC_BATCH_SIZE = 30;
 /* CNBC rejects well-known tool user agents (curl, wget), so identify honestly as this extension. */
-const CNBC_USER_AGENT = 'gnome-ticker-price-extension/1.0';
+const CNBC_USER_AGENT = 'ticker-tape-gnome-extension/1.0';
 const CNBC_QUOTE_ENDPOINT = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
 
 /*
@@ -232,5 +232,5 @@ function logRefreshResult(tickers, quotesBySymbol) {
 /* Tests run outside GNOME Shell's logging globals, so logging stays optional at the provider boundary. */
 function logCnbcWarning(message) {
     if (typeof log === 'function')
-        log(`Ticker Price Extension: ${message}`);
+        log(`Ticker Tape: ${message}`);
 }
