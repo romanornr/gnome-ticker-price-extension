@@ -1,50 +1,73 @@
-<img src="icon.png" alt="Ticker Tape" width="96" align="left">
+<div align="center">
 
-# Ticker Tape
+<img src="icon.png" alt="Ticker Tape" width="96" />
+
+<h1><code>ticker-tape</code></h1>
+
+<strong>Market prices in the GNOME top bar.</strong>
+
+<em>Stocks, ETFs, indices, forex, commodities and live crypto, across ten exchanges.</em>
+
+<br />
+<br />
+
+<a href="https://www.gnome.org/"><img src="https://img.shields.io/badge/GNOME_Shell-49_|_49.5_|_50-4A86CF?style=flat-square&logo=gnome&logoColor=white" alt="GNOME Shell 49, 49.5, 50" /></a>
+<a href="https://gjs.guide/extensions/"><img src="https://img.shields.io/badge/GJS-ESM,_no_build_step-E9A825?style=flat-square&logo=javascript&logoColor=white" alt="GJS ESM, no build step" /></a>
+<img src="https://img.shields.io/badge/API_key-not_required-2ea44f?style=flat-square" alt="API key not required" />
+
+<a href="https://www.cnbc.com/"><img src="https://img.shields.io/badge/Quotes-CNBC-005594?style=flat-square" alt="Quotes from CNBC" /></a>
+<a href="https://www.kraken.com/"><img src="https://img.shields.io/badge/Crypto-Kraken_|_Hyperliquid-7132F5?style=flat-square" alt="Crypto from Kraken and Hyperliquid" /></a>
+<img src="https://img.shields.io/badge/Exchanges-10-64748B?style=flat-square" alt="Ten exchanges" />
+
+</div>
+
+<!-- Add a screenshot of the indicator in the top bar, then remove these comment markers:
+<p align="center"><img src="screenshot.png" alt="The Ticker Tape indicator in the GNOME top bar" width="720"></p>
+-->
+
+---
+
+## What this extension does
 
 Ticker Tape shows market prices in the GNOME top bar.
 It supports stocks, ETFs, indices, forex, commodities and crypto.
 It covers ten exchanges in the US, Europe and Asia.
 It does not need an API key.
 
-<br clear="left">
+The extension polls a non-crypto ticker at the refresh interval.
+It polls less frequently when the market of that ticker is closed.
+A crypto ticker uses a WebSocket connection for live updates.
 
+> [!NOTE]
+> The extension needs GNOME Shell 49, 49.5 or 50.
+> The UUID is `ticker-tape@romanornr`.
 
-## Compatibility
-
-- The extension needs GNOME Shell 49, 49.5 or 50.
-- The UUID is `ticker-tape@romanornr`.
+---
 
 ## Install
 
 Use one of these commands:
 
-- `./install.sh` installs a copy of the extension.
-- `./install-dev.sh` installs a symbolic link for development.
-- `./remove.sh` removes the installed files.
+| Command | Result |
+|---|---|
+| `./install.sh` | Installs a copy of the extension. |
+| `./install-dev.sh` | Installs a symbolic link for development. |
+| `./remove.sh` | Removes the installed files. |
 
-This extension had a different name before its first release.
-GNOME identifies an extension by its UUID.
-Thus GNOME reads an older installation as a different extension.
-The older installation stays on the disk and shows a second indicator.
-Remove the old directories one time:
+GNOME Shell reads a new extension only after it starts again.
+On Wayland, log out and log in again.
+On Xorg, press `Alt+F2`, type `r` and press Enter.
 
-```bash
-rm -rf ~/.local/share/gnome-shell/extensions/ticker-price-extension@romanornr
-rm -rf ~/.local/share/gnome-shell/extensions/ticker-price-extension@romano
-```
+---
 
-The settings schema also has a new name.
-Thus GNOME does not keep the tickers that you saved before the new name.
-
-## Default Tickers
+## Default tickers
 
 The extension includes these tickers:
 
-| Label | Symbol | Category | Panel Side |
+| Label | Symbol | Category | Panel side |
 |---|---|---|---|
-| SPX | `^spx` | US Equity | Right |
-| NDX | `^ndq` | US Equity | Right |
+| SPX | `^spx` | US equity | Right |
+| NDX | `^ndq` | US equity | Right |
 | DXY | `dx.f` | FX | Left |
 | EUR/USD | `eurusd` | FX | Left |
 | Gold | `xauusd` | Commodity | Right |
@@ -58,7 +81,9 @@ The two crypto tickers use Kraken.
 Select Hyperliquid for one crypto ticker with the `Crypto API` option.
 Change any of these values in the extension preferences.
 
-## Add a Ticker
+---
+
+## Add a ticker
 
 1. Open the extension preferences.
 2. Click `+ Add ticker`.
@@ -80,22 +105,22 @@ Use it before you save the ticker.
 A crypto ticker has no `Verify` button.
 The Save operation validates a crypto ticker against the provider catalog.
 
-## Supported Markets
+---
 
-| Category | Description | Trading Session |
+## Supported markets
+
+| Category | Description | Trading session |
 |---|---|---|
-| **U.S. Equities** | Stocks and major U.S. equity indexes | U.S. session |
-| **International Equities** | Mainland China, Germany, Hong Kong, Japan, Netherlands, and UK stocks | Local market session |
+| **U.S. equities** | Stocks and major U.S. equity indexes | U.S. session |
+| **International equities** | Mainland China, Germany, Hong Kong, Japan, Netherlands and UK stocks | Local market session |
 | **U.S. ETFs** | Exchange-traded funds | U.S. session |
-| **Commodities** | Metals, energy markets, and exchange-listed funds | Weekday session, or U.S. session for U.S.-listed funds |
+| **Commodities** | Metals, energy markets and exchange-listed funds | Weekday session, or U.S. session for a U.S.-listed fund |
 | **FX** | Forex pairs and currency products such as DXY | Weekday session |
 | **Crypto** | Spot and perpetual crypto markets | Always open |
 
-The extension polls a non-crypto ticker at the refresh interval.
-It polls less frequently when the market of that ticker is closed.
-A crypto ticker uses a WebSocket connection for live updates.
+---
 
-## Crypto Exchanges
+## Crypto exchanges
 
 | Feature | Kraken | Hyperliquid |
 |---|---|---|
@@ -111,18 +136,24 @@ It does not open one connection for each ticker.
 If the connection stops, the provider polls the REST endpoint at the refresh interval.
 The provider also tries to connect again.
 
-## Display Settings
+---
+
+## Display settings
 
 The preferences window has these display options:
 
-- **Format preset** selects which parts of a ticker show.
-- **Show price**, **Show arrow** and **Show percent** each show or hide one part.
-- **Separator style** sets the character between two tickers. The default is a dot.
-- **Refresh interval** sets how frequently the extension polls quotes.
-  The default is 5 minutes.
-  The extension polls less frequently when a market is closed.
+| Option | Result |
+|---|---|
+| **Format preset** | Selects which parts of a ticker show. |
+| **Show price**, **Show arrow**, **Show percent** | Each one shows or hides one part. |
+| **Separator style** | Sets the character between two tickers. The default is a dot. |
+| **Refresh interval** | Sets how frequently the extension polls quotes. The default is 5 minutes. |
 
-## Manage the Extension
+The extension polls less frequently when a market is closed.
+
+---
+
+## Manage the extension
 
 Open this page after you install the extension:
 
@@ -133,10 +164,14 @@ On the page you can enable, disable or remove the extension.
 
 Use the page when you do not have this repository on the disk.
 Also use it when you do not want to run `./remove.sh`.
-The page needs the GNOME Shell Integration browser add-on.
-Without the add-on, the website cannot control a local extension.
 
-## Provider Layout
+> [!NOTE]
+> The page needs the GNOME Shell Integration browser add-on.
+> Without the add-on, the website cannot control a local extension.
+
+---
+
+## Provider layout
 
 This section is for developers.
 
@@ -153,7 +188,9 @@ Each provider keeps its own files:
 - `utils/crypto-providers/kraken/`
 - `utils/crypto-providers/hyperliquid/`
 
-## Edit the Catalog
+---
+
+## Edit the catalog
 
 One file holds the tickers of one market:
 
@@ -182,10 +219,13 @@ To add a ticker to the catalog:
    Add `priceDecimals` only where the mapper of that file permits a row value.
 7. Add a small number of `keywords`. The catalog search then finds the ticker more easily.
 
-Do not add a crypto ticker to the static catalog.
-The selected live provider supplies the crypto markets at runtime.
+> [!WARNING]
+> Do not add a crypto ticker to the static catalog.
+> The selected live provider supplies the crypto markets at runtime.
 
-## Run the Local Checks
+---
+
+## Run the local checks
 
 One command runs the local safety net:
 
@@ -216,7 +256,9 @@ Then correct this document in the same change.
 `check.sh` does not import `prefs.js`.
 The GNOME preferences resource path exists only in the real preferences host process.
 
-## Test After a Refactor
+---
+
+## Test after a refactor
 
 Do this end-to-end pass after a structural change.
 Do it before you start more feature work.
@@ -252,7 +294,10 @@ journalctl --user -f /usr/bin/gnome-shell
 Then the extension is not installed, or the active session cannot read it.
 Install the extension first. Then do the checklist again in the real GNOME session.
 
-## Developer Guides
+---
+
+## Developer guides
 
 - [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md) tells you how to debug the extension behavior and the API parse steps.
 - [CODE_STYLE_GUIDE.md](CODE_STYLE_GUIDE.md) gives the comment rules and the code style rules.
+- [AGENTS.md](AGENTS.md) holds the file map and the data conventions.
