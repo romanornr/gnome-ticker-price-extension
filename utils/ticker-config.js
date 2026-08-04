@@ -1,15 +1,14 @@
 import {
     ASSET_CATEGORIES,
     CRYPTO_PROVIDERS,
-    getAssetCategoryDefaultMarketSessionId,
     getDefaultCryptoProvider,
+    getTickerMarketSessionPolicy,
 } from './asset-categories.js';
 import {getCryptoProviderAdapter} from './crypto-providers/index.js';
 import {
     MARKET_SESSION_IDS,
     getMarketSessionIdFromLegacyMarketType,
     hasMarketSessionId,
-    isEquityMarketSessionId,
 } from './market-sessions.js';
 import {LEFT_PANEL_SIDE, RIGHT_PANEL_SIDE} from './panel-sides.js';
 
@@ -17,7 +16,6 @@ const SUPPORTED_LIVE_TICKERS = [
     {
         label: 'BTC',
         symbol: 'btcusd',
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         liveSymbol: 'BTC/USD',
@@ -25,7 +23,6 @@ const SUPPORTED_LIVE_TICKERS = [
     {
         label: 'ETH',
         symbol: 'ethusd',
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         liveSymbol: 'ETH/USD',
@@ -72,7 +69,7 @@ export function normalizeTickerConfig(rawTicker) {
         label,
         symbol,
         priceDecimals,
-        marketSessionId: normalizeTickerMarketSessionId(marketSessionId, assetCategory),
+        marketSessionId: getTickerMarketSessionPolicy({...rawTicker, symbol, assetCategory}).marketSessionId,
         assetCategory,
         panelSide,
     };
@@ -96,7 +93,7 @@ export function serializeTickerConfig(ticker) {
         label: ticker.label,
         symbol: ticker.symbol,
         priceDecimals: ticker.priceDecimals,
-        marketSessionId: normalizeTickerMarketSessionId(ticker.marketSessionId, assetCategory),
+        marketSessionId: getTickerMarketSessionPolicy({...ticker, assetCategory}).marketSessionId,
         assetCategory,
         panelSide: ticker.panelSide,
     };
@@ -156,19 +153,6 @@ function normalizeMarketSessionId(marketSessionId, legacyMarketType = '') {
     return hasMarketSessionId(marketSessionId)
         ? marketSessionId
         : getMarketSessionIdFromLegacyMarketType(legacyMarketType);
-}
-
-function normalizeTickerMarketSessionId(marketSessionId, assetCategory) {
-    if (assetCategory === ASSET_CATEGORIES.CRYPTO)
-        return MARKET_SESSION_IDS.ALWAYS_OPEN;
-
-    if (assetCategory === ASSET_CATEGORIES.COMMODITY || assetCategory === ASSET_CATEGORIES.FX)
-        return MARKET_SESSION_IDS.WEEKDAY_24H;
-
-    if (isEquityMarketSessionId(marketSessionId))
-        return marketSessionId;
-
-    return MARKET_SESSION_IDS.US_EQUITY_EXTENDED;
 }
 
 function normalizeAssetCategory(assetCategory, ticker = null) {
@@ -231,7 +215,6 @@ function getSupportedLiveSymbol(ticker, rawLiveSymbol) {
     const supportedTicker = SUPPORTED_LIVE_TICKERS.find(candidate =>
         candidate.label === ticker.label &&
         candidate.symbol === ticker.symbol &&
-        candidate.marketSessionId === ticker.marketSessionId &&
         candidate.assetCategory === ticker.assetCategory &&
         candidate.cryptoProvider === ticker.cryptoProvider &&
         (explicitLiveSymbol === '' || explicitLiveSymbol === candidate.liveSymbol)

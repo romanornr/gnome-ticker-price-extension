@@ -57,7 +57,7 @@ Examples: `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD`, `USO`.
 | **U.S. Equities** | Stocks and major U.S. equity indexes | U.S. session |
 | **International Equities** | Mainland China, Germany, Hong Kong, Japan, Netherlands, and UK stocks | Local market session |
 | **U.S. ETFs** | Exchange-traded funds | U.S. session |
-| **Commodities** | Metals and energy markets | Weekday session |
+| **Commodities** | Metals, energy markets, and exchange-listed funds | Weekday session, or U.S. session for U.S.-listed funds |
 | **FX** | Forex pairs and currency products like DXY | Weekday session |
 | **Crypto** | Spot and perpetual crypto markets | Always open |
 
@@ -134,12 +134,12 @@ The curated catalog is split by market so it is easier to maintain:
 
 The crypto catalog provides a minimal static seed for offline/fallback use; broader crypto discovery comes from the live providers (Kraken and Hyperliquid) at runtime.
 
-Shared category labels, descriptions, default market sessions, and category search terms live in [utils/asset-categories.js](utils/asset-categories.js).
+Shared category labels, ticker-aware market-session policy, and category search terms live in [utils/asset-categories.js](utils/asset-categories.js).
 
 When adding a curated ticker:
 
 - put one compact source record in the file for its asset category and preserve the file's label order
-- let the file-local mapper supply its shared `assetCategory`, `marketSessionId`, regional keywords, and precision policy
+- let the file-local mapper supply shared metadata; market sessions derive centrally from known listing suffixes and category fallbacks
 - equity and ETF symbols normally derive from the lowercase label plus the file's market suffix; keep verified exceptions explicit, as `us-equity.js` does for `BRK.B`, `NDX`, and `SPX`
 - keep commodity symbols explicit, and add `priceDecimals` only in files whose mapper supports a row-level override
 - add a few helpful `keywords` so catalog search is forgiving

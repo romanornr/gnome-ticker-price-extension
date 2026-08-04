@@ -1,8 +1,8 @@
 import {
     ASSET_CATEGORIES,
     CRYPTO_PROVIDERS,
+    withDefaultMarketSession,
 } from './asset-categories.js';
-import {MARKET_SESSION_IDS} from './market-sessions.js';
 import {
     DEFAULT_DISPLAY_SETTINGS,
     DEFAULT_REFRESH_INTERVAL_SECONDS,
@@ -33,7 +33,6 @@ export const DEFAULT_TICKERS = [
         label: 'SPX',
         symbol: '^spx',
         priceDecimals: 0,
-        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         assetCategory: ASSET_CATEGORIES.EQUITY,
         panelSide: RIGHT_PANEL_SIDE,
     },
@@ -41,7 +40,6 @@ export const DEFAULT_TICKERS = [
         label: 'NDX',
         symbol: '^ndq',
         priceDecimals: 0,
-        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         assetCategory: ASSET_CATEGORIES.EQUITY,
         panelSide: RIGHT_PANEL_SIDE,
     },
@@ -49,7 +47,6 @@ export const DEFAULT_TICKERS = [
         label: 'DXY',
         symbol: 'dx.f',
         priceDecimals: 2,
-        marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         assetCategory: ASSET_CATEGORIES.FX,
         panelSide: LEFT_PANEL_SIDE,
     },
@@ -57,7 +54,6 @@ export const DEFAULT_TICKERS = [
         label: 'EUR/USD',
         symbol: 'eurusd',
         priceDecimals: 4,
-        marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         assetCategory: ASSET_CATEGORIES.FX,
         panelSide: LEFT_PANEL_SIDE,
     },
@@ -65,7 +61,6 @@ export const DEFAULT_TICKERS = [
         label: 'Gold',
         symbol: 'xauusd',
         priceDecimals: 0,
-        marketSessionId: MARKET_SESSION_IDS.WEEKDAY_24H,
         assetCategory: ASSET_CATEGORIES.COMMODITY,
         panelSide: RIGHT_PANEL_SIDE,
     },
@@ -73,7 +68,6 @@ export const DEFAULT_TICKERS = [
         label: 'USO',
         symbol: 'uso.us',
         priceDecimals: 2,
-        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
         assetCategory: ASSET_CATEGORIES.ETF,
         panelSide: RIGHT_PANEL_SIDE,
     },
@@ -81,7 +75,6 @@ export const DEFAULT_TICKERS = [
         label: 'ETH',
         symbol: 'ethusd',
         priceDecimals: 0,
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         panelSide: RIGHT_PANEL_SIDE,
@@ -91,13 +84,12 @@ export const DEFAULT_TICKERS = [
         label: 'BTC',
         symbol: 'btcusd',
         priceDecimals: 0,
-        marketSessionId: MARKET_SESSION_IDS.ALWAYS_OPEN,
         assetCategory: ASSET_CATEGORIES.CRYPTO,
         cryptoProvider: CRYPTO_PROVIDERS.KRAKEN,
         panelSide: RIGHT_PANEL_SIDE,
         liveSymbol: 'BTC/USD',
     },
-];
+].map(withDefaultMarketSession);
 
 export function loadTickerConfigs(settings) {
     const serialized = settings?.get_string(SETTINGS_KEYS.TICKERS_JSON) ?? '';

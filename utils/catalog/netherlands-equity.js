@@ -1,5 +1,4 @@
-import {ASSET_CATEGORIES} from '../asset-categories.js';
-import {MARKET_SESSION_IDS} from '../market-sessions.js';
+import {ASSET_CATEGORIES, withDefaultMarketSession} from '../asset-categories.js';
 
 /* This file is the curated Netherlands equity suggestion source used by prefs search and Europe cash-session defaults. */
 export const NETHERLANDS_EQUITY_TICKERS = [
@@ -107,11 +106,10 @@ export const NETHERLANDS_EQUITY_TICKERS = [
     {label: 'VVY', keywords: ['vivoryon therapeutics']},
     {label: 'WHA', keywords: ['wereldhave']},
     {label: 'WKL', keywords: ['wolters kluwer']},
-].map(entry => ({
+].map(entry => withDefaultMarketSession({
     assetCategory: ASSET_CATEGORIES.EQUITY,
     label: entry.label,
     symbol: `${entry.label.toLowerCase()}.nl`,
     priceDecimals: entry.priceDecimals ?? 2,
-    marketSessionId: MARKET_SESSION_IDS.EUROPE_EQUITY_CASH,
     keywords: [...entry.keywords],
 }));
