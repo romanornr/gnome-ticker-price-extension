@@ -7,10 +7,10 @@ import {
 } from './market-sessions.js';
 
 /*
- * Asset/category metadata is the shared taxonomy for the entire extension.
- *
- * These constants and metadata tables keep prefs, scheduling, search, and
- * default ticker setup aligned on the same domain language.
+ * Asset/category metadata is the shared taxonomy for the entire extension, and
+ * this module also resolves which market session a ticker belongs to.
+ * Catalogs, saved-config normalization, prefs, and scheduling all read that one
+ * answer here rather than restating category or venue rules of their own.
  */
 export const ASSET_CATEGORIES = {
     EQUITY: 'equity',

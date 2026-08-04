@@ -7,7 +7,12 @@ import {
     validateTickerDraft,
     validateTickerSymbol,
 } from '../utils/prefs/ticker-dialog-state.js';
-import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
+import {
+    ASSET_CATEGORIES,
+    CRYPTO_PROVIDERS,
+    getTickerMarketSessionOptions,
+    getTickerMarketSessionPolicy,
+} from '../utils/asset-categories.js';
 import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
 import {assertEqual, assertTruthy} from './support/assert.js';
 
@@ -97,4 +102,18 @@ export function runTests() {
     assertEqual(nextTicker.label, 'BTC/USD', 'Empty crypto labels should autofill from resolved ticker');
     assertEqual(nextTicker.marketSessionId, MARKET_SESSION_IDS.ALWAYS_OPEN,
         'Built crypto configs should persist the selected market session id');
+
+    /* Switching category recomputes the session, and a listed fund's default depends on its symbol. */
+    const listedFundDefault = getTickerMarketSessionPolicy({
+        assetCategory: ASSET_CATEGORIES.COMMODITY,
+        symbol: 'gld.us',
+    }).defaultMarketSessionId;
+    assertEqual(listedFundDefault, MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+        'A listed commodity fund should default to its venue session, not the category session');
+    assertTruthy(getTickerMarketSessionOptions({
+        assetCategory: ASSET_CATEGORIES.COMMODITY,
+        marketSessionId: listedFundDefault,
+        symbol: 'gld.us',
+    }).some(option => option.value === listedFundDefault),
+    'The session the dialog selects must be offered by the session row');
 }

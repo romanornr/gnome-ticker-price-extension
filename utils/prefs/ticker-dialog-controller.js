@@ -197,7 +197,11 @@ class TickerDialogController {
                 return;
 
             this.activeAssetCategory = option.value;
-            this.activeMarketSessionId = getTickerMarketSessionPolicy({assetCategory: this.activeAssetCategory}).defaultMarketSessionId;
+            /* The symbol travels with the category because a listed fund's default follows its venue, not its type. */
+            this.activeMarketSessionId = getTickerMarketSessionPolicy({
+                assetCategory: this.activeAssetCategory,
+                symbol: this._getSymbolText(),
+            }).defaultMarketSessionId;
             this.activeCryptoProvider = this.activeAssetCategory === 'crypto'
                 ? (this.activeCryptoProvider || getDefaultCryptoProvider())
                 : '';
