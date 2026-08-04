@@ -18,9 +18,6 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-    # dev is the default branch, so PRs into main need main listed explicitly.
-    base_branches:
-      - "main"
 
   path_instructions:
     - path: "utils/catalog/**"
