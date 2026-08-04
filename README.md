@@ -14,6 +14,7 @@
 <a href="https://www.gnome.org/"><img src="https://img.shields.io/badge/GNOME_Shell-49_|_49.5_|_50-4A86CF?style=flat-square&logo=gnome&logoColor=white" alt="GNOME Shell 49, 49.5, 50" /></a>
 <a href="https://gjs.guide/extensions/"><img src="https://img.shields.io/badge/GJS-ESM,_no_build_step-E9A825?style=flat-square&logo=javascript&logoColor=white" alt="GJS ESM, no build step" /></a>
 <img src="https://img.shields.io/badge/API_key-not_required-2ea44f?style=flat-square" alt="API key not required" />
+<a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--2.0--or--later-blue?style=flat-square" alt="GPL-2.0-or-later" /></a>
 
 </div>
 
@@ -297,3 +298,13 @@ Install the extension first. Then do the checklist again in the real GNOME sessi
 - [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md) tells you how to debug the extension behavior and the API parse steps.
 - [CODE_STYLE_GUIDE.md](CODE_STYLE_GUIDE.md) gives the comment rules and the code style rules.
 - [AGENTS.md](AGENTS.md) holds the file map and the data conventions.
+
+---
+
+## License
+
+Ticker Tape uses the GPL-2.0-or-later license. See [LICENSE](LICENSE).
+
+GNOME Shell also uses the GPL-2.0-or-later license.
+An extension runs in the GNOME Shell process.
+Thus an extension must use compatible terms.
