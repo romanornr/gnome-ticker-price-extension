@@ -2,37 +2,44 @@
 
 # Ticker Tape
 
-Stocks, ETFs, indices, forex, commodities and live crypto in your GNOME top bar.
-Ten exchanges across the US, Europe and Asia, with market-aware refresh. No API key required.
+Ticker Tape shows market prices in the GNOME top bar.
+It supports stocks, ETFs, indices, forex, commodities and crypto.
+It covers ten exchanges in the US, Europe and Asia.
+It does not need an API key.
 
 <br clear="left">
 
 
 ## Compatibility
 
-- Requires **GNOME Shell 49**, **49.5**, or **50**
-- UUID: `ticker-tape@romanornr`
+- The extension needs GNOME Shell 49, 49.5 or 50.
+- The UUID is `ticker-tape@romanornr`.
 
-## Local Install
+## Install
 
-- `./install.sh` for a normal local install
-- `./install-dev.sh` for a symlinked development install
-- `./remove.sh` to uninstall the extension files when you still have this checkout available
+Use one of these commands:
 
-The extension was renamed to Ticker Tape before its first release. GNOME treats a
-different UUID as a different extension, so any earlier install stays on disk and
-draws its own panel indicator. Remove the old copies once:
+- `./install.sh` installs a copy of the extension.
+- `./install-dev.sh` installs a symbolic link for development.
+- `./remove.sh` removes the installed files.
+
+This extension had a different name before its first release.
+GNOME identifies an extension by its UUID.
+Thus GNOME reads an older installation as a different extension.
+The older installation stays on the disk and shows a second indicator.
+Remove the old directories one time:
 
 ```bash
 rm -rf ~/.local/share/gnome-shell/extensions/ticker-price-extension@romanornr
 rm -rf ~/.local/share/gnome-shell/extensions/ticker-price-extension@romano
 ```
 
-Saved tickers do not carry across, because the settings schema was renamed with it.
+The settings schema also has a new name.
+Thus GNOME does not keep the tickers that you saved before the new name.
 
 ## Default Tickers
 
-The extension ships with the following tickers out of the box:
+The extension includes these tickers:
 
 | Label | Symbol | Category | Panel Side |
 |---|---|---|---|
@@ -45,19 +52,33 @@ The extension ships with the following tickers out of the box:
 | ETH | `ethusd` | Crypto (Kraken) | Right |
 | BTC | `btcusd` | Crypto (Kraken) | Right |
 
-DXY and EUR/USD default to the left panel side while all other tickers appear on the right. The default crypto entries use Kraken, but Hyperliquid is also available as a crypto provider and can be selected per-ticker through the `Crypto API` option in preferences. All defaults can be changed through the extension preferences.
+DXY and EUR/USD show on the left side of the panel.
+The other tickers show on the right side.
+The two crypto tickers use Kraken.
+Select Hyperliquid for one crypto ticker with the `Crypto API` option.
+Change any of these values in the extension preferences.
 
-## Adding Tickers
+## Add a Ticker
 
-Open the extension preferences and use `+ Add ticker`. You can search the built-in catalog by label, symbol, or broad category terms such as `energy`, `metals`, `forex`, or `crypto`.
+1. Open the extension preferences.
+2. Click `+ Add ticker`.
+3. Search the catalog by label, by symbol or by category.
 
-- Crypto tickers support both Kraken spot pairs and Hyperliquid spot/perp markets through the `Crypto API` selector in prefs.
-- Kraken suggestions are loaded dynamically from Kraken WebSocket instrument metadata, so you can search pairs like `SOL`, `SOLUSD`, or `SOL/USD`.
-- Hyperliquid suggestions are loaded dynamically from the official spot/perp metadata endpoints, so you can search perps like `BTC`.
+Category search terms include `energy`, `metals`, `forex` and `crypto`.
+Symbol examples include `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD` and `USO`.
 
-For non-crypto matches, `Verify` checks whether the runtime REST quote chain currently returns data before saving. Crypto markets are validated against the selected provider's loaded live catalog as part of the Save path.
+For a crypto ticker:
 
-Examples: `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD`, `USO`.
+- The `Crypto API` option selects Kraken or Hyperliquid.
+- The extension reads the Kraken markets from the Kraken WebSocket.
+  Search for `SOL`, `SOLUSD` or `SOL/USD`.
+- The extension reads the Hyperliquid markets from the Hyperliquid metadata endpoints.
+  Search for a perp such as `BTC`.
+
+The `Verify` button requests a live quote for a non-crypto ticker.
+Use it before you save the ticker.
+A crypto ticker has no `Verify` button.
+The Save operation validates a crypto ticker against the provider catalog.
 
 ## Supported Markets
 
@@ -67,73 +88,74 @@ Examples: `QQQ`, `Gold`, `EUR/USD`, `SOL/USD`, `BTC/USD`, `USO`.
 | **International Equities** | Mainland China, Germany, Hong Kong, Japan, Netherlands, and UK stocks | Local market session |
 | **U.S. ETFs** | Exchange-traded funds | U.S. session |
 | **Commodities** | Metals, energy markets, and exchange-listed funds | Weekday session, or U.S. session for U.S.-listed funds |
-| **FX** | Forex pairs and currency products like DXY | Weekday session |
+| **FX** | Forex pairs and currency products such as DXY | Weekday session |
 | **Crypto** | Spot and perpetual crypto markets | Always open |
 
-Non-crypto tickers are polled on a configurable refresh interval with market-aware throttling. Crypto tickers use live WebSocket connections for real-time updates (see below).
+The extension polls a non-crypto ticker at the refresh interval.
+It polls less frequently when the market of that ticker is closed.
+A crypto ticker uses a WebSocket connection for live updates.
 
-## Crypto Exchange Support
+## Crypto Exchanges
 
 | Feature | Kraken | Hyperliquid |
 |---|---|---|
-| **Markets** | Spot pairs | Perps + Spot pairs |
+| **Markets** | Spot pairs | Perps and spot pairs |
 | **Live transport** | WebSocket v2 | WebSocket |
 | **REST fallback** | Ticker endpoint | Market snapshots |
-| **Catalog discovery** | Dynamic from instrument metadata | Dynamic from spot/perp metadata endpoints |
+| **Catalog source** | Instrument metadata | Spot and perp metadata endpoints |
 | **Search examples** | `SOL`, `SOLUSD`, `SOL/USD` | `BTC`, `ETH`, `ETH/USDC` |
-| **Connection model** | Single socket, batch subscribe | Single socket, per-symbol subscribe |
+| **Connection model** | One socket, batch subscribe | One socket, subscribe per symbol |
 
-Both providers maintain one persistent WebSocket connection for all saved crypto pairs rather than opening one socket per ticker. If either WebSocket disconnects, its provider falls back to REST polling on the normal refresh cadence while reconnecting conservatively.
+Each provider keeps one WebSocket connection for all of its crypto tickers.
+It does not open one connection for each ticker.
+If the connection stops, the provider polls the REST endpoint at the refresh interval.
+The provider also tries to connect again.
 
 ## Display Settings
 
-The extension preferences panel exposes several display options:
+The preferences window has these display options:
 
-- **Format presets** — controls which parts of each entry are shown (e.g. symbol only, price only, full detail)
-- **Show/hide** price, directional arrow, and percent change individually
-- **Separator style** between ticker entries (default: dot)
-- **Refresh interval** — how often quotes are polled (default: 5 minutes, with market-aware throttling that reduces frequency outside trading hours)
+- **Format preset** selects which parts of a ticker show.
+- **Show price**, **Show arrow** and **Show percent** each show or hide one part.
+- **Separator style** sets the character between two tickers. The default is a dot.
+- **Refresh interval** sets how frequently the extension polls quotes.
+  The default is 5 minutes.
+  The extension polls less frequently when a market is closed.
 
-## Managing The Extension
+## Manage the Extension
 
-After the extension is installed, open:
+Open this page after you install the extension:
 
 - `https://extensions.gnome.org/local/`
 
-This page shows the extensions that GNOME Shell can currently see for your
-session. From there you can:
+The page shows the extensions that GNOME Shell reads for your session.
+On the page you can enable, disable or remove the extension.
 
-- enable the extension
-- disable the extension
-- remove the installed extension from GNOME Shell
-
-Use this page when you just want to manage the installed extension and do not
-care where it originally came from. It is especially useful if you no longer
-have this repository checked out locally, do not remember how you installed it,
-or do not want to use `./remove.sh`.
-
-This browser-based flow requires the GNOME Shell Integration browser
-extension/add-on to be installed first. Without that browser integration, the
-website cannot control local GNOME Shell extensions.
+Use the page when you do not have this repository on the disk.
+Also use it when you do not want to run `./remove.sh`.
+The page needs the GNOME Shell Integration browser add-on.
+Without the add-on, the website cannot control a local extension.
 
 ## Provider Layout
 
-This section describes the internal provider architecture for developers and contributors.
+This section is for developers.
 
-The crypto provider code is split into two layers:
+The crypto provider code has two layers:
 
-- `utils/crypto-providers/` for provider semantics such as symbol normalization, catalog loading, scoring, and quote normalization
-- `services/providers/` for runtime transport, provider ownership, and refresh orchestration
+- `utils/crypto-providers/` holds the provider semantics.
+  These are symbol normalization, catalog load, search score and quote normalization.
+- `services/providers/` holds the runtime transport, the provider ownership and the refresh order.
 
-`utils/crypto-providers/index.js` composes the shared adapter objects used by
-prefs and runtime routing. Provider internals stay split by concern under:
+`utils/crypto-providers/index.js` composes the adapter objects.
+The preferences code and the runtime code both use these adapters.
+Each provider keeps its own files:
 
 - `utils/crypto-providers/kraken/`
 - `utils/crypto-providers/hyperliquid/`
 
-## Editing The Curated Catalog
+## Edit the Catalog
 
-The curated catalog is split by market so it is easier to maintain:
+One file holds the tickers of one market:
 
 - [utils/catalog/us-equity.js](utils/catalog/us-equity.js)
 - [utils/catalog/us-etf.js](utils/catalog/us-etf.js)
@@ -141,79 +163,96 @@ The curated catalog is split by market so it is easier to maintain:
 - [utils/catalog/fx.js](utils/catalog/fx.js)
 - [utils/catalog/crypto.js](utils/catalog/crypto.js)
 
-The crypto catalog provides a minimal static seed for offline/fallback use; broader crypto discovery comes from the live providers (Kraken and Hyperliquid) at runtime.
+The crypto file holds a small static list for offline use.
+At runtime the live providers supply the full crypto catalog.
 
-Shared category labels, ticker-aware market-session policy, and category search terms live in [utils/asset-categories.js](utils/asset-categories.js).
+[utils/asset-categories.js](utils/asset-categories.js) holds the category labels,
+the market-session policy and the category search terms.
 
-When adding a curated ticker:
+To add a ticker to the catalog:
 
-- put one compact source record in the file for its asset category and preserve the file's label order
-- let the file-local mapper supply shared metadata; market sessions derive centrally from known listing suffixes and category fallbacks
-- equity and ETF symbols normally derive from the lowercase label plus the file's market suffix; keep verified exceptions explicit, as `us-equity.js` does for `BRK.B`, `NDX`, and `SPX`
-- keep commodity symbols explicit, and add `priceDecimals` only in files whose mapper supports a row-level override
-- add a few helpful `keywords` so catalog search is forgiving
-- verify the provider symbol first for non-crypto instruments
-- crypto suggestions come from the selected live provider at runtime rather than a manually maintained static catalog
+1. Verify the provider symbol first. This step does not apply to a crypto ticker.
+2. Add one compact record to the file of its asset category.
+3. Keep the label order of that file.
+4. Let the mapper of the file supply the shared values.
+   The market session derives centrally from the symbol suffix or from the category.
+5. For an equity or an ETF, the symbol derives from the lowercase label plus the market suffix.
+   Keep a verified exception explicit. `us-equity.js` does this for `BRK.B`, `NDX` and `SPX`.
+6. Keep a commodity symbol explicit.
+   Add `priceDecimals` only where the mapper of that file permits a row value.
+7. Add a small number of `keywords`. The catalog search then finds the ticker more easily.
 
-## Local Checks
+Do not add a crypto ticker to the static catalog.
+The selected live provider supplies the crypto markets at runtime.
 
-Use one command for the current lightweight local safety net:
+## Run the Local Checks
+
+One command runs the local safety net:
 
 ```bash
 ./check.sh
 ```
 
-This runs:
+The command runs these checks:
 
 - `gjs -m tests/run.js`
-- focused `gjs -m` import checks for the runtime/provider/helper modules that should load outside the GNOME prefs host
+- one `gjs -m` import check for each runtime module, provider module and helper module
+  that must load outside the GNOME preferences host
 
-The current test suite covers:
+The tests cover these areas:
 
-- market schedule policy
-- entry-model rendering
-- live-websocket lifecycle and direct provider routing
-- provider adapters and REST fallback boundaries
-- non-crypto quote parsing and live-provider payload handling
-- QuotesService orchestration, coordinator scheduling, and lifecycle
-- ticker config and prefs dialog state
+- the market schedule policy
+- the entry-model render
+- the live WebSocket lifecycle and the provider routes
+- the provider adapters and the REST fallback limits
+- the non-crypto quote parse and the live provider payloads
+- the QuotesService orchestration, the coordinator schedule and the lifecycle
+- the ticker config and the preferences dialog state
 
-The current suite count is expected to grow as provider refactors add more
-focused seams. If `tests/run.js` reports more suites than this README lists,
-prefer the code and update the document in the same change.
+The number of test suites increases when a refactor adds a new seam.
+If `tests/run.js` reports more suites than this list, read the code.
+Then correct this document in the same change.
 
-It intentionally does not import `prefs.js` directly, because the GNOME prefs resource path only exists when the real extension preferences host process launches it.
+`check.sh` does not import `prefs.js`.
+The GNOME preferences resource path exists only in the real preferences host process.
 
-## Refactor Regression Workflow
+## Test After a Refactor
 
-After structural changes, run this end-to-end pass before starting more feature work:
+Do this end-to-end pass after a structural change.
+Do it before you start more feature work.
 
 1. Run `./check.sh`.
-2. Install the current tree with `./install-dev.sh` for normal development or `./install.sh` for a copy-based install.
-3. If the install script says GNOME Shell has not picked up the extension yet:
-   on Wayland, log out and back in;
-   on Xorg, reload GNOME Shell with `Alt+F2`, `r`, Enter.
-4. Start a log tail in another terminal:
+2. Install the current tree.
+   Run `./install-dev.sh` for development, or `./install.sh` for a copy.
+3. The install script can report that GNOME Shell does not read the extension yet.
+   On Wayland, log out and log in again.
+   On Xorg, press `Alt+F2`, type `r` and press Enter.
+4. Start a log in a second terminal:
 
 ```bash
 journalctl --user -f /usr/bin/gnome-shell
 ```
 
-5. Open the extension preferences and walk through this regression checklist:
-   enable and disable the extension without errors;
-   confirm the indicator appears in the panel;
-   confirm left-panel tickers still stay left and right-panel tickers stay right;
-   confirm startup shows loading placeholders before live data arrives;
-   confirm non-crypto `Verify` still works for selected catalog entries;
-   confirm add, edit, remove, reorder, and reset-to-defaults still persist correctly;
-   confirm switching `Crypto API` changes the searchable markets and Save validation;
-   confirm Kraken and Hyperliquid crypto entries receive live updates;
-   confirm price changes still flash briefly and then settle back to the default text color.
-6. If a runtime issue appears, add targeted `log()` or `logError()` statements near the relevant provider, orchestrator, or prefs path before doing more refactoring.
+5. Open the extension preferences. Then confirm each item of this checklist:
+   - The extension enables and disables without an error.
+   - The indicator shows in the panel.
+   - A left-panel ticker stays on the left. A right-panel ticker stays on the right.
+   - The panel shows a placeholder at startup, before the first quote arrives.
+   - `Verify` still works for a non-crypto catalog entry.
+   - Add, edit, remove, reorder and reset-to-defaults each persist correctly.
+   - A change of `Crypto API` changes the searchable markets and the Save validation.
+   - A Kraken ticker and a Hyperliquid ticker each receive live updates.
+   - A price change flashes one time. The color then returns to the default color.
+6. If you find a runtime problem, add a `log()` or a `logError()` statement.
+   Put it near the related provider, orchestrator or preferences path.
+   Do this before you refactor more code.
 
-If `gnome-extensions info ticker-tape@romanornr` or `gnome-extensions show ticker-tape@romanornr` returns no data, the extension is not currently installed or not visible to the active session. In that case, install it first and repeat the checklist in the real GNOME session.
+`gnome-extensions info ticker-tape@romanornr` can return no data.
+`gnome-extensions show ticker-tape@romanornr` can also return no data.
+Then the extension is not installed, or the active session cannot read it.
+Install the extension first. Then do the checklist again in the real GNOME session.
 
 ## Developer Guides
 
-- [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md) — detailed debugging procedures for extension behavior and API parsing
-- [CODE_STYLE_GUIDE.md](CODE_STYLE_GUIDE.md) — commenting and code style conventions
+- [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md) tells you how to debug the extension behavior and the API parse steps.
+- [CODE_STYLE_GUIDE.md](CODE_STYLE_GUIDE.md) gives the comment rules and the code style rules.
