@@ -15,10 +15,6 @@
 <a href="https://gjs.guide/extensions/"><img src="https://img.shields.io/badge/GJS-ESM,_no_build_step-E9A825?style=flat-square&logo=javascript&logoColor=white" alt="GJS ESM, no build step" /></a>
 <img src="https://img.shields.io/badge/API_key-not_required-2ea44f?style=flat-square" alt="API key not required" />
 
-<a href="https://www.cnbc.com/"><img src="https://img.shields.io/badge/Quotes-CNBC-005594?style=flat-square" alt="Quotes from CNBC" /></a>
-<a href="https://www.kraken.com/"><img src="https://img.shields.io/badge/Crypto-Kraken_|_Hyperliquid-7132F5?style=flat-square" alt="Crypto from Kraken and Hyperliquid" /></a>
-<img src="https://img.shields.io/badge/Exchanges-10-64748B?style=flat-square" alt="Ten exchanges" />
-
 </div>
 
 <!-- Add a screenshot of the indicator in the top bar, then remove these comment markers:
