@@ -53,6 +53,7 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `utils/catalog/commodity.js` and `utils/catalog/fx.js`: keep labels alphabetized and prefer verified symbols when adding or replacing entries
 - `schemas/org.gnome.shell.extensions.ticker-tape.gschema.xml`: extension settings schema
 - `metadata.json`: GNOME Shell extension metadata and compatibility
+- `icon.png`: project logo for the README and the extensions.gnome.org listing; not shipped in the installed extension
 - `install.sh`: copy-based local install, including runtime module directories
 - `install-dev.sh`: symlink-based development install
 - `check.sh`: canonical local test/import sanity entry point for the current lightweight developer workflow

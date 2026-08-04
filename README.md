@@ -1,7 +1,12 @@
+<img src="icon.png" alt="Ticker Tape" width="96" align="left">
+
 # Ticker Tape
 
 Stocks, ETFs, indices, forex, commodities and live crypto in your GNOME top bar.
 Ten exchanges across the US, Europe and Asia, with market-aware refresh. No API key required.
+
+<br clear="left">
+
 
 ## Compatibility
 
