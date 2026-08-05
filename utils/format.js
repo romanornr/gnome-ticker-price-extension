@@ -82,7 +82,7 @@ export function createDisplayEntry(ticker, quote, previousClose, index, displayS
         priceText,
         displayPrice: quote.price,
         arrow: getArrow(percentChange),
-        percentText: `${Math.abs(percentChange).toFixed(1)}%`,
+        percentText: formatPercentChange(percentChange),
         priceColor: neutralTextColor,
         changeColor: isStale ? STALE_TEXT_COLOR : getChangeColor(percentChange),
         isStale,
@@ -151,6 +151,15 @@ function formatPrice(price, decimals) {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
     }).format(price);
+}
+
+/*
+ * Spot FX and metals reset their reference close at 17:00 New York, so for hours afterwards
+ * a real move is a few hundredths of a percent. One decimal renders those as a flat 0.0%.
+ */
+function formatPercentChange(percentChange) {
+    const magnitude = Math.abs(percentChange);
+    return `${magnitude.toFixed(magnitude < 0.1 ? 2 : 1)}%`;
 }
 
 /* Arrows are derived once here so all entry creators share the same directional language. */
