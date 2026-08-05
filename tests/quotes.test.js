@@ -1,5 +1,10 @@
+import GLib from 'gi://GLib';
+
 import {QuotesService} from '../services/quotes.js';
+import {restProvider} from '../services/providers/rest-quotes.js';
 import {ASSET_CATEGORIES, CRYPTO_PROVIDERS} from '../utils/asset-categories.js';
+import {createMarketScheduleNow} from '../utils/market-schedule.js';
+import {MARKET_SESSION_IDS} from '../utils/market-sessions.js';
 import {SETTINGS_KEYS} from '../utils/settings.js';
 import {assertDeepEqual, assertEqual} from './support/assert.js';
 
@@ -8,7 +13,10 @@ export async function runTests() {
     await testRefreshQuotesSkipsEntryUpdateWhenNoProvidersNeedRefresh();
     await testPollProviderPreservesPreviousClose();
     await testPollProviderSwallowsProviderErrors();
+    await testPollProviderIgnoresDeferredCompletionAfterStop();
     await testRefreshQuotesContinuesAfterProviderError();
+    await testDirectRestOutcomeDistinguishesRejectionFromPartialMiss();
+    testStaleTickersBypassClosedSessionPolicy();
     testHandleLiveQuotesMergesQuotesAndRequestsThrottledUpdate();
     await testStartBootsProvidersAndSchedulesRefresh();
     await testStartHandlesPollingOnlyProviders();
@@ -161,6 +169,34 @@ async function testPollProviderSwallowsProviderErrors() {
     }
 }
 
+async function testPollProviderIgnoresDeferredCompletionAfterStop() {
+    for (const shouldReject of [false, true]) {
+        const service = createQuotesService();
+        let finishPoll = null;
+        service._running = true;
+        service._session = {};
+        const provider = {
+            id: 'deferred-provider',
+            poll: () => new Promise((resolve, reject) => {
+                finishPoll = shouldReject ? () => reject(new Error('late failure')) : () => resolve(
+                    new Map([['AAPL.US', {price: 200, quoteDate: '20260322', previousClose: 190}]])
+                );
+            }),
+        };
+
+        const outcome = service._pollProvider(provider, [{symbol: 'aapl.us'}]);
+        service._running = false;
+        finishPoll();
+
+        assertEqual(await outcome, null,
+            'Provider completion after stop should return the inactive tri-state');
+        assertEqual(service._quoteStore.getQuote('aapl.us'), null,
+            'Provider completion after stop should not mutate cached quotes');
+        assertEqual(service._quoteStore.isStale('aapl.us'), false,
+            'Provider completion after stop should not mutate stale state');
+    }
+}
+
 async function testRefreshQuotesContinuesAfterProviderError() {
     const service = createQuotesService();
     const originalLogError = globalThis.logError;
@@ -210,6 +246,61 @@ async function testRefreshQuotesContinuesAfterProviderError() {
         'QuotesService should still request an entry rebuild when a later provider succeeds');
 }
 
+async function testDirectRestOutcomeDistinguishesRejectionFromPartialMiss() {
+    const service = createQuotesService();
+    const originalPoll = restProvider.poll;
+    const originalLogError = globalThis.logError;
+    globalThis.logError = () => {};
+    service._running = true;
+    service._session = {};
+    service._tickers = [{assetCategory: ASSET_CATEGORIES.EQUITY, symbol: 'missing.us'}];
+    service._providers = [restProvider];
+    service._coordinator = {requestEntriesUpdate() {}};
+
+    try {
+        restProvider.poll = async () => {
+            throw new Error('transport failed');
+        };
+        assertEqual(await service._refreshQuotes(true), false,
+            'A rejected direct REST promise should report the retry outcome');
+        assertEqual(service._quoteStore.isStale('missing.us'), true,
+            'A rejected direct REST promise should mark a cold-cache symbol stale');
+
+        restProvider.poll = async () => new Map();
+        assertEqual(await service._refreshQuotes(true), true,
+            'A fulfilled direct REST promise with partial misses should not request fast retry');
+    } finally {
+        restProvider.poll = originalPoll;
+        globalThis.logError = originalLogError;
+    }
+}
+
+function testStaleTickersBypassClosedSessionPolicy() {
+    const service = createQuotesService();
+    const ticker = {
+        symbol: 'aapl.us',
+        marketSessionId: MARKET_SESSION_IDS.US_EQUITY_EXTENDED,
+    };
+    const nowUsec = GLib.get_monotonic_time();
+    const saturday = createMarketScheduleNow(new Date('2026-03-21T14:00:00Z'), nowUsec);
+    const mondayOvernight = createMarketScheduleNow(new Date('2026-03-23T01:30:00Z'), nowUsec);
+    service._refreshIntervalSeconds = 300;
+
+    service._quoteStore.markRefreshed([ticker]);
+    assertEqual(service._shouldRefreshTicker(ticker, saturday), false,
+        'Fresh U.S. tickers should still respect weekend closure');
+    service._quoteStore.markStale([ticker]);
+    assertEqual(service._shouldRefreshTicker(ticker, saturday), true,
+        'Stale U.S. tickers should bypass weekend closure');
+
+    service._quoteStore.markRefreshed([ticker]);
+    assertEqual(service._shouldRefreshTicker(ticker, mondayOvernight), false,
+        'Fresh U.S. tickers should respect closed-session cadence');
+    service._quoteStore.markStale([ticker]);
+    assertEqual(service._shouldRefreshTicker(ticker, mondayOvernight), true,
+        'Stale U.S. tickers should bypass closed-session cadence');
+}
+
 function testHandleLiveQuotesMergesQuotesAndRequestsThrottledUpdate() {
     const service = createQuotesService();
     let throttledUpdateRequests = 0;
@@ -256,11 +347,11 @@ async function testStartBootsProvidersAndSchedulesRefresh() {
         scheduleRefreshTimer(interval) {
             scheduledRefreshInterval = interval;
         },
+        requestRefresh(forceRefreshAll) {
+            refreshRequested = forceRefreshAll;
+        },
         stop() {
         },
-    };
-    service._refreshQuotes = async forceRefreshAll => {
-        refreshRequested = forceRefreshAll;
     };
     service.connect('entries-changed', () => {
         initialEntries = service.getEntries();
@@ -315,11 +406,11 @@ async function testStartHandlesPollingOnlyProviders() {
     service._coordinator = {
         scheduleRefreshTimer() {
         },
+        requestRefresh(forceRefreshAll) {
+            refreshRequested = forceRefreshAll;
+        },
         stop() {
         },
-    };
-    service._refreshQuotes = async forceRefreshAll => {
-        refreshRequested = forceRefreshAll;
     };
 
     service.start();
@@ -405,9 +496,9 @@ async function testTickerSettingsChangeReloadsConfigurationAndRefreshes() {
         scheduleRefreshTimer(interval) {
             scheduledRefreshInterval = interval;
         },
-    };
-    service._refreshQuotes = async forceRefreshAll => {
-        refreshRequested = forceRefreshAll;
+        requestRefresh(forceRefreshAll) {
+            refreshRequested = forceRefreshAll;
+        },
     };
     service.connect('entries-changed', () => {
         changedEntries = service.getEntries();
