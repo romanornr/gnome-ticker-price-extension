@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="icon.png" alt="Ticker Tape" width="96" />
+<img src="icon.svg" alt="Ticker Tape" width="96" />
 
 <h1><code>ticker-tape</code></h1>
 

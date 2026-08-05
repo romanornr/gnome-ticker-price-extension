@@ -54,7 +54,8 @@ The default ticker list is defined in `utils/settings.js`, and the curated sugge
 - `schemas/org.gnome.shell.extensions.ticker-tape.gschema.xml`: extension settings schema
 - `metadata.json`: GNOME Shell extension metadata and compatibility
 - `LICENSE`: GPL-2.0-or-later, matching GNOME Shell so extensions.gnome.org can distribute the extension
-- `icon.png`: project logo for the README and the extensions.gnome.org listing; not shipped in the installed extension
+- `icon.png`: project logo for the extensions.gnome.org listing, which needs a raster upload; not shipped in the installed extension
+- `icon.svg`: vector logo shown in the README, and the source the PNG is rendered from
 - `install.sh`: copy-based local install, including runtime module directories
 - `install-dev.sh`: symlink-based development install
 - `check.sh`: canonical local test/import sanity entry point for the current lightweight developer workflow
