@@ -232,8 +232,7 @@ export const QuotesService = GObject.registerClass({
                 return null;
 
             this._quoteStore.markStale(tickers);
-            if (this._running)
-                logError(error, `${this._uuid}: failed to poll ${provider.id} quotes`);
+            logError(error, `${this._uuid}: failed to poll ${provider.id} quotes`);
             return false;
         }
     }

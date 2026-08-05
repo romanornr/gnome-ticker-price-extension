@@ -59,7 +59,10 @@ export class QuotesCoordinator {
         this._lastEntriesUpdateUsec = 0;
     }
 
-    /* The base refresh timer drives the normal polling cadence independently from UI rebuild throttling. */
+    /*
+     * The base refresh timer drives the normal polling cadence independently from UI rebuild throttling.
+     * This is also what activates the coordinator: refresh requests and network recovery no-op until it runs.
+     */
     scheduleRefreshTimer(refreshIntervalSeconds) {
         this._active = true;
         this._refreshIntervalSeconds = refreshIntervalSeconds;
