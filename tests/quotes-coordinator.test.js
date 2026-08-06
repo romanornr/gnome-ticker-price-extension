@@ -9,6 +9,7 @@ export async function runTests() {
     await testDirectRestRetryBackoffAndReset();
     await testRefreshSingleFlightMergesForcedScope();
     await testNetworkRecoveryRequestsForcedRefresh();
+    await testRoutineNetworkChangeDoesNotTriggerRecovery();
     testStopClearsTimersAndNetworkSubscription();
     await testStopDuringRefreshPreventsQueuedWorkAndLateRetry();
 }
@@ -155,6 +156,38 @@ async function testNetworkRecoveryRequestsForcedRefresh() {
     coordinator.stop();
 }
 
+/* Route and VPN changes emit network-changed while already available; only an outage edge is recovery. */
+async function testRoutineNetworkChangeDoesNotTriggerRecovery() {
+    const networkMonitor = new FakeNetworkMonitor(true);
+    const refreshScopes = [];
+    let reconnectCalls = 0;
+    const coordinator = new QuotesCoordinator({
+        onRefresh: async forced => {
+            refreshScopes.push(forced);
+            return null;
+        },
+        onReconnectLiveProviders: () => {
+            reconnectCalls += 1;
+        },
+        networkMonitor,
+    });
+    coordinator.scheduleRefreshTimer(60);
+    coordinator._scheduleRestRetry();
+    const retryAttempt = coordinator._restRetryAttempt;
+
+    networkMonitor.emit(true);
+    networkMonitor.emit(true);
+    await waitFor(5);
+
+    assertEqual(reconnectCalls, 0,
+        'Reconfiguration while already available should not tear down healthy sockets');
+    assertEqual(refreshScopes.length, 0,
+        'Reconfiguration while already available should not force a refresh');
+    assertEqual(coordinator._restRetryAttempt, retryAttempt,
+        'Reconfiguration while already available should preserve the retry rung');
+    coordinator.stop();
+}
+
 function testStopClearsTimersAndNetworkSubscription() {
     const networkMonitor = new FakeNetworkMonitor();
     const coordinator = new QuotesCoordinator({
@@ -217,10 +250,15 @@ async function testStopDuringRefreshPreventsQueuedWorkAndLateRetry() {
 }
 
 class FakeNetworkMonitor {
-    constructor() {
+    constructor(available = true) {
         this.handler = null;
+        this.available = available;
         this.connectCalls = 0;
         this.disconnectCalls = 0;
+    }
+
+    get_network_available() {
+        return this.available;
     }
 
     connect(_signal, handler) {

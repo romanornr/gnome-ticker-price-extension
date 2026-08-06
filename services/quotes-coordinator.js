@@ -27,6 +27,7 @@ export class QuotesCoordinator {
         this._onResetPriceFlash = onResetPriceFlash;
         this._networkMonitor = networkMonitor;
         this._networkMonitorSignalId = 0;
+        this._networkAvailable = false;
         this._active = false;
         this._refreshTimeoutId = 0;
         this._refreshInProgress = false;
@@ -67,6 +68,7 @@ export class QuotesCoordinator {
         this._active = true;
         this._refreshIntervalSeconds = refreshIntervalSeconds;
         if (this._networkMonitorSignalId === 0) {
+            this._networkAvailable = this._networkMonitor.get_network_available();
             this._networkMonitorSignalId = this._networkMonitor.connect(
                 'network-changed',
                 (_monitor, available) => this._handleNetworkChanged(available)
@@ -178,22 +180,22 @@ export class QuotesCoordinator {
 
         try {
             const directRestOutcome = await this._onRefresh?.(forced);
-            if (!this._active)
-                return;
-
-            if (directRestOutcome === true)
+            if (this._active && directRestOutcome === true)
                 this._resetRestRetry();
-            else if (directRestOutcome === false)
+            else if (this._active && directRestOutcome === false)
                 this._scheduleRestRetry();
+        } catch (error) {
+            logError(error, 'Ticker Tape: refresh pass failed');
         } finally {
             this._refreshInProgress = false;
-            if (!this._active || this._refreshQueued === null)
-                return;
-
-            const queuedForced = this._refreshQueued;
-            this._refreshQueued = null;
-            this.requestRefresh(queuedForced);
         }
+
+        if (!this._active || this._refreshQueued === null)
+            return;
+
+        const queuedForced = this._refreshQueued;
+        this._refreshQueued = null;
+        this.requestRefresh(queuedForced);
     }
 
     /* Only a rejected direct REST poll advances the bounded fast-retry ladder. */
@@ -222,9 +224,15 @@ export class QuotesCoordinator {
         this._restRetryAttempt = 0;
     }
 
-    /* Link restoration permits one immediate recovery attempt without declaring the providers healthy. */
+    /*
+     * Link restoration permits one immediate recovery attempt without declaring the providers healthy.
+     * network-changed also fires for routine reconfiguration, so only a false-to-true edge is recovery;
+     * reacting to every available event would tear down healthy sockets whenever a route or VPN changed.
+     */
     _handleNetworkChanged(available) {
-        if (!this._active || !available)
+        const restored = available && !this._networkAvailable;
+        this._networkAvailable = available;
+        if (!this._active || !restored)
             return;
 
         this._resetRestRetry();

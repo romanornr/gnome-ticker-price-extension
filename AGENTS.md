@@ -77,7 +77,7 @@ If a key repo file is created, renamed, or deleted, update this `AGENTS.md` file
 - Prefer the batched quote endpoint for current prices.
 - Maintain one persistent Kraken public WebSocket connection for all saved crypto pairs rather than opening one socket per ticker.
 - Maintain one persistent Hyperliquid public WebSocket connection for all saved Hyperliquid crypto markets rather than opening one socket per ticker.
-- Keep REST fallback behavior on the normal polling cadence if the crypto socket disconnects; do not increase REST frequency because the socket is down.
+- Keep REST fallback behavior on the normal polling cadence if the crypto socket disconnects; do not increase REST frequency because the socket is down. One exception: a rejected direct-REST pass arms a bounded retry ladder that forces every provider, so a disconnected socket's fallback polls a few times faster until the ladder reaches the base interval.
 - Throttle crypto-driven UI updates so the top bar is not repainted on every trade.
 - Reconnect the Kraken socket conservatively and avoid aggressive retry loops.
 - Previous close should be cached per symbol and invalidated based on the provider quote date, not the user's local timezone.
