@@ -43,10 +43,8 @@ export const QuotesService = GObject.registerClass({
         this._entries = createLoadingEntries(this._tickers, this._displaySettings);
         this._quoteStore = new QuoteStore();
         this._coordinator = new QuotesCoordinator({
-            onRefresh: async () => {
-                if (this._running)
-                    await this._refreshQuotes(false);
-            },
+            onRefresh: forced => this._running ? this._refreshQuotes(forced) : null,
+            onReconnectLiveProviders: () => this._providers.forEach(provider => provider.reconnectNow?.()),
             onRebuildEntries: async () => {
                 if (!this._running)
                     return;
@@ -95,8 +93,8 @@ export const QuotesService = GObject.registerClass({
         this._providers.forEach(provider => provider.start?.(this._session));
         this._updateProviderSubscriptions();
 
-        void this._refreshQuotes(true);
         this._coordinator.scheduleRefreshTimer(this._refreshIntervalSeconds);
+        this._coordinator.requestRefresh(true);
     }
 
     /* stop() shuts down the quote pipeline in reverse order so sockets, timers, and cache state cannot leak. */
@@ -129,7 +127,7 @@ export const QuotesService = GObject.registerClass({
      */
     async _refreshQuotes(forceRefreshAll = false) {
         if (!this._running)
-            return;
+            return null;
 
         const now = createMarketScheduleNow();
         const tickersToRefresh = forceRefreshAll
@@ -143,11 +141,20 @@ export const QuotesService = GObject.registerClass({
             }))
             .filter(({tickers}) => tickers.length > 0);
 
-        for (const {provider, tickers} of providerRefreshPlan)
-            await this._pollProvider(provider, tickers);
+        let directRestOutcome = null;
+        for (const {provider, tickers} of providerRefreshPlan) {
+            const outcome = await this._pollProvider(provider, tickers);
+            if (!this._running || outcome === null)
+                return null;
+
+            if (provider === restProvider)
+                directRestOutcome = outcome;
+        }
 
         if (providerRefreshPlan.length > 0)
             this._coordinator.requestEntriesUpdate(true);
+
+        return directRestOutcome;
     }
 
     /*
@@ -166,7 +173,7 @@ export const QuotesService = GObject.registerClass({
                 this.emit('entries-changed');
                 this._coordinator.scheduleRefreshTimer(this._refreshIntervalSeconds);
                 this._updateProviderSubscriptions();
-                void this._refreshQuotes(true);
+                this._coordinator.requestRefresh(true);
             }),
             this._settings.connect(`changed::${SETTINGS_KEYS.REFRESH_INTERVAL_SECONDS}`, () => {
                 this._refreshIntervalSeconds = loadRefreshIntervalSeconds(this._settings);
@@ -212,17 +219,21 @@ export const QuotesService = GObject.registerClass({
                 session: this._session,
             });
             if (!this._running)
-                return;
+                return null;
 
             quotesBySymbol.forEach((quote, symbol) => this._quoteStore.setQuote(symbol, quote));
             const refreshedTickers = tickers.filter(ticker => quotesBySymbol.has(ticker.symbol.toUpperCase()));
             const staleTickers = tickers.filter(ticker => !quotesBySymbol.has(ticker.symbol.toUpperCase()));
             this._quoteStore.markRefreshed(refreshedTickers);
             this._quoteStore.markStale(staleTickers);
+            return true;
         } catch (error) {
+            if (!this._running)
+                return null;
+
             this._quoteStore.markStale(tickers);
-            if (this._running)
-                logError(error, `${this._uuid}: failed to poll ${provider.id} quotes`);
+            logError(error, `${this._uuid}: failed to poll ${provider.id} quotes`);
+            return false;
         }
     }
 
@@ -255,6 +266,9 @@ export const QuotesService = GObject.registerClass({
      * rules directly in the orchestration flow.
      */
     _shouldRefreshTicker(ticker, now) {
+        if (this._quoteStore.isStale(ticker.symbol))
+            return true;
+
         return shouldRefreshTicker(
             ticker,
             now,

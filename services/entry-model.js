@@ -7,7 +7,6 @@ import {
     POSITIVE_COLOR,
     STALE_TEXT_COLOR,
 } from '../utils/format.js';
-import {isLiveCryptoTicker} from '../utils/asset-categories.js';
 
 /*
  * This module translates QuoteStore state into loading, error, and display entries.
@@ -18,7 +17,7 @@ export function buildEntries(tickers, quoteStore, displaySettings, previousEntri
     const baseEntries = tickers.map((ticker, index) => {
         const quote = quoteStore.getQuote(ticker.symbol);
 
-        if (!quote && isLiveCryptoTicker(ticker))
+        if (!quote && !quoteStore.isStale(ticker.symbol))
             return createLoadingEntry(ticker, index, displaySettings);
 
         if (!quote)
@@ -67,4 +66,3 @@ function decorateEntriesWithPriceFlash(entries, previousEntries) {
         };
     });
 }
-

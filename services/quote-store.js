@@ -66,11 +66,11 @@ export class QuoteStore {
         });
     }
 
-    /* Failed refresh attempts mark existing quotes stale so the panel can distinguish old data from live data. */
+    /* Failed or incomplete attempts mark symbols stale, including cold-cache misses. */
     markStale(symbols) {
         [...symbols].forEach(symbol => {
             const normalizedSymbol = normalizeSymbol(symbol?.symbol ?? symbol);
-            if (normalizedSymbol !== '' && this._quotesBySymbol.has(normalizedSymbol))
+            if (normalizedSymbol !== '')
                 this._staleSymbols.add(normalizedSymbol);
         });
     }

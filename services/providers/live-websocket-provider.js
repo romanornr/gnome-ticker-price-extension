@@ -96,6 +96,17 @@ export class LiveWebsocketProvider {
         return !this.isConnected();
     }
 
+    /* Restored network availability restarts the existing reconnect ladder at its first delay. */
+    reconnectNow() {
+        if (!this._running)
+            return;
+
+        this._reconnectTimeoutId = removeTimeout(this._reconnectTimeoutId);
+        this._disconnectWebsocket();
+        this._reconnectAttempt = 0;
+        this._scheduleReconnect();
+    }
+
     _getDesiredSymbols() {
         return [...new Set(this._tickers.map(ticker => ticker.liveSymbol))];
     }

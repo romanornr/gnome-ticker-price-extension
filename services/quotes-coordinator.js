@@ -1,28 +1,40 @@
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import {clearPriceFlash} from './entry-model.js';
 const CRYPTO_UI_UPDATE_INTERVAL_SECONDS = 4;
 const PRICE_FLASH_DURATION_MS = 700;
+const REST_RETRY_INITIAL_SECONDS = 5;
 
 /*
  * QuotesCoordinator owns timing and pacing for the quote pipeline.
  *
- * QuotesService decides what the system should do; this coordinator decides
- * when it should happen:
- * - base refresh timer cadence
- * - throttled entry rebuilds for live crypto updates
- * - delayed reset of the temporary price-flash highlight
- *
- * Keeping these timers here prevents timing concerns from being mixed into the
- * higher-level orchestration and provider logic.
+ * It coalesces refresh and entry-update work, owns retry and display timers,
+ * and translates restored network availability into one recovery attempt.
  */
 export class QuotesCoordinator {
     /* The coordinator is created with callbacks so QuotesService can supply policy without re-owning timers. */
-    constructor({onRefresh, onRebuildEntries, onResetPriceFlash}) {
+    constructor({
+        onRefresh,
+        onReconnectLiveProviders,
+        onRebuildEntries,
+        onResetPriceFlash,
+        networkMonitor = Gio.NetworkMonitor.get_default(),
+    }) {
         this._onRefresh = onRefresh;
+        this._onReconnectLiveProviders = onReconnectLiveProviders;
         this._onRebuildEntries = onRebuildEntries;
         this._onResetPriceFlash = onResetPriceFlash;
+        this._networkMonitor = networkMonitor;
+        this._networkMonitorSignalId = 0;
+        this._networkAvailable = false;
+        this._active = false;
         this._refreshTimeoutId = 0;
+        this._refreshInProgress = false;
+        this._refreshQueued = null;
+        this._refreshIntervalSeconds = 0;
+        this._restRetryTimeoutId = 0;
+        this._restRetryAttempt = 0;
         this._entriesUpdateTimeoutId = 0;
         this._entriesUpdateInProgress = false;
         this._entriesUpdateQueued = false;
@@ -32,25 +44,58 @@ export class QuotesCoordinator {
 
     /* stop() is the single timer cleanup point for the entire timing subsystem. */
     stop() {
+        this._active = false;
         this._refreshTimeoutId = removeTimeout(this._refreshTimeoutId);
+        this._restRetryTimeoutId = removeTimeout(this._restRetryTimeoutId);
         this._entriesUpdateTimeoutId = removeTimeout(this._entriesUpdateTimeoutId);
         this._priceFlashTimeoutId = removeTimeout(this._priceFlashTimeoutId);
+        if (this._networkMonitorSignalId !== 0)
+            this._networkMonitor.disconnect(this._networkMonitorSignalId);
+        this._networkMonitorSignalId = 0;
+        this._refreshInProgress = false;
+        this._refreshQueued = null;
+        this._restRetryAttempt = 0;
         this._entriesUpdateInProgress = false;
         this._entriesUpdateQueued = false;
         this._lastEntriesUpdateUsec = 0;
     }
 
-    /* The base refresh timer drives the normal polling cadence independently from UI rebuild throttling. */
+    /*
+     * The base refresh timer drives the normal polling cadence independently from UI rebuild throttling.
+     * This is also what activates the coordinator: refresh requests and network recovery no-op until it runs.
+     */
     scheduleRefreshTimer(refreshIntervalSeconds) {
+        this._active = true;
+        this._refreshIntervalSeconds = refreshIntervalSeconds;
+        if (this._networkMonitorSignalId === 0) {
+            this._networkAvailable = this._networkMonitor.get_network_available();
+            this._networkMonitorSignalId = this._networkMonitor.connect(
+                'network-changed',
+                (_monitor, available) => this._handleNetworkChanged(available)
+            );
+        }
         this._refreshTimeoutId = removeTimeout(this._refreshTimeoutId);
         this._refreshTimeoutId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             refreshIntervalSeconds,
             () => {
-                void this._onRefresh?.();
+                this.requestRefresh(false);
                 return GLib.SOURCE_CONTINUE;
             }
         );
+    }
+
+    /* Refresh requests share the entry-update single-flight shape; a queued forced pass wins on merge. */
+    requestRefresh(forced = false) {
+        if (!this._active)
+            return;
+
+        if (this._refreshInProgress) {
+            this._refreshQueued = this._refreshQueued === true || forced;
+            return;
+        }
+
+        void this._runRefresh(forced);
     }
 
     /* Live updates may arrive faster than the panel should redraw, so rebuild requests are coalesced here. */
@@ -125,6 +170,74 @@ export class QuotesCoordinator {
             this._entriesUpdateQueued = false;
             this.requestEntriesUpdate(false);
         }
+    }
+
+    async _runRefresh(forced) {
+        if (this._refreshInProgress)
+            return;
+
+        this._refreshInProgress = true;
+
+        try {
+            const directRestOutcome = await this._onRefresh?.(forced);
+            if (this._active && directRestOutcome === true)
+                this._resetRestRetry();
+            else if (this._active && directRestOutcome === false)
+                this._scheduleRestRetry();
+        } catch (error) {
+            logError(error, 'Ticker Tape: refresh pass failed');
+        } finally {
+            this._refreshInProgress = false;
+        }
+
+        if (!this._active || this._refreshQueued === null)
+            return;
+
+        const queuedForced = this._refreshQueued;
+        this._refreshQueued = null;
+        this.requestRefresh(queuedForced);
+    }
+
+    /* Only a rejected direct REST poll advances the bounded fast-retry ladder. */
+    _scheduleRestRetry() {
+        if (!this._active || this._restRetryTimeoutId !== 0)
+            return;
+
+        const delaySeconds = REST_RETRY_INITIAL_SECONDS * 2 ** this._restRetryAttempt;
+        if (delaySeconds >= this._refreshIntervalSeconds)
+            return;
+
+        this._restRetryAttempt += 1;
+        this._restRetryTimeoutId = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            delaySeconds,
+            () => {
+                this._restRetryTimeoutId = 0;
+                this.requestRefresh(true);
+                return GLib.SOURCE_REMOVE;
+            }
+        );
+    }
+
+    _resetRestRetry() {
+        this._restRetryTimeoutId = removeTimeout(this._restRetryTimeoutId);
+        this._restRetryAttempt = 0;
+    }
+
+    /*
+     * Link restoration permits one immediate recovery attempt without declaring the providers healthy.
+     * network-changed also fires for routine reconfiguration, so only a false-to-true edge is recovery;
+     * reacting to every available event would tear down healthy sockets whenever a route or VPN changed.
+     */
+    _handleNetworkChanged(available) {
+        const restored = available && !this._networkAvailable;
+        this._networkAvailable = available;
+        if (!this._active || !restored)
+            return;
+
+        this._resetRestRetry();
+        this._onReconnectLiveProviders?.();
+        this.requestRefresh(true);
     }
 }
 

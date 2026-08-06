@@ -27,8 +27,13 @@ export function runTests() {
     };
 
     let entries = buildEntries([restTicker, liveCryptoTicker], quoteStore, displaySettings);
-    assertEqual(entries[0].priceText, '--', 'Missing non-live quotes should render error entries');
+    assertEqual(entries[0].priceText, '...', 'Unattempted REST quotes should render loading entries');
     assertEqual(entries[1].priceText, '...', 'Missing live crypto quotes should render loading entries');
+
+    quoteStore.markStale([restTicker, liveCryptoTicker]);
+    entries = buildEntries([restTicker, liveCryptoTicker], quoteStore, displaySettings);
+    assertEqual(entries[0].priceText, '--', 'Completed REST failures should render error entries');
+    assertEqual(entries[1].priceText, '--', 'Completed live-provider failures should render error entries');
 
     quoteStore.setQuote('^spx', {price: 5100, quoteDate: '20260323', previousClose: 5000});
     entries = buildEntries([restTicker], quoteStore, displaySettings);

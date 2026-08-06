@@ -1,3 +1,4 @@
+import GLib from 'gi://GLib';
 import Soup from 'gi://Soup?version=3.0';
 
 import {LiveWebsocketProvider} from '../services/providers/live-websocket-provider.js';
@@ -14,6 +15,7 @@ export function runTests() {
     testSocketMessagesRefreshLivenessTimestamps();
     testLiveTrafficTimeoutDetection();
     testSilentConnectionDropsMarksStaleAndReconnects();
+    testReconnectNowRestartsTheExistingReconnectLadder();
 }
 
 function testHandleSocketMessageEmitsQuotesAndResetsReconnect() {
@@ -165,6 +167,28 @@ function testSilentConnectionDropsMarksStaleAndReconnects() {
         'LiveWebsocketProvider should mark current tickers stale when a silent socket is dropped');
     assertEqual(provider.scheduleReconnectCalls, 1,
         'LiveWebsocketProvider should schedule reconnect after dropping a silent socket');
+}
+
+function testReconnectNowRestartsTheExistingReconnectLadder() {
+    const provider = new TestLiveWebsocketProvider();
+    provider._running = true;
+    provider._reconnectAttempt = 4;
+    provider._reconnectTimeoutId = GLib.timeout_add_seconds(
+        GLib.PRIORITY_DEFAULT,
+        60,
+        () => GLib.SOURCE_REMOVE
+    );
+
+    provider.reconnectNow();
+
+    assertEqual(provider._reconnectTimeoutId, 0,
+        'Immediate recovery should remove the previous reconnect source');
+    assertEqual(provider._reconnectAttempt, 0,
+        'Immediate recovery should restart the reconnect ladder at its first rung');
+    assertEqual(provider.disconnectCalls, 1,
+        'Immediate recovery should drop the current socket through the shared teardown path');
+    assertEqual(provider.scheduleReconnectCalls, 1,
+        'Immediate recovery should use the existing delayed reconnect path');
 }
 
 class TestLiveWebsocketProvider extends LiveWebsocketProvider {
