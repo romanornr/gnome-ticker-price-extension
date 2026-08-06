@@ -69,7 +69,15 @@ export function parseRestQuoteResponse(payload) {
         if (cnbcSymbol === '' || !Number.isFinite(price) || quoteDate === '')
             return;
 
-        const previousClose = parseQuoteNumber(entry?.previous_day_closing);
+        /*
+         * CNBC rolls previous_day_closing to the just-finished U.S. close before the next session prints.
+         * It then equals last, so every U.S. ticker would read 0.00% until the open.
+         * change stays anchored to the real prior close; last - change matches previous_day_closing while a market trades.
+         */
+        const change = parseQuoteNumber(entry?.change);
+        const previousClose = Number.isFinite(change)
+            ? price - change
+            : parseQuoteNumber(entry?.previous_day_closing);
         quotesByCnbcSymbol.set(cnbcSymbol, {
             price,
             quoteDate,

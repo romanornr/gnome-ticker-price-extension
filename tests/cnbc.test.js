@@ -84,14 +84,14 @@ export async function runTests() {
         'Missing CNBC prices should parse to null');
 
     const parsedQuotes = parseRestQuoteResponse(buildQuotePayload([
-        {symbol: 'AAPL', last: '308.91', last_time: '2026-07-31', previous_day_closing: '333.43'},
-        {symbol: '@GC.1', last: '4,118.90', last_time: '2026-08-02T20:47:06.492-0400'},
+        {symbol: 'AAPL', last: '308.91', change: '-24.52', last_time: '2026-07-31', previous_day_closing: '308.91'},
+        {symbol: '@GC.1', last: '4,118.90', change: '18.90', last_time: '2026-08-02T20:47:06.492-0400', previous_day_closing: '4,100.00'},
         {symbol: 'BAD-NL', code: 1},
         {symbol: 'NOPRICE', last: '', last_time: '2026-07-31'},
     ]));
     assertDeepEqual(Array.from(parsedQuotes.entries()), [
         ['AAPL', {price: 308.91, quoteDate: '20260731', previousClose: 333.43}],
-        ['@GC.1', {price: 4118.9, quoteDate: '20260802', previousClose: null}],
+        ['@GC.1', {price: 4118.9, quoteDate: '20260802', previousClose: 4100}],
     ], 'CNBC batch parsing should normalize prices and dates while skipping unusable entries');
 
     assertDeepEqual(Array.from(parseRestQuoteResponse({}).entries()), [],
@@ -145,7 +145,7 @@ export async function runTests() {
         'DXY should not derive a quote from a non-finite basket leg');
 
     const refreshSession = new FakeSession(buildQuotePayload([
-        {symbol: 'AAPL', last: '308.91', last_time: '2026-07-31', previous_day_closing: '333.43'},
+        {symbol: 'AAPL', last: '308.91', change: 'N/A', last_time: '2026-07-31', previous_day_closing: '333.43'},
         {symbol: 'EUR=', last: '1.25', last_time: '2026-07-31', previous_day_closing: '1.20'},
         {symbol: 'MISSING-NL', code: 1},
     ]));
