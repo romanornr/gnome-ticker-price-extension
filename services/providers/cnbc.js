@@ -131,16 +131,21 @@ export function deriveFxQuote({baseCurrency, quoteCurrency}, quotesByCnbcSymbol)
 export function deriveDxyQuote(quotesByCnbcSymbol) {
     const legs = DXY_FORMULA.legs.map(([symbol, exponent]) => [quotesByCnbcSymbol.get(symbol), exponent]);
     const deriveValue = field => {
-        if (legs.some(([quote]) => !Number.isFinite(quote?.[field]))) return null;
+        if (legs.some(([quote]) => !Number.isFinite(quote?.[field])))
+            return null;
+
         const value = legs.reduce(
             (result, [quote, exponent]) => result * Math.pow(quote[field], exponent), DXY_FORMULA.constant);
         return Number.isFinite(value) ? value : null;
     };
     const price = deriveValue('price');
-    if (price === null) return null;
+    if (price === null)
+        return null;
 
     const quoteDate = legs.map(([quote]) => quote.quoteDate).filter(Boolean).sort().at(-1) ?? '';
-    if (quoteDate === '') return null;
+    if (quoteDate === '')
+        return null;
+
     return {price, quoteDate, previousClose: deriveValue('previousClose')};
 }
 
