@@ -10,10 +10,23 @@ const CNBC_BATCH_SIZE = 30;
 /* CNBC rejects well-known tool user agents (curl, wget), so identify honestly as this extension. */
 const CNBC_USER_AGENT = 'ticker-tape-gnome-extension/1.0';
 const CNBC_QUOTE_ENDPOINT = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
+const DXY_SAVED_SYMBOL = 'dx.f';
+/* Standard ICE U.S. Dollar Index formula against CNBC's matching six spot symbols. */
+const DXY_FORMULA = {
+    constant: 50.14348112,
+    legs: [
+        ['EUR=', -0.576],
+        ['JPY=', 0.136],
+        ['GBP=', -0.119],
+        ['CAD=', 0.091],
+        ['SEK=', 0.042],
+        ['CHF=', 0.036],
+    ],
+};
 
 /*
  * CNBC maps catalog tickers into batched wire symbols and normalized quotes.
- * FX pairs derive from per-currency USD spot legs fetched in those same batches.
+ * FX pairs and DXY derive from per-currency USD spot legs in those same batches.
  */
 export async function refresh(tickers, {session, quiet = false}) {
     if (!session || tickers.length === 0)
@@ -83,6 +96,11 @@ export function normalizeQuoteDate(dateText) {
     return /^\d{8}$/.test(normalized) ? normalized : '';
 }
 
+/* DXY keeps its saved catalog symbol while provider routing recognizes it as a derived basket. */
+export function isDerivedDxySymbol(symbol) {
+    return `${symbol ?? ''}`.trim().toLowerCase() === DXY_SAVED_SYMBOL;
+}
+
 /* An FX pair quote is the ratio of both legs' USD-per-unit rates, dated by the freshest leg. */
 export function deriveFxQuote({baseCurrency, quoteCurrency}, quotesByCnbcSymbol) {
     const baseLeg = resolveFxLeg(baseCurrency, quotesByCnbcSymbol);
@@ -109,6 +127,23 @@ export function deriveFxQuote({baseCurrency, quoteCurrency}, quotesByCnbcSymbol)
     return {price, quoteDate, previousClose};
 }
 
+/* DXY derives from the same parsed spot vector as FX pairs and is valid only with a complete basket. */
+export function deriveDxyQuote(quotesByCnbcSymbol) {
+    const legs = DXY_FORMULA.legs.map(([symbol, exponent]) => [quotesByCnbcSymbol.get(symbol), exponent]);
+    const deriveValue = field => {
+        if (legs.some(([quote]) => !Number.isFinite(quote?.[field]))) return null;
+        const value = legs.reduce(
+            (result, [quote, exponent]) => result * Math.pow(quote[field], exponent), DXY_FORMULA.constant);
+        return Number.isFinite(value) ? value : null;
+    };
+    const price = deriveValue('price');
+    if (price === null) return null;
+
+    const quoteDate = legs.map(([quote]) => quote.quoteDate).filter(Boolean).sort().at(-1) ?? '';
+    if (quoteDate === '') return null;
+    return {price, quoteDate, previousClose: deriveValue('previousClose')};
+}
+
 /* USD is the vector anchor with no request of its own; every other leg must resolve from the fetched spot quotes. */
 function resolveFxLeg(currencyCode, quotesByCnbcSymbol) {
     if (currencyCode === 'USD')
@@ -129,10 +164,11 @@ function resolveFxLeg(currencyCode, quotesByCnbcSymbol) {
     };
 }
 
-/* Tickers split into direct CNBC symbols and FX pairs whose spot legs join the same request batch. */
+/* Tickers split into direct symbols, FX pairs, and DXY; every derived spot leg joins the same batch. */
 function buildRequestPlan(tickers) {
     const directRequests = [];
     const fxRequests = [];
+    const dxyRequests = [];
     const unmappedSymbols = [];
     const requestSymbols = new Set();
 
@@ -140,6 +176,12 @@ function buildRequestPlan(tickers) {
         const symbol = `${ticker?.symbol ?? ''}`.trim();
         const storeKey = symbol.toUpperCase();
         const fxPair = parseFxPairSymbol(symbol);
+
+        if (isDerivedDxySymbol(symbol)) {
+            dxyRequests.push({storeKey});
+            DXY_FORMULA.legs.forEach(([cnbcSymbol]) => requestSymbols.add(cnbcSymbol));
+            return;
+        }
 
         if (fxPair) {
             fxRequests.push({storeKey, fxPair});
@@ -157,7 +199,7 @@ function buildRequestPlan(tickers) {
         requestSymbols.add(cnbcSymbol);
     });
 
-    return {directRequests, fxRequests, unmappedSymbols, requestSymbols: [...requestSymbols]};
+    return {directRequests, fxRequests, dxyRequests, unmappedSymbols, requestSymbols: [...requestSymbols]};
 }
 
 function fxLegSymbols({baseCurrency, quoteCurrency}) {
@@ -166,7 +208,7 @@ function fxLegSymbols({baseCurrency, quoteCurrency}) {
         .filter(legSymbol => legSymbol !== null);
 }
 
-function assembleQuotes({directRequests, fxRequests}, quotesByCnbcSymbol) {
+function assembleQuotes({directRequests, fxRequests, dxyRequests}, quotesByCnbcSymbol) {
     const quotesBySymbol = new Map();
 
     directRequests.forEach(({storeKey, cnbcSymbol}) => {
@@ -177,6 +219,12 @@ function assembleQuotes({directRequests, fxRequests}, quotesByCnbcSymbol) {
 
     fxRequests.forEach(({storeKey, fxPair}) => {
         const quote = deriveFxQuote(fxPair, quotesByCnbcSymbol);
+        if (quote)
+            quotesBySymbol.set(storeKey, quote);
+    });
+
+    dxyRequests.forEach(({storeKey}) => {
+        const quote = deriveDxyQuote(quotesByCnbcSymbol);
         if (quote)
             quotesBySymbol.set(storeKey, quote);
     });

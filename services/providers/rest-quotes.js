@@ -1,6 +1,6 @@
 import {isLiveCryptoTicker} from '../../utils/asset-categories.js';
 
-import {refresh as refreshCnbcQuotes} from './cnbc.js';
+import {isDerivedDxySymbol, refresh as refreshCnbcQuotes} from './cnbc.js';
 import {refresh as refreshNasdaqQuotes} from './nasdaq.js';
 import {refresh as refreshFallbackFxQuotes} from './open-er-api.js';
 import {mapSymbolToCnbc, parseFxPairSymbol} from './cnbc-symbols.js';
@@ -52,7 +52,7 @@ export const restProvider = {
  */
 export async function verifySymbol(session, symbol, assetCategory = null) {
     const normalizedSymbol = `${symbol ?? ''}`.trim().toLowerCase();
-    if (!parseFxPairSymbol(normalizedSymbol) && !mapSymbolToCnbc(normalizedSymbol))
+    if (!isDerivedDxySymbol(normalizedSymbol) && !parseFxPairSymbol(normalizedSymbol) && !mapSymbolToCnbc(normalizedSymbol))
         throw new Error(`Could not verify ${symbol}. The symbol format is not supported.`);
 
     const quotesBySymbol = await refresh([{symbol: normalizedSymbol, assetCategory}], {session, quiet: true});
