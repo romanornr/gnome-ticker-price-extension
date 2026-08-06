@@ -33,7 +33,6 @@ const CNBC_SYMBOL_OVERRIDES = new Map(Object.entries({
     'zn.f': '@LZN.1',
     'zs.f': '@S.1',
     'zw.f': '@W.1',
-    'dx.f': '.DXY',
     'xagusd': 'XAG=',
     'xauusd': 'XAU=',
     '^spx': '.SPX',

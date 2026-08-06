@@ -7,6 +7,7 @@ import {
 } from '../services/providers/cnbc-symbols.js';
 import {
     buildQuoteUrl,
+    deriveDxyQuote,
     deriveFxQuote,
     normalizeQuoteDate,
     parseQuoteNumber,
@@ -33,7 +34,7 @@ export async function runTests() {
         ['300750.cn', '300750.SZ', 'ChiNext symbols should map to the .SZ suffix'],
         ['gc.f', '@GC.1', 'Futures symbols should map through the override table'],
         ['zn.f', '@LZN.1', 'Zinc futures should map to LME zinc rather than treasury futures'],
-        ['dx.f', '.DXY', 'The dollar index should map to CNBC index notation'],
+        ['dx.f', null, 'The dollar index should not map to a direct CNBC symbol'],
         ['xagusd', 'XAG=', 'Spot silver should map to the CNBC spot metal symbol'],
         ['^spx', '.SPX', 'Index symbols should map through the override table'],
         ['unknown.xx', null, 'Unknown market suffixes should not map'],
@@ -117,6 +118,32 @@ export async function runTests() {
     assertEqual(deriveFxQuote({baseCurrency: 'EUR', quoteCurrency: 'CHF'}, fxVector), null,
         'FX pairs with a missing leg should not derive a quote');
 
+    const dxyVector = new Map([
+        ['EUR=', {price: 1.1553, quoteDate: '20260804', previousClose: 1.1555}],
+        ['JPY=', {price: 157.62, quoteDate: '20260805', previousClose: 157.55}],
+        ['GBP=', {price: 1.3464, quoteDate: '20260804', previousClose: 1.346}],
+        ['CAD=', {price: 1.4011, quoteDate: '20260804', previousClose: 1.4015}],
+        ['SEK=', {price: 9.4832, quoteDate: '20260804', previousClose: 9.49}],
+        ['CHF=', {price: 0.8067, quoteDate: '20260804', previousClose: 0.807}],
+    ]);
+    const dxyQuote = deriveDxyQuote(dxyVector);
+    assertEqual(Math.abs(dxyQuote.price - 99.676) / 99.676 <= 0.0001, true,
+        'DXY should derive within 0.01% of the recorded CNBC level');
+    assertEqual(dxyQuote.previousClose.toFixed(6), '99.674515',
+        'DXY previous close should derive from every spot leg previous close');
+    assertEqual(dxyQuote.quoteDate, '20260805',
+        'DXY should use the freshest contributing spot-leg date');
+
+    const incompleteDxyVector = new Map(dxyVector);
+    incompleteDxyVector.delete('SEK=');
+    assertEqual(deriveDxyQuote(incompleteDxyVector), null,
+        'DXY should not derive a partial quote when a basket leg is missing');
+
+    const invalidDxyVector = new Map(dxyVector);
+    invalidDxyVector.set('SEK=', {...invalidDxyVector.get('SEK='), price: Number.NaN});
+    assertEqual(deriveDxyQuote(invalidDxyVector), null,
+        'DXY should not derive a quote from a non-finite basket leg');
+
     const refreshSession = new FakeSession(buildQuotePayload([
         {symbol: 'AAPL', last: '308.91', last_time: '2026-07-31', previous_day_closing: '333.43'},
         {symbol: 'EUR=', last: '1.25', last_time: '2026-07-31', previous_day_closing: '1.20'},
@@ -136,6 +163,25 @@ export async function runTests() {
     assertEqual(refreshSession.requestedUrls[0].includes('AAPL|EUR='), true,
         'CNBC refresh should request direct symbols alongside FX spot legs');
 
+    const dxyRefreshSession = new FakeSession(buildQuotePayload([
+        {symbol: 'EUR=', last: '1.1553', last_time: '2026-08-05', previous_day_closing: '1.1555'},
+        {symbol: 'JPY=', last: '157.62', last_time: '2026-08-05', previous_day_closing: '157.55'},
+        {symbol: 'GBP=', last: '1.3464', last_time: '2026-08-05', previous_day_closing: '1.3460'},
+        {symbol: 'CAD=', last: '1.4011', last_time: '2026-08-05', previous_day_closing: '1.4015'},
+        {symbol: 'SEK=', last: '9.4832', last_time: '2026-08-05', previous_day_closing: '9.4900'},
+        {symbol: 'CHF=', last: '0.8067', last_time: '2026-08-05', previous_day_closing: '0.8070'},
+    ]));
+    const refreshedDxy = await refresh([{symbol: 'dx.f'}], {session: dxyRefreshSession});
+    assertEqual(refreshedDxy.has('DX.F'), true,
+        'CNBC refresh should assemble DXY under its normalized saved symbol');
+    assertEqual(dxyRefreshSession.requestedUrls.length, 1,
+        'DXY refresh should fetch its six spot legs in one batch');
+    assertEqual(['EUR=', 'JPY=', 'GBP=', 'CAD=', 'SEK=', 'CHF=']
+        .every(legSymbol => dxyRefreshSession.requestedUrls[0].includes(legSymbol)), true,
+        'DXY refresh should put all six spot legs into the request batch');
+    assertEqual(dxyRefreshSession.requestedUrls.some(url => url.includes('.DXY')), false,
+        'DXY refresh should not request the direct CNBC index symbol');
+
     assertDeepEqual(Array.from((await refresh([], {session: refreshSession})).entries()), [],
         'CNBC refresh should return no quotes when no tickers are requested');
 
@@ -153,6 +199,10 @@ export async function runTests() {
     assertDeepEqual(await verifySymbol(verifyFxSession, 'eurjpy'),
         {symbol: 'eurjpy', quoteDate: '2026-07-31'},
         'CNBC verification should derive FX pairs from their spot legs');
+
+    assertDeepEqual(await verifySymbol(dxyRefreshSession, 'dx.f'),
+        {symbol: 'dx.f', quoteDate: '2026-08-05'},
+        'CNBC verification should derive the saved DXY symbol from its basket');
 
     await assertVerifyRejects(new FakeSession(buildQuotePayload([{symbol: 'NOPE-NL', code: 1}])), 'nope.nl',
         'Could not verify nope.nl. No quote data was returned by CNBC.',
